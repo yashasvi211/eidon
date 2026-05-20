@@ -1,0 +1,97 @@
+{
+  "tasks": [
+    {
+      "id": "t1",
+      "title": "Bill Of Material Core Redesign",
+      "project": "Bill of Material",
+      "due": "2026-04-25",
+      "est": "12h",
+      "notes": "Comprehensive redesign of the BOM module. Requires database schema updates and UI refactoring.",
+      "done": false,
+      "target": "today",
+      "subtasks": [
+        { "id": "s1", "title": "Implement new type system in PostgreSQL", "done": true },
+        { "id": "s2", "title": "Refactor Site ID validation logic", "done": true },
+        { "id": "s3", "title": "Optimize scaling algorithms for large datasets", "done": true },
+        { "id": "s4", "title": "Connect frontend React components to new API", "done": true },
+        { "id": "s5", "title": "Research and document adjustment logic", "done": true },
+        { "id": "s6", "title": "Fix layout issues in Item Spec Tab", "done": true },
+        { "id": "s7", "title": "Conduct peer review for the entire module", "done": false },
+        { "id": "s8", "title": "Write end-to-end integration tests", "done": false }
+      ],
+      "sessions": [
+        { "id": "sess1", "start": 1779264000000, "end": 1779267600000 },
+        { "id": "sess2", "start": 1779271200000, "end": 1779274800000 }
+      ]
+    },
+    {
+      "id": "t2",
+      "title": "HubSpot OAuth Integration",
+      "project": "HubSpot Integration",
+      "due": "2026-05-23",
+      "est": "8h",
+      "notes": "Implement secure OAuth2 flow for HubSpot API access.",
+      "done": false,
+      "target": "today",
+      "subtasks": [
+        { "id": "s9", "title": "Create developer portal app", "done": true },
+        { "id": "s10", "title": "Configure redirect URIs and scopes", "done": true },
+        { "id": "s11", "title": "Implement token exchange logic", "done": false },
+        { "id": "s12", "title": "Setup secure refresh token rotation", "done": false }
+      ],
+      "sessions": []
+    },
+    {
+      "id": "t3",
+      "title": "Nightly Audit Log Backup System",
+      "project": "GitHub Logs Backup",
+      "due": "2026-05-21",
+      "est": "4h",
+      "notes": "Automated system to back up GitHub audit logs to AWS S3.",
+      "done": false,
+      "target": "today",
+      "subtasks": [
+        { "id": "s13", "title": "Write log extraction script", "done": true },
+        { "id": "s14", "title": "Setup S3 bucket and IAM policies", "done": true },
+        { "id": "s15", "title": "Configure cron job on production server", "done": false }
+      ],
+      "sessions": []
+    },
+    {
+      "id": "s1",
+      "title": "Sprint Retrospective Meeting",
+      "project": "Inbox",
+      "due": "2026-05-20",
+      "est": "1.5h",
+      "notes": "Bi-weekly team meeting to discuss what went well and what didn't.",
+      "done": false,
+      "target": "scheduled",
+      "subtasks": [],
+      "sessions": []
+    },
+    {
+      "id": "s2",
+      "title": "Quarterly Security Audit",
+      "project": "Inbox",
+      "due": "2026-05-25",
+      "est": "6h",
+      "notes": "Full audit of infrastructure security and dependency vulnerabilities.",
+      "done": false,
+      "target": "scheduled",
+      "subtasks": [],
+      "sessions": []
+    },
+    {
+      "id": "b1",
+      "title": "Explore Modern UI Design Tokens",
+      "project": "Inbox",
+      "due": "",
+      "est": "5h",
+      "notes": "Investigate migration to a more robust design token system for themes.",
+      "done": false,
+      "target": "backlog",
+      "subtasks": [],
+      "sessions": []
+    }
+  ]
+}
