@@ -28,7 +28,7 @@ function QuickAdd({ onAdd }) {
   );
 }
 
-export default function TaskPanel({ tasks, timeLogs, currentFilter, setCurrentFilter, selectedTaskId, setSelectedTaskId, toggleDone, handleQuickAdd, currentView }) {
+export default function TaskPanel({ tasks, timeLogs, currentFilter, setCurrentFilter, selectedTaskId, setSelectedTaskId, toggleDone, handleQuickAdd, currentView, currentProject }) {
   return (
     <div className="task-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', borderRight: '1px solid var(--gh-border)' }}>
       <div className="task-panel-header" style={{ padding: '12px 16px', borderBottom: '1px solid var(--gh-border)', display: 'flex', gap: '10px' }}>
@@ -40,6 +40,7 @@ export default function TaskPanel({ tasks, timeLogs, currentFilter, setCurrentFi
       <div className="task-list" style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
         {tasks.filter(t => t.target === (currentView === 'backlog' ? 'backlog' : 'today'))
           .filter(t => currentFilter === 'all' ? true : currentFilter === 'active' ? !t.done : t.done)
+          .filter(t => !currentProject || t.project === currentProject)
           .map(task => (
             <TaskItem
               key={task.id}

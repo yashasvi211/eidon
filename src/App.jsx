@@ -30,6 +30,7 @@ function App() {
   const [currentView, setCurrentView] = useState("today");
   const [selectedTaskId, setSelectedTaskId] = useState(null);
   const [currentFilter, setCurrentFilter] = useState("all");
+  const [currentProject, setCurrentProject] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Timer State
@@ -44,14 +45,14 @@ function App() {
         const response = await fetch("/tasks.json");
         const data = await response.json();
 
-        // Simulate 5 second delay
+        // Simulate 2 second delay
         setTimeout(() => {
           setTasks(data.tasks);
           if (data.tasks.length > 0) {
             setSelectedTaskId(data.tasks[0].id);
           }
           setLoading(false);
-        }, 5000);
+        }, 2000);
       } catch (error) {
         console.error("Failed to fetch tasks:", error);
         setLoading(false);
@@ -183,6 +184,7 @@ function App() {
           toggleDone={toggleDone}
           handleQuickAdd={handleQuickAdd}
           currentView={currentView}
+          currentProject={currentProject}
         />
 
         <DetailPanel
@@ -207,6 +209,8 @@ function App() {
         currentView={currentView}
         setCurrentView={setCurrentView}
         tasks={tasks}
+        currentProject={currentProject}
+        setCurrentProject={setCurrentProject}
       />
 
       <div
@@ -222,6 +226,8 @@ function App() {
           currentView={currentView}
           tasks={tasks}
           onOpenModal={() => setIsModalOpen(true)}
+          currentProject={currentProject}
+          setCurrentProject={setCurrentProject}
         />
 
         <div
@@ -241,7 +247,7 @@ function App() {
   );
 }
 
-function Topbar({ currentView, tasks, onOpenModal }) {
+function Topbar({ currentView, tasks, onOpenModal, currentProject, setCurrentProject }) {
   const titles = {
     today: "Today's Tasks",
     scheduled: "Scheduled Calendar",
@@ -266,9 +272,26 @@ function Topbar({ currentView, tasks, onOpenModal }) {
     >
       <div
         className="topbar-title"
-        style={{ fontWeight: "600", fontSize: "15px" }}
+        style={{ fontWeight: "600", fontSize: "15px", display: "flex", alignItems: "center", gap: "8px" }}
       >
         {titles[currentView] || currentView}
+        {currentProject && (
+          <span
+            onClick={() => setCurrentProject(null)}
+            style={{
+              fontFamily: "var(--mono)",
+              fontSize: "11px",
+              color: "var(--gh-blue)",
+              background: "rgba(31,111,235,0.1)",
+              padding: "2px 8px",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontWeight: 500,
+            }}
+          >
+            {currentProject} ✕
+          </span>
+        )}
       </div>
       <span className="topbar-sep" style={{ color: "var(--gh-border2)" }}>
         —

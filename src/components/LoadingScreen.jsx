@@ -1,6 +1,23 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+
+const messages = [
+  'Loading workspace...',
+  'Initializing modules...',
+  'Fetching tasks...',
+  'Indexing projects...',
+  'Almost ready...',
+];
 
 export default function LoadingScreen() {
+  const [index, setIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setIndex((prev) => (prev + 1) % messages.length);
+    }, 2000);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <div
       style={{
@@ -41,10 +58,24 @@ export default function LoadingScreen() {
         EIDON
       </div>
 
+      {/* Status message */}
+      <div className="obs-status" key={index}
+        style={{
+          fontFamily: 'var(--mono)',
+          fontSize: '12px',
+          color: 'var(--gh-muted)',
+          letterSpacing: '0.08em',
+          marginBottom: '20px',
+          height: '18px',
+        }}
+      >
+        {messages[index]}
+      </div>
+
       {/* Progress bar */}
       <div
         style={{
-          width: '100px',
+          width: '120px',
           height: '2px',
           background: 'var(--gh-border)',
           borderRadius: '1px',
@@ -55,23 +86,6 @@ export default function LoadingScreen() {
         <div className="obs-bar" />
       </div>
 
-      {/* Loading text with dots */}
-      <div
-        style={{
-          fontFamily: 'var(--mono)',
-          fontSize: '11px',
-          color: 'var(--gh-muted)',
-          letterSpacing: '0.15em',
-          display: 'flex',
-          gap: '2px',
-        }}
-      >
-        <span>LOADING</span>
-        <span className="obs-dot" style={{ animationDelay: '0s' }}>.</span>
-        <span className="obs-dot" style={{ animationDelay: '0.2s' }}>.</span>
-        <span className="obs-dot" style={{ animationDelay: '0.4s' }}>.</span>
-      </div>
-
       <style>{`
         .obs-logo svg {
           animation: obsPulse 2s ease-in-out infinite;
@@ -80,11 +94,11 @@ export default function LoadingScreen() {
           height: 100%;
           width: 100%;
           background: var(--gh-blue);
-          animation: obsProgress 1.5s ease-in-out infinite;
+          animation: obsProgress 2s ease-in-out forwards;
           transform-origin: left;
         }
-        .obs-dot {
-          animation: obsDot 1.5s ease-in-out infinite;
+        .obs-status {
+          animation: obsFade 2s ease-in-out;
         }
         @keyframes obsPulse {
           0%, 100% { opacity: 0.5; transform: scale(1); }
@@ -92,12 +106,13 @@ export default function LoadingScreen() {
         }
         @keyframes obsProgress {
           0% { transform: scaleX(0); }
-          50% { transform: scaleX(0.6); }
-          100% { transform: scaleX(0); }
+          100% { transform: scaleX(1); }
         }
-        @keyframes obsDot {
-          0%, 100% { opacity: 0.2; }
-          50% { opacity: 1; }
+        @keyframes obsFade {
+          0% { opacity: 0; transform: translateY(4px); }
+          20% { opacity: 1; transform: translateY(0); }
+          80% { opacity: 1; transform: translateY(0); }
+          100% { opacity: 0; transform: translateY(-4px); }
         }
       `}</style>
     </div>

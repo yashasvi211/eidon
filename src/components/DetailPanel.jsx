@@ -233,12 +233,26 @@ export default function DetailPanel({
                   opacity: s.done ? 0.5 : 1,
                 }}
               >
-                <input
-                  type="checkbox"
-                  checked={s.done}
-                  onChange={() => toggleSubtask(s.id)}
-                  style={{ cursor: "pointer" }}
-                />
+                <div
+                  onClick={() => toggleSubtask(s.id)}
+                  style={{
+                    width: "14px",
+                    height: "14px",
+                    borderRadius: "50%",
+                    border: "1.5px solid",
+                    borderColor: s.done ? "var(--gh-green-dim)" : "var(--gh-border2)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: s.done ? "var(--gh-green-dim)" : "transparent",
+                    cursor: "pointer",
+                    flexShrink: 0,
+                  }}
+                >
+                  {s.done && (
+                    <span style={{ color: "#fff", fontSize: "8px" }}>✓</span>
+                  )}
+                </div>
                 <span
                   style={{ textDecoration: s.done ? "line-through" : "none" }}
                 >

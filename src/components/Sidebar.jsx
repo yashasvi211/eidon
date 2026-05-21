@@ -56,10 +56,11 @@ function NavItem({ active, onClick, icon, label, badge }) {
   );
 }
 
-function ProjectItem({ color, label }) {
+function ProjectItem({ color, label, active, onClick }) {
   return (
     <div
       className="project-item"
+      onClick={onClick}
       style={{
         display: "flex",
         alignItems: "center",
@@ -67,8 +68,11 @@ function ProjectItem({ color, label }) {
         padding: "5px 8px",
         borderRadius: "6px",
         cursor: "pointer",
-        color: "var(--gh-muted)",
+        color: active ? "var(--gh-text)" : "var(--gh-muted)",
         fontSize: "13px",
+        background: active ? "var(--gh-surface2)" : "transparent",
+        transition: "all 0.15s",
+        position: "relative",
       }}
     >
       <div
@@ -81,6 +85,19 @@ function ProjectItem({ color, label }) {
         }}
       />
       {label}
+      {active && (
+        <div
+          style={{
+            position: "absolute",
+            left: 0,
+            top: "20%",
+            bottom: "20%",
+            width: "2px",
+            background: "var(--gh-blue)",
+            borderRadius: "0 2px 2px 0",
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -114,7 +131,7 @@ const StatsIcon = (props) => (
   </svg>
 );
 
-export default function Sidebar({ currentView, setCurrentView, tasks }) {
+export default function Sidebar({ currentView, setCurrentView, tasks, currentProject, setCurrentProject }) {
   return (
     <aside
       className="sidebar"
@@ -234,9 +251,44 @@ export default function Sidebar({ currentView, setCurrentView, tasks }) {
         >
           Projects
         </div>
-        <ProjectItem color="#58a6ff" label="HubSpot Integration" />
-        <ProjectItem color="#3fb950" label="Bill of Material" />
-        <ProjectItem color="#bc8cff" label="GitHub Logs Backup" />
+        {currentProject && (
+          <div
+            onClick={() => setCurrentProject(null)}
+            style={{
+              fontFamily: "var(--mono)",
+              fontSize: "10px",
+              color: "var(--gh-blue)",
+              padding: "4px 8px 8px",
+              cursor: "pointer",
+            }}
+          >
+            ← All Projects
+          </div>
+        )}
+        <ProjectItem
+          color="#58a6ff"
+          label="HubSpot Integration"
+          active={currentProject === "HubSpot Integration"}
+          onClick={() => setCurrentProject(currentProject === "HubSpot Integration" ? null : "HubSpot Integration")}
+        />
+        <ProjectItem
+          color="#3fb950"
+          label="Bill of Material"
+          active={currentProject === "Bill of Material"}
+          onClick={() => setCurrentProject(currentProject === "Bill of Material" ? null : "Bill of Material")}
+        />
+        <ProjectItem
+          color="#bc8cff"
+          label="GitHub Logs Backup"
+          active={currentProject === "GitHub Logs Backup"}
+          onClick={() => setCurrentProject(currentProject === "GitHub Logs Backup" ? null : "GitHub Logs Backup")}
+        />
+        <ProjectItem
+          color="#8b949e"
+          label="Inbox"
+          active={currentProject === "Inbox"}
+          onClick={() => setCurrentProject(currentProject === "Inbox" ? null : "Inbox")}
+        />
       </div>
     </aside>
   );
