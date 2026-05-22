@@ -88,7 +88,7 @@ function App() {
     const newTask = {
       id: genId(),
       title,
-      project: "Inbox",
+      project: currentProject || "Inbox",
       due: "",
       est: "0h",
       notes: "",
@@ -203,7 +203,12 @@ function App() {
   return (
     <div
       className="root-container"
-      style={{ display: "flex", width: "100%", height: "100vh", animation: "contentFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1)" }}
+      style={{
+        display: "flex",
+        width: "100%",
+        height: "100vh",
+        animation: "contentFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1)",
+      }}
     >
       <Sidebar
         currentView={currentView}
@@ -247,7 +252,13 @@ function App() {
   );
 }
 
-function Topbar({ currentView, tasks, onOpenModal, currentProject, setCurrentProject }) {
+function Topbar({
+  currentView,
+  tasks,
+  onOpenModal,
+  currentProject,
+  setCurrentProject,
+}) {
   const titles = {
     today: "Today's Tasks",
     scheduled: "Scheduled Calendar",
@@ -272,24 +283,27 @@ function Topbar({ currentView, tasks, onOpenModal, currentProject, setCurrentPro
     >
       <div
         className="topbar-title"
-        style={{ fontWeight: "600", fontSize: "15px", display: "flex", alignItems: "center", gap: "8px" }}
+        style={{
+          fontWeight: "600",
+          fontSize: "15px",
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+        }}
       >
-        {titles[currentView] || currentView}
+        {currentProject || titles[currentView] || currentView}
         {currentProject && (
           <span
             onClick={() => setCurrentProject(null)}
             style={{
               fontFamily: "var(--mono)",
-              fontSize: "11px",
-              color: "var(--gh-blue)",
-              background: "rgba(31,111,235,0.1)",
-              padding: "2px 8px",
-              borderRadius: "4px",
+              fontSize: "10px",
+              color: "var(--gh-muted)",
               cursor: "pointer",
-              fontWeight: 500,
+              marginLeft: "4px",
             }}
           >
-            {currentProject} ✕
+            ✕
           </span>
         )}
       </div>

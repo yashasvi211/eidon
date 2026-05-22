@@ -136,14 +136,7 @@ export default function AddTaskModal({ isOpen, onClose, onAdd }) {
                 onChange={handleChange}
                 placeholder="What needs to be done?"
                 autoFocus
-                style={{
-                  background: "var(--gh-surface2)",
-                  border: "1px solid var(--gh-border)",
-                  borderRadius: "6px",
-                  padding: "8px 12px",
-                  color: "var(--gh-text)",
-                  outline: "none",
-                }}
+                style={{ width: "100%" }}
               />
             </div>
             <div
@@ -174,14 +167,6 @@ export default function AddTaskModal({ isOpen, onClose, onAdd }) {
                   name="project"
                   value={formData.project}
                   onChange={handleChange}
-                  style={{
-                    background: "var(--gh-surface2)",
-                    border: "1px solid var(--gh-border)",
-                    borderRadius: "6px",
-                    padding: "8px 12px",
-                    color: "var(--gh-text)",
-                    outline: "none",
-                  }}
                 >
                   <option value="Inbox">Inbox</option>
                   <option value="HubSpot Integration">
@@ -211,14 +196,6 @@ export default function AddTaskModal({ isOpen, onClose, onAdd }) {
                   name="target"
                   value={formData.target}
                   onChange={handleChange}
-                  style={{
-                    background: "var(--gh-surface2)",
-                    border: "1px solid var(--gh-border)",
-                    borderRadius: "6px",
-                    padding: "8px 12px",
-                    color: "var(--gh-text)",
-                    outline: "none",
-                  }}
                 >
                   <option value="today">Today</option>
                   <option value="backlog">Backlog</option>
@@ -255,14 +232,7 @@ export default function AddTaskModal({ isOpen, onClose, onAdd }) {
                   type="date"
                   value={formData.due}
                   onChange={handleChange}
-                  style={{
-                    background: "var(--gh-surface2)",
-                    border: "1px solid var(--gh-border)",
-                    borderRadius: "6px",
-                    padding: "8px 12px",
-                    color: "var(--gh-text)",
-                    outline: "none",
-                  }}
+                  style={{ width: "100%" }}
                 />
               </div>
               <div
@@ -286,14 +256,7 @@ export default function AddTaskModal({ isOpen, onClose, onAdd }) {
                   value={formData.est}
                   onChange={handleChange}
                   placeholder="e.g. 2h, 30m"
-                  style={{
-                    background: "var(--gh-surface2)",
-                    border: "1px solid var(--gh-border)",
-                    borderRadius: "6px",
-                    padding: "8px 12px",
-                    color: "var(--gh-text)",
-                    outline: "none",
-                  }}
+                  style={{ width: "100%" }}
                 />
               </div>
             </div>
@@ -319,14 +282,9 @@ export default function AddTaskModal({ isOpen, onClose, onAdd }) {
                 onChange={handleChange}
                 placeholder="Optional notes…"
                 style={{
-                  background: "var(--gh-surface2)",
-                  border: "1px solid var(--gh-border)",
-                  borderRadius: "6px",
-                  padding: "8px 12px",
-                  color: "var(--gh-text)",
-                  outline: "none",
                   minHeight: "60px",
                   resize: "vertical",
+                  width: "100%",
                 }}
               />
             </div>

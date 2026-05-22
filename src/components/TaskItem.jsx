@@ -47,15 +47,17 @@ export default function TaskItem({
       onClick={onSelect}
       style={{
         display: "flex",
-        alignItems: "flex-start",
-        gap: "10px",
-        padding: "8px 16px",
+        alignItems: "center",
+        gap: "14px",
+        padding: "12px 16px",
         cursor: "pointer",
         borderLeft: active
-          ? "2px solid var(--gh-blue)"
-          : "2px solid transparent",
+          ? "3px solid var(--gh-blue)"
+          : "3px solid transparent",
         background: active ? "rgba(31,111,235,0.08)" : "transparent",
         opacity: task.done ? 0.5 : 1,
+        transition: "all 0.15s ease",
+        borderBottom: "1px solid var(--gh-border)",
       }}
     >
       <div
@@ -65,28 +67,30 @@ export default function TaskItem({
           onToggle();
         }}
         style={{
-          width: "16px",
-          height: "16px",
+          width: "18px",
+          height: "18px",
           borderRadius: "50%",
           border: "1.5px solid var(--gh-border2)",
-          marginTop: "2px",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           background: task.done ? "var(--gh-green-dim)" : "transparent",
           borderColor: task.done ? "var(--gh-green-dim)" : "var(--gh-border2)",
+          flexShrink: 0,
         }}
       >
         {task.done && (
-          <span style={{ color: "#fff", fontSize: "10px" }}>✓</span>
+          <span style={{ color: "#fff", fontSize: "12px" }}>✓</span>
         )}
       </div>
       <div className="task-body" style={{ flex: 1 }}>
         <div
           className="task-title"
           style={{
-            fontSize: "13px",
+            fontSize: "14px",
+            fontWeight: active ? "500" : "400",
             textDecoration: task.done ? "line-through" : "none",
+            color: task.done ? "var(--gh-muted)" : "var(--gh-text)",
           }}
         >
           {task.title}
@@ -96,21 +100,28 @@ export default function TaskItem({
           style={{
             display: "flex",
             alignItems: "center",
-            gap: 8,
-            marginTop: 4,
+            gap: 10,
+            marginTop: 6,
           }}
         >
-          <span className="task-tag tag-project">{task.project}</span>
+          <span className="task-tag tag-project" style={{ fontSize: "11px" }}>
+            {task.project}
+          </span>
           {task.due && (
-            <span className="task-tag tag-due">{fmtDateDisplay(task.due)}</span>
+            <span className="task-tag tag-due" style={{ fontSize: "11px" }}>
+              {fmtDateDisplay(task.due)}
+            </span>
           )}
           {task.est && task.est !== "0h" && (
-            <span className="task-tag tag-time">{task.est}</span>
+            <span className="task-tag tag-time" style={{ fontSize: "11px" }}>
+              {task.est}
+            </span>
           )}
           {totalSubtasks > 0 && (
             <span
               className="task-tag"
               style={{
+                fontSize: "11px",
                 color: "var(--gh-orange)",
                 borderColor: "rgba(227,179,65,0.3)",
                 background: "rgba(227,179,65,0.08)",
@@ -122,16 +133,19 @@ export default function TaskItem({
         </div>
       </div>
       {totalSeconds > 0 && (
-        <span
-          className="task-timer"
+        <div
           style={{
             fontFamily: "var(--mono)",
-            fontSize: "11px",
+            fontSize: "12px",
             color: "var(--gh-muted)",
+            background: "var(--gh-surface2)",
+            padding: "4px 8px",
+            borderRadius: "6px",
+            border: "1px solid var(--gh-border)",
           }}
         >
           {fmtSeconds(totalSeconds)}
-        </span>
+        </div>
       )}
     </div>
   );

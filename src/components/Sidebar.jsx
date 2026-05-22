@@ -131,7 +131,13 @@ const StatsIcon = (props) => (
   </svg>
 );
 
-export default function Sidebar({ currentView, setCurrentView, tasks, currentProject, setCurrentProject }) {
+export default function Sidebar({
+  currentView,
+  setCurrentView,
+  tasks,
+  currentProject,
+  setCurrentProject,
+}) {
   return (
     <aside
       className="sidebar"
@@ -205,33 +211,48 @@ export default function Sidebar({ currentView, setCurrentView, tasks, currentPro
           Workspace
         </div>
         <NavItem
-          active={currentView === "today"}
-          onClick={() => setCurrentView("today")}
+          active={currentView === "today" && !currentProject}
+          onClick={() => {
+            setCurrentView("today");
+            setCurrentProject(null);
+          }}
           icon={<TodayIcon />}
           label="Today's Tasks"
           badge={tasks.filter((t) => t.target === "today" && !t.done).length}
         />
         <NavItem
           active={currentView === "scheduled"}
-          onClick={() => setCurrentView("scheduled")}
+          onClick={() => {
+            setCurrentView("scheduled");
+            setCurrentProject(null);
+          }}
           icon={<ScheduledIcon />}
           label="Scheduled"
         />
         <NavItem
           active={currentView === "timetracking"}
-          onClick={() => setCurrentView("timetracking")}
+          onClick={() => {
+            setCurrentView("timetracking");
+            setCurrentProject(null);
+          }}
           icon={<TimeIcon />}
           label="Time Tracking"
         />
         <NavItem
           active={currentView === "stats"}
-          onClick={() => setCurrentView("stats")}
+          onClick={() => {
+            setCurrentView("stats");
+            setCurrentProject(null);
+          }}
           icon={<StatsIcon />}
           label="Deep Stats"
         />
         <NavItem
-          active={currentView === "backlog"}
-          onClick={() => setCurrentView("backlog")}
+          active={currentView === "backlog" && !currentProject}
+          onClick={() => {
+            setCurrentView("backlog");
+            setCurrentProject(null);
+          }}
           icon={<BacklogIcon />}
           label="Backlog"
           badge={tasks.filter((t) => t.target === "backlog" && !t.done).length}
@@ -251,44 +272,131 @@ export default function Sidebar({ currentView, setCurrentView, tasks, currentPro
         >
           Projects
         </div>
-        {currentProject && (
-          <div
-            onClick={() => setCurrentProject(null)}
-            style={{
-              fontFamily: "var(--mono)",
-              fontSize: "10px",
-              color: "var(--gh-blue)",
-              padding: "4px 8px 8px",
-              cursor: "pointer",
-            }}
-          >
-            ← All Projects
-          </div>
-        )}
         <ProjectItem
           color="#58a6ff"
           label="HubSpot Integration"
           active={currentProject === "HubSpot Integration"}
-          onClick={() => setCurrentProject(currentProject === "HubSpot Integration" ? null : "HubSpot Integration")}
+          onClick={() => {
+            setCurrentProject("HubSpot Integration");
+            if (currentView !== "today" && currentView !== "backlog") {
+              setCurrentView("today");
+            }
+          }}
         />
         <ProjectItem
           color="#3fb950"
           label="Bill of Material"
           active={currentProject === "Bill of Material"}
-          onClick={() => setCurrentProject(currentProject === "Bill of Material" ? null : "Bill of Material")}
+          onClick={() => {
+            setCurrentProject("Bill of Material");
+            if (currentView !== "today" && currentView !== "backlog") {
+              setCurrentView("today");
+            }
+          }}
         />
         <ProjectItem
           color="#bc8cff"
           label="GitHub Logs Backup"
           active={currentProject === "GitHub Logs Backup"}
-          onClick={() => setCurrentProject(currentProject === "GitHub Logs Backup" ? null : "GitHub Logs Backup")}
+          onClick={() => {
+            setCurrentProject("GitHub Logs Backup");
+            if (currentView !== "today" && currentView !== "backlog") {
+              setCurrentView("today");
+            }
+          }}
         />
         <ProjectItem
           color="#8b949e"
           label="Inbox"
           active={currentProject === "Inbox"}
-          onClick={() => setCurrentProject(currentProject === "Inbox" ? null : "Inbox")}
+          onClick={() => {
+            setCurrentProject("Inbox");
+            if (currentView !== "today" && currentView !== "backlog") {
+              setCurrentView("today");
+            }
+          }}
         />
+      </div>
+
+      <div
+        className="sidebar-footer"
+        style={{
+          marginTop: "auto",
+          padding: "12px",
+          borderTop: "1px solid var(--gh-border)",
+          display: "flex",
+          alignItems: "center",
+          gap: "10px",
+        }}
+      >
+        <div
+          className="user-avatar"
+          style={{
+            width: "32px",
+            height: "32px",
+            borderRadius: "50%",
+            background: "var(--gh-blue)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "12px",
+            fontWeight: "600",
+            color: "#fff",
+          }}
+        >
+          JD
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: "13px",
+              fontWeight: "600",
+              color: "var(--gh-text)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            John Doe
+          </div>
+          <div
+            style={{
+              fontSize: "11px",
+              color: "var(--gh-muted)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            Free Plan
+          </div>
+        </div>
+        <div
+          className="settings-btn"
+          style={{
+            padding: "6px",
+            borderRadius: "6px",
+            cursor: "pointer",
+            color: "var(--gh-muted)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "all 0.15s",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "var(--gh-surface2)";
+            e.currentTarget.style.color = "var(--gh-text)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent";
+            e.currentTarget.style.color = "var(--gh-muted)";
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 11.5a3.5 3.5 0 110-7 3.5 3.5 0 010 7zm0-1.5a2 2 0 100-4 2 2 0 000 4z" />
+            <path d="M12.87 6.42a.5.5 0 01.31.6l-.37 1.35c.02.21.02.43 0 .64l.37 1.35a.5.5 0 01-.31.6l-1.45.47c-.12.18-.27.35-.43.5l.07 1.53a.5.5 0 01-.45.52l-1.5.07c-.18.12-.38.21-.59.28l-.5 1.45a.5.5 0 01-.6.31l-1.35-.37c-.21.02-.43.02-.64 0l-1.35.37a.5.5 0 01-.6-.31l-.47-1.45c-.21-.07-.41-.16-.59-.28l-1.5-.07a.5.5 0 01-.45-.52l.07-1.53c-.16-.15-.31-.32-.43-.5l-1.45-.47a.5.5 0 01-.31-.6l.37-1.35c-.02-.21-.02-.43 0-.64l-.37-1.35a.5.5 0 01.31-.6l1.45-.47c.12-.18.27-.35.43-.5l-.07-1.53a.5.5 0 01.45-.52l1.5-.07c.18-.12.38-.21.59-.28l.5-1.45a.5.5 0 01.6-.31l1.35.37c.21-.02.43-.02.64 0l1.35-.37a.5.5 0 01.6.31l.47 1.45c.21.07.41.16.59.28l1.5.07a.5.5 0 01.45.52l-.07 1.53c.16.15.31.32.43.5l1.45.47z" />
+          </svg>
+        </div>
       </div>
     </aside>
   );

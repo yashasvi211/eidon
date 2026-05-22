@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 const fmtDateDisplay = (iso) => {
   if (!iso) return "—";
@@ -104,6 +104,15 @@ export default function DetailPanel({
   timerSeconds,
 }) {
   const [newSubtask, setNewSubtask] = useState("");
+  const textareaRef = useRef(null);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height =
+        textareaRef.current.scrollHeight + "px";
+    }
+  }, [selectedTask.notes, selectedTask.id]);
 
   if (!selectedTask)
     return (
@@ -240,7 +249,9 @@ export default function DetailPanel({
                     height: "14px",
                     borderRadius: "50%",
                     border: "1.5px solid",
-                    borderColor: s.done ? "var(--gh-green-dim)" : "var(--gh-border2)",
+                    borderColor: s.done
+                      ? "var(--gh-green-dim)"
+                      : "var(--gh-border2)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -268,7 +279,7 @@ export default function DetailPanel({
               onChange={(e) => setNewSubtask(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && addSubtask()}
               placeholder="Add subtask..."
-              style={{ flex: 1, fontSize: "12px" }}
+              style={{ flex: 1 }}
             />
             <button
               className="btn btn-primary"
@@ -281,9 +292,72 @@ export default function DetailPanel({
         </DetailSection>
 
         <DetailSection label="Time Tracking Sessions">
+          <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+            <div
+              style={{
+                flex: 1,
+                background: "var(--gh-surface2)",
+                padding: "10px",
+                borderRadius: "8px",
+                border: "1px solid var(--gh-border)",
+                textAlign: "center",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "10px",
+                  color: "var(--gh-muted)",
+                  textTransform: "uppercase",
+                  marginBottom: "4px",
+                }}
+              >
+                Total Time
+              </div>
+              <div
+                style={{
+                  fontSize: "14px",
+                  fontWeight: "600",
+                  color: "var(--gh-green)",
+                }}
+              >
+                {fmtSeconds(totalSpent)}
+              </div>
+            </div>
+            <div
+              style={{
+                flex: 1,
+                background: "var(--gh-surface2)",
+                padding: "10px",
+                borderRadius: "8px",
+                border: "1px solid var(--gh-border)",
+                textAlign: "center",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "10px",
+                  color: "var(--gh-muted)",
+                  textTransform: "uppercase",
+                  marginBottom: "4px",
+                }}
+              >
+                Sessions
+              </div>
+              <div
+                style={{
+                  fontSize: "14px",
+                  fontWeight: "600",
+                  color: "var(--gh-blue)",
+                }}
+              >
+                {(selectedTask.sessions || []).length}
+              </div>
+            </div>
+          </div>
+
           <div
             className="session-list"
-            style={{ display: "flex", flexDirection: "column", gap: "6px" }}
+            style={{ display: "flex", flexDirection: "column", gap: "8px" }}
           >
             {(selectedTask.sessions || [])
               .slice()
@@ -295,18 +369,40 @@ export default function DetailPanel({
                   style={{
                     background: "var(--gh-surface2)",
                     border: "1px solid var(--gh-border)",
-                    borderRadius: "6px",
-                    padding: "8px 10px",
+                    borderRadius: "8px",
+                    padding: "10px 12px",
                     display: "flex",
-                    justifyContent: "space-between",
                     alignItems: "center",
+                    gap: "12px",
                   }}
                 >
-                  <div style={{ display: "flex", flexDirection: "column" }}>
+                  <div
+                    style={{
+                      minWidth: "65px",
+                      fontFamily: "var(--mono)",
+                      fontSize: "11px",
+                      color: "var(--gh-green)",
+                      fontWeight: "600",
+                      background: "rgba(63,185,80,0.1)",
+                      padding: "6px 4px",
+                      borderRadius: "6px",
+                      textAlign: "center",
+                    }}
+                  >
+                    {fmtSeconds((sess.end - sess.start) / 1000)}
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "2px",
+                    }}
+                  >
                     <span
                       style={{
                         fontFamily: "var(--mono)",
-                        fontSize: "11px",
+                        fontSize: "12px",
+                        fontWeight: "500",
                         color: "var(--gh-text)",
                       }}
                     >
@@ -321,41 +417,20 @@ export default function DetailPanel({
                       })}
                     </span>
                     <span
-                      style={{ fontSize: "10px", color: "var(--gh-muted)" }}
+                      style={{ fontSize: "11px", color: "var(--gh-muted)" }}
                     >
                       {new Date(sess.start).toLocaleDateString()}
                     </span>
                   </div>
-                  <span
-                    style={{
-                      fontFamily: "var(--mono)",
-                      fontSize: "11px",
-                      color: "var(--gh-green)",
-                      fontWeight: "600",
-                    }}
-                  >
-                    {fmtSeconds((sess.end - sess.start) / 1000)}
-                  </span>
                 </div>
               ))}
-            {(!selectedTask.sessions || selectedTask.sessions.length === 0) && (
-              <div
-                style={{
-                  color: "var(--gh-muted)",
-                  fontSize: "12px",
-                  textAlign: "center",
-                  padding: "10px",
-                }}
-              >
-                No sessions recorded
-              </div>
-            )}
           </div>
         </DetailSection>
 
         <DetailSection label="Notes">
           <textarea
             className="notes-area"
+            ref={textareaRef}
             value={selectedTask.notes}
             onChange={(e) =>
               setTasks(
@@ -369,16 +444,16 @@ export default function DetailPanel({
             placeholder="Add notes..."
             style={{
               width: "100%",
-              minHeight: "100px",
               background: "var(--gh-surface2)",
               border: "1px solid var(--gh-border)",
               borderRadius: "6px",
               padding: "10px",
               color: "var(--gh-text)",
               fontFamily: "var(--mono)",
-              fontSize: "12px",
+              fontSize: "13px",
               outline: "none",
-              resize: "vertical",
+              resize: "none",
+              overflow: "hidden",
             }}
           />
         </DetailSection>
