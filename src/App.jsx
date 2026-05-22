@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { AnimatePresence } from "framer-motion";
 import "./App.css";
 import Sidebar from "./components/Sidebar";
 import TaskPanel from "./components/TaskPanel";
@@ -9,6 +10,7 @@ import AddTaskModal from "./components/AddTaskModal";
 import ScheduledView from "./components/ScheduledView";
 import LoadingScreen from "./components/LoadingScreen";
 import SettingsModal from "./components/SettingsModal";
+import ConfirmationModal from "./components/ConfirmationModal";
 
 // ============================================================
 // UTILITIES
@@ -34,6 +36,7 @@ function App() {
   const [currentProject, setCurrentProject] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState(null);
 
   // Settings State
   const [settings, setSettings] = useState(() => {
@@ -103,6 +106,15 @@ function App() {
     if (currentProject === projectName) {
       setCurrentProject(null);
     }
+  };
+
+  const handleDeleteTask = (taskId) => {
+    setTasks(tasks.filter((t) => t.id !== taskId));
+    if (selectedTaskId === taskId) {
+      const remaining = tasks.filter((t) => t.id !== taskId);
+      setSelectedTaskId(remaining.length > 0 ? remaining[0].id : null);
+    }
+    setTaskToDelete(null);
   };
 
   // Timer State
@@ -269,6 +281,7 @@ function App() {
           onStopTimer={handleStopTimer}
           timerSeconds={timerSeconds}
           projects={projects}
+          onDeleteTask={() => setTaskToDelete(selectedTask)}
         />
       </>
     );
@@ -292,6 +305,7 @@ function App() {
         currentProject={currentProject}
         setCurrentProject={setCurrentProject}
         projects={projects}
+        setProjects={setProjects}
         onAddProject={handleAddProject}
         onDeleteProject={handleDeleteProject}
         onOpenSettings={() => setIsSettingsOpen(true)}
@@ -322,21 +336,38 @@ function App() {
         </div>
       </div>
 
-      <AddTaskModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onAdd={handleAddTask}
-        projects={projects}
-      />
+      <AnimatePresence>
+        {isModalOpen && (
+          <AddTaskModal
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            onAdd={handleAddTask}
+            projects={projects}
+          />
+        )}
 
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        projects={projects}
-        setProjects={setProjects}
-        settings={settings}
-        setSettings={setSettings}
-      />
+        {isSettingsOpen && (
+          <SettingsModal
+            isOpen={isSettingsOpen}
+            onClose={() => setIsSettingsOpen(false)}
+            projects={projects}
+            setProjects={setProjects}
+            settings={settings}
+            setSettings={setSettings}
+            onDeleteProject={handleDeleteProject}
+          />
+        )}
+
+        {taskToDelete && (
+          <ConfirmationModal
+            isOpen={!!taskToDelete}
+            onClose={() => setTaskToDelete(null)}
+            onConfirm={() => handleDeleteTask(taskToDelete.id)}
+            title="Delete Task"
+            message={`Are you sure you want to delete "${taskToDelete?.title}"? This action cannot be undone.`}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -101,10 +101,11 @@ export default function DetailPanel({
   onStopTimer,
   timerSeconds,
   projects = [],
+  onDeleteTask,
 }) {
   const projectColor = (p) => {
     const found = projects.find((proj) => proj.name === p);
-    return found ? found.color : (PROJECT_COLORS[p] || "#8b949e");
+    return found ? found.color : PROJECT_COLORS[p] || "#8b949e";
   };
   const [newSubtask, setNewSubtask] = useState("");
   const textareaRef = useRef(null);
@@ -204,7 +205,9 @@ export default function DetailPanel({
               ⏹ Stop Timer
             </button>
           )}
-          <button className="btn btn-danger">✕ Delete</button>
+          <button className="btn btn-danger" onClick={onDeleteTask}>
+            ✕ Delete
+          </button>
         </div>
       </div>
 

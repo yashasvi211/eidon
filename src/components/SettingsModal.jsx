@@ -1,5 +1,152 @@
-import React from "react";
+import React, { useEffect } from "react";
+import { motion } from "framer-motion";
 import "../App.css";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+
+function SortableProjectItem({
+  proj,
+  index,
+  onDeleteProject,
+  moveProject,
+  projectsCount,
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: proj.name });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : 1,
+    display: "flex",
+    alignItems: "center",
+    gap: "12px",
+    padding: "8px 12px",
+    background: "var(--gh-surface2)",
+    border: "1px solid var(--gh-border)",
+    borderRadius: "6px",
+    marginBottom: "8px",
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      <div
+        {...listeners}
+        style={{
+          cursor: "grab",
+          display: "flex",
+          alignItems: "center",
+          color: "var(--gh-muted)",
+        }}
+        title="Drag to reorder"
+      >
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M5 4a1 1 0 11-2 0 1 1 0 012 0zm5 0a1 1 0 11-2 0 1 1 0 012 0zm-5 4a1 1 0 11-2 0 1 1 0 012 0zm5 0a1 1 0 11-2 0 1 1 0 012 0zm-5 4a1 1 0 11-2 0 1 1 0 012 0zm5 0a1 1 0 11-2 0 1 1 0 012 0z" />
+        </svg>
+      </div>
+      <span
+        style={{
+          fontFamily: "var(--mono)",
+          fontSize: "11px",
+          color: "var(--gh-muted)",
+          width: "16px",
+        }}
+      >
+        {index + 1}.
+      </span>
+      <div
+        style={{
+          width: "8px",
+          height: "8px",
+          borderRadius: "50%",
+          background: proj.color,
+        }}
+      />
+      <span style={{ flex: 1, fontSize: "13px" }}>{proj.name}</span>
+      <div style={{ display: "flex", gap: "6px" }}>
+        <div style={{ display: "flex", gap: "2px" }}>
+          <button
+            onClick={() => moveProject(index, -1)}
+            disabled={index === 0}
+            title="Move Up"
+            style={{
+              background: "none",
+              border: "1px solid var(--gh-border2)",
+              color: "var(--gh-muted)",
+              borderRadius: "4px",
+              padding: "2px 6px",
+              cursor: index === 0 ? "not-allowed" : "pointer",
+              opacity: index === 0 ? 0.3 : 1,
+            }}
+          >
+            ↑
+          </button>
+          <button
+            onClick={() => moveProject(index, 1)}
+            disabled={index === projectsCount - 1}
+            title="Move Down"
+            style={{
+              background: "none",
+              border: "1px solid var(--gh-border2)",
+              color: "var(--gh-muted)",
+              borderRadius: "4px",
+              padding: "2px 6px",
+              cursor: index === projectsCount - 1 ? "not-allowed" : "pointer",
+              opacity: index === projectsCount - 1 ? 0.3 : 1,
+            }}
+          >
+            ↓
+          </button>
+        </div>
+        {proj.name !== "Inbox" && (
+          <button
+            onClick={() => onDeleteProject(proj.name)}
+            title="Delete Project"
+            style={{
+              background: "none",
+              border: "1px solid var(--gh-red)",
+              color: "var(--gh-red)",
+              borderRadius: "4px",
+              padding: "2px 6px",
+              cursor: "pointer",
+              opacity: 0.8,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.8)}
+          >
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M11 1.75V3h2.25a.75.75 0 010 1.5H2.75a.75.75 0 010-1.5H5V1.75a1.75 1.75 0 011.75-1.75h2.5A1.75 1.75 0 0111 1.75zm-1.25 13.25a.75.75 0 00.75-.75V6.75a.75.75 0 00-1.5 0v7.5a.75.75 0 00.75.75zM6.25 6.75a.75.75 0 00-1.5 0v7.5a.75.75 0 001.5 0v-7.5z" />
+            </svg>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function SettingsModal({
   isOpen,
@@ -8,14 +155,38 @@ export default function SettingsModal({
   setProjects,
   settings,
   setSettings,
+  onDeleteProject,
 }) {
-  if (!isOpen) return null;
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  // Escape key listener
+  useEffect(() => {
+    const handleEsc = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleEsc);
+    return () => window.removeEventListener("keydown", handleEsc);
+  }, [onClose]);
+
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+    if (!over) return;
+    if (active.id !== over.id) {
+      const oldIndex = projects.findIndex((p) => p.name === active.id);
+      const newIndex = projects.findIndex((p) => p.name === over.id);
+      setProjects(arrayMove(projects, oldIndex, newIndex));
+    }
+  };
 
   const moveProject = (index, direction) => {
     const newProjects = [...projects];
     const targetIndex = index + direction;
     if (targetIndex < 0 || targetIndex >= newProjects.length) return;
-
     const temp = newProjects[index];
     newProjects[index] = newProjects[targetIndex];
     newProjects[targetIndex] = temp;
@@ -23,13 +194,16 @@ export default function SettingsModal({
   };
 
   return (
-    <div
-      className="modal-overlay fade-in"
+    <motion.div
+      className="modal-overlay"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
       style={{
         position: "fixed",
         inset: 0,
         background: "rgba(0,0,0,0.5)",
-        backdropFilter: "blur(4px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -37,8 +211,12 @@ export default function SettingsModal({
       }}
       onClick={onClose}
     >
-      <div
+      <motion.div
         className="modal"
+        initial={{ scale: 0.9, y: 15, opacity: 0 }}
+        animate={{ scale: 1, y: 0, opacity: 1 }}
+        exit={{ scale: 0.9, y: 15, opacity: 0 }}
+        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         style={{
           background: "var(--gh-surface)",
           border: "1px solid var(--gh-border)",
@@ -161,71 +339,31 @@ export default function SettingsModal({
                 marginBottom: "12px",
               }}
             >
-              Rearrange Projects
+              Manage Projects (Drag or use arrows)
             </label>
-            <div
-              style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
             >
-              {projects.map((proj, index) => (
-                <div
-                  key={proj.name}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    padding: "8px 12px",
-                    background: "var(--gh-surface2)",
-                    border: "1px solid var(--gh-border)",
-                    borderRadius: "6px",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "8px",
-                      height: "8px",
-                      borderRadius: "50%",
-                      background: proj.color,
-                    }}
-                  />
-                  <span style={{ flex: 1, fontSize: "13px" }}>{proj.name}</span>
-                  <div style={{ display: "flex", gap: "4px" }}>
-                    <button
-                      onClick={() => moveProject(index, -1)}
-                      disabled={index === 0}
-                      style={{
-                        background: "none",
-                        border: "1px solid var(--gh-border2)",
-                        color: "var(--gh-muted)",
-                        borderRadius: "4px",
-                        padding: "2px 6px",
-                        cursor: index === 0 ? "not-allowed" : "pointer",
-                        opacity: index === 0 ? 0.3 : 1,
-                      }}
-                    >
-                      ↑
-                    </button>
-                    <button
-                      onClick={() => moveProject(index, 1)}
-                      disabled={index === projects.length - 1}
-                      style={{
-                        background: "none",
-                        border: "1px solid var(--gh-border2)",
-                        color: "var(--gh-muted)",
-                        borderRadius: "4px",
-                        padding: "2px 6px",
-                        cursor:
-                          index === projects.length - 1
-                            ? "not-allowed"
-                            : "pointer",
-                        opacity: index === projects.length - 1 ? 0.3 : 1,
-                      }}
-                    >
-                      ↓
-                    </button>
-                  </div>
+              <SortableContext
+                items={projects.map((p) => p.name)}
+                strategy={verticalListSortingStrategy}
+              >
+                <div>
+                  {projects.map((proj, index) => (
+                    <SortableProjectItem
+                      key={proj.name}
+                      proj={proj}
+                      index={index}
+                      onDeleteProject={onDeleteProject}
+                      moveProject={moveProject}
+                      projectsCount={projects.length}
+                    />
+                  ))}
                 </div>
-              ))}
-            </div>
+              </SortableContext>
+            </DndContext>
           </section>
         </div>
 
@@ -241,7 +379,7 @@ export default function SettingsModal({
             Done
           </button>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

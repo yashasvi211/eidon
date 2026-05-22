@@ -31,7 +31,7 @@
 
 @keyframes slideDown {
     from {
-        transform: translateY(-20px);
+        transform: translateY(-10px);
         opacity: 0;
     }
     to {
@@ -46,25 +46,25 @@
         opacity: 1;
     }
     to {
-        transform: translateY(-20px);
+        transform: translateY(-10px);
         opacity: 0;
     }
 }
 
 .modal-overlay.fade-in {
-    animation: fadeIn 0.3s ease forwards;
+    animation: fadeIn 0.2s ease-out forwards;
 }
 
 .modal-overlay.fade-out {
-    animation: fadeOut 0.3s ease forwards;
+    animation: fadeOut 0.2s ease-in forwards;
 }
 
 .modal-overlay.fade-in .modal {
-    animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: slideDown 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .modal-overlay.fade-out .modal {
-    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Rest of App.css */

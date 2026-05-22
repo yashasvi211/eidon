@@ -56,7 +56,7 @@ function NavItem({ active, onClick, icon, label, badge }) {
   );
 }
 
-function ProjectItem({ color, label, active, onClick, onDelete }) {
+function ProjectItem({ color, label, active, onClick }) {
   return (
     <div
       className="project-item"
@@ -74,14 +74,6 @@ function ProjectItem({ color, label, active, onClick, onDelete }) {
         transition: "all 0.15s",
         position: "relative",
       }}
-      onMouseEnter={(e) => {
-        const delBtn = e.currentTarget.querySelector(".delete-project-btn");
-        if (delBtn) delBtn.style.opacity = 1;
-      }}
-      onMouseLeave={(e) => {
-        const delBtn = e.currentTarget.querySelector(".delete-project-btn");
-        if (delBtn) delBtn.style.opacity = 0;
-      }}
     >
       <div
         className="project-dot"
@@ -90,6 +82,7 @@ function ProjectItem({ color, label, active, onClick, onDelete }) {
           height: "8px",
           borderRadius: "50%",
           background: color,
+          flexShrink: 0,
         }}
       />
       <span
@@ -102,40 +95,6 @@ function ProjectItem({ color, label, active, onClick, onDelete }) {
       >
         {label}
       </span>
-      {label !== "Inbox" && (
-        <button
-          className="delete-project-btn"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete(label);
-          }}
-          style={{
-            background: "none",
-            border: "none",
-            color: "var(--gh-muted)",
-            cursor: "pointer",
-            padding: "4px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            opacity: 0,
-            borderRadius: "4px",
-            transition: "all 0.15s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = "var(--gh-red)";
-            e.currentTarget.style.background = "rgba(248, 81, 73, 0.1)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = "var(--gh-muted)";
-            e.currentTarget.style.background = "none";
-          }}
-        >
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M11 1.75V3h2.25a.75.75 0 010 1.5H2.75a.75.75 0 010-1.5H5V1.75a1.75 1.75 0 011.75-1.75h2.5A1.75 1.75 0 0111 1.75zm-1.25 13.25a.75.75 0 00.75-.75V6.75a.75.75 0 00-1.5 0v7.5a.75.75 0 00.75.75zM6.25 6.75a.75.75 0 00-1.5 0v7.5a.75.75 0 001.5 0v-7.5z" />
-          </svg>
-        </button>
-      )}
       {active && (
         <div
           style={{
@@ -190,7 +149,6 @@ export default function Sidebar({
   setCurrentProject,
   projects = [],
   onAddProject,
-  onDeleteProject,
   onOpenSettings,
 }) {
   const [isAdding, setIsAdding] = React.useState(false);
@@ -198,14 +156,14 @@ export default function Sidebar({
   const [newProjectColor, setNewProjectColor] = React.useState("#58a6ff");
 
   const CURATED_COLORS = [
-    "#58a6ff", // Blue
-    "#3fb950", // Green
-    "#bc8cff", // Purple
-    "#ff7b72", // Red
-    "#e3b341", // Orange/Amber
-    "#db61a2", // Pink
-    "#f2cc60", // Yellow
-    "#8b949e", // Grey
+    "#58a6ff",
+    "#3fb950",
+    "#bc8cff",
+    "#ff7b72",
+    "#e3b341",
+    "#db61a2",
+    "#f2cc60",
+    "#8b949e",
   ];
 
   const handleSave = () => {
@@ -448,49 +406,16 @@ export default function Sidebar({
               }}
             >
               <button
+                className="btn"
                 onClick={handleCancel}
-                style={{
-                  background: "none",
-                  border: "1px solid var(--gh-border)",
-                  borderRadius: "4px",
-                  color: "var(--gh-muted)",
-                  fontSize: "11px",
-                  padding: "4px 8px",
-                  cursor: "pointer",
-                  fontFamily: "var(--sans)",
-                  transition: "all 0.1s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = "var(--gh-border2)";
-                  e.currentTarget.style.color = "var(--gh-text)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = "var(--gh-border)";
-                  e.currentTarget.style.color = "var(--gh-muted)";
-                }}
+                style={{ fontSize: "11px", padding: "4px 8px" }}
               >
                 Cancel
               </button>
               <button
+                className="btn btn-primary"
                 onClick={handleSave}
-                style={{
-                  background: "var(--gh-green-dim)",
-                  border: "none",
-                  borderRadius: "4px",
-                  color: "#fff",
-                  fontSize: "11px",
-                  fontWeight: "600",
-                  padding: "4px 10px",
-                  cursor: "pointer",
-                  fontFamily: "var(--sans)",
-                  transition: "all 0.1s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "var(--gh-green)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "var(--gh-green-dim)";
-                }}
+                style={{ fontSize: "11px", padding: "4px 10px" }}
               >
                 Create
               </button>
@@ -498,81 +423,41 @@ export default function Sidebar({
           </div>
         )}
 
-        {projects.map((proj) => (
-          <ProjectItem
-            key={proj.name}
-            color={proj.color}
-            label={proj.name}
-            active={currentProject === proj.name}
-            onClick={() => {
-              setCurrentProject(proj.name);
-              if (currentView !== "today" && currentView !== "backlog") {
-                setCurrentView("today");
-              }
-            }}
-            onDelete={onDeleteProject}
-          />
-        ))}
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          {projects.map((proj) => (
+            <ProjectItem
+              key={proj.name}
+              color={proj.color}
+              label={proj.name}
+              active={currentProject === proj.name}
+              onClick={() => {
+                setCurrentProject(proj.name);
+                if (currentView !== "today" && currentView !== "backlog") {
+                  setCurrentView("today");
+                }
+              }}
+            />
+          ))}
+        </div>
       </div>
 
       <div
         className="sidebar-footer"
         style={{
           marginTop: "auto",
-          padding: "12px",
+          padding: "12px 16px",
           borderTop: "1px solid var(--gh-border)",
           display: "flex",
           alignItems: "center",
-          gap: "10px",
+          gap: "12px",
         }}
       >
-        <div
-          className="user-avatar"
-          style={{
-            width: "32px",
-            height: "32px",
-            borderRadius: "50%",
-            background: "var(--gh-blue)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "12px",
-            fontWeight: "600",
-            color: "#fff",
-          }}
-        >
-          JD
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: "13px",
-              fontWeight: "600",
-              color: "var(--gh-text)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            John Doe
-          </div>
-          <div
-            style={{
-              fontSize: "11px",
-              color: "var(--gh-muted)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            Free Plan
-          </div>
-        </div>
         <div
           className="settings-btn"
           onClick={onOpenSettings}
           style={{
-            padding: "6px",
+            width: "32px",
+            height: "32px",
             borderRadius: "6px",
             cursor: "pointer",
             color: "var(--gh-muted)",
@@ -590,10 +475,57 @@ export default function Sidebar({
             e.currentTarget.style.color = "var(--gh-muted)";
           }}
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M8 11.5a3.5 3.5 0 110-7 3.5 3.5 0 010 7zm0-1.5a2 2 0 100-4 2 2 0 000 4z" />
-            <path d="M12.87 6.42a.5.5 0 01.31.6l-.37 1.35c.02.21.02.43 0 .64l.37 1.35a.5.5 0 01-.31.6l-1.45.47c-.12.18-.27.35-.43.5l.07 1.53a.5.5 0 01-.45.52l-1.5.07c-.18.12-.38.21-.59.28l-.5 1.45a.5.5 0 01-.6.31l-1.35-.37c-.21.02-.43.02-.64 0l-1.35.37a.5.5 0 01-.6-.31l-.47-1.45c-.21-.07-.41-.16-.59-.28l-1.5-.07a.5.5 0 01-.45-.52l.07-1.53c-.16-.15-.31-.32-.43-.5l-1.45-.47a.5.5 0 01-.31-.6l.37-1.35c-.02-.21-.02-.43 0-.64l-.37-1.35a.5.5 0 01.31-.6l1.45-.47c.12-.18.27-.35.43-.5l-.07-1.53a.5.5 0 01.45-.52l1.5-.07c.18-.12.38-.21.59-.28l.5-1.45a.5.5 0 01.6-.31l1.35.37c.21-.02.43-.02.64 0l1.35-.37a.5.5 0 01.6.31l.47 1.45c.21.07.41.16.59.28l1.5.07a.5.5 0 01.45.52l-.07 1.53c.16.15.31.32.43.5l1.45.47z" />
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
           </svg>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            flex: 1,
+          }}
+        >
+          <div
+            className="user-avatar"
+            style={{
+              width: "28px",
+              height: "28px",
+              borderRadius: "50%",
+              background: "var(--gh-blue)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "11px",
+              fontWeight: "600",
+              color: "#fff",
+            }}
+          >
+            JD
+          </div>
+          <div
+            style={{
+              fontSize: "13px",
+              fontWeight: "500",
+              color: "var(--gh-text)",
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+          >
+            John Doe
+          </div>
         </div>
       </div>
     </aside>
