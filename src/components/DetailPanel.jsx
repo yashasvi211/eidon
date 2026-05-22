@@ -41,8 +41,6 @@ const PROJECT_COLORS = {
   Inbox: "#8b949e",
 };
 
-const projectColor = (p) => PROJECT_COLORS[p] || "#8b949e";
-
 function DetailSection({ label, children, action }) {
   return (
     <div className="detail-section" style={{ marginBottom: "20px" }}>
@@ -102,7 +100,12 @@ export default function DetailPanel({
   onStartTimer,
   onStopTimer,
   timerSeconds,
+  projects = [],
 }) {
+  const projectColor = (p) => {
+    const found = projects.find((proj) => proj.name === p);
+    return found ? found.color : (PROJECT_COLORS[p] || "#8b949e");
+  };
   const [newSubtask, setNewSubtask] = useState("");
   const textareaRef = useRef(null);
 

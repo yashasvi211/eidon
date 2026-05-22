@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 
-export default function AddTaskModal({ isOpen, onClose, onAdd }) {
+export default function AddTaskModal({ isOpen, onClose, onAdd, projects = [] }) {
   const [isAnimating, setIsAnimating] = useState(false);
   const [shouldRender, setShouldRender] = useState(isOpen);
 
@@ -168,12 +168,11 @@ export default function AddTaskModal({ isOpen, onClose, onAdd }) {
                   value={formData.project}
                   onChange={handleChange}
                 >
-                  <option value="Inbox">Inbox</option>
-                  <option value="HubSpot Integration">
-                    HubSpot Integration
-                  </option>
-                  <option value="Bill of Material">Bill of Material</option>
-                  <option value="GitHub Logs Backup">GitHub Logs Backup</option>
+                  {projects.map((p) => (
+                    <option key={p.name} value={p.name}>
+                      {p.name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div

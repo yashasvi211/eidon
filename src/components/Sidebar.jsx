@@ -56,7 +56,7 @@ function NavItem({ active, onClick, icon, label, badge }) {
   );
 }
 
-function ProjectItem({ color, label, active, onClick }) {
+function ProjectItem({ color, label, active, onClick, onDelete }) {
   return (
     <div
       className="project-item"
@@ -74,6 +74,14 @@ function ProjectItem({ color, label, active, onClick }) {
         transition: "all 0.15s",
         position: "relative",
       }}
+      onMouseEnter={(e) => {
+        const delBtn = e.currentTarget.querySelector(".delete-project-btn");
+        if (delBtn) delBtn.style.opacity = 1;
+      }}
+      onMouseLeave={(e) => {
+        const delBtn = e.currentTarget.querySelector(".delete-project-btn");
+        if (delBtn) delBtn.style.opacity = 0;
+      }}
     >
       <div
         className="project-dot"
@@ -84,7 +92,50 @@ function ProjectItem({ color, label, active, onClick }) {
           background: color,
         }}
       />
-      {label}
+      <span
+        style={{
+          flex: 1,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {label}
+      </span>
+      {label !== "Inbox" && (
+        <button
+          className="delete-project-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(label);
+          }}
+          style={{
+            background: "none",
+            border: "none",
+            color: "var(--gh-muted)",
+            cursor: "pointer",
+            padding: "4px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: 0,
+            borderRadius: "4px",
+            transition: "all 0.15s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.color = "var(--gh-red)";
+            e.currentTarget.style.background = "rgba(248, 81, 73, 0.1)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.color = "var(--gh-muted)";
+            e.currentTarget.style.background = "none";
+          }}
+        >
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M11 1.75V3h2.25a.75.75 0 010 1.5H2.75a.75.75 0 010-1.5H5V1.75a1.75 1.75 0 011.75-1.75h2.5A1.75 1.75 0 0111 1.75zm-1.25 13.25a.75.75 0 00.75-.75V6.75a.75.75 0 00-1.5 0v7.5a.75.75 0 00.75.75zM6.25 6.75a.75.75 0 00-1.5 0v7.5a.75.75 0 001.5 0v-7.5z" />
+          </svg>
+        </button>
+      )}
       {active && (
         <div
           style={{
@@ -137,7 +188,38 @@ export default function Sidebar({
   tasks,
   currentProject,
   setCurrentProject,
+  projects = [],
+  onAddProject,
+  onDeleteProject,
+  onOpenSettings,
 }) {
+  const [isAdding, setIsAdding] = React.useState(false);
+  const [newProjectName, setNewProjectName] = React.useState("");
+  const [newProjectColor, setNewProjectColor] = React.useState("#58a6ff");
+
+  const CURATED_COLORS = [
+    "#58a6ff", // Blue
+    "#3fb950", // Green
+    "#bc8cff", // Purple
+    "#ff7b72", // Red
+    "#e3b341", // Orange/Amber
+    "#db61a2", // Pink
+    "#f2cc60", // Yellow
+    "#8b949e", // Grey
+  ];
+
+  const handleSave = () => {
+    if (!newProjectName.trim()) return;
+    onAddProject(newProjectName.trim(), newProjectColor);
+    setNewProjectName("");
+    setIsAdding(false);
+  };
+
+  const handleCancel = () => {
+    setNewProjectName("");
+    setIsAdding(false);
+  };
+
   return (
     <aside
       className="sidebar"
@@ -149,55 +231,7 @@ export default function Sidebar({
         flexDirection: "column",
       }}
     >
-      <div
-        className="sidebar-header"
-        style={{
-          padding: "16px",
-          borderBottom: "1px solid var(--gh-border)",
-          display: "flex",
-          alignItems: "center",
-          gap: "10px",
-        }}
-      >
-        <div
-          className="logo"
-          style={{
-            width: "28px",
-            height: "28px",
-            background: "var(--gh-green-dim)",
-            borderRadius: "6px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontFamily: "var(--mono)",
-            fontSize: "12px",
-            fontWeight: "600",
-            color: "#fff",
-          }}
-        >
-          SP
-        </div>
-        <div>
-          <div
-            className="logo-text"
-            style={{ fontWeight: "600", fontSize: "15px" }}
-          >
-            Eidon
-          </div>
-          <div
-            className="logo-version"
-            style={{
-              fontFamily: "var(--mono)",
-              fontSize: "10px",
-              color: "var(--gh-muted)",
-            }}
-          >
-            v1.0.0-dev
-          </div>
-        </div>
-      </div>
-
-      <div className="nav-section" style={{ padding: "12px 8px 4px" }}>
+      <div className="nav-section" style={{ padding: "24px 8px 4px" }}>
         <div
           className="nav-label"
           style={{
@@ -261,61 +295,224 @@ export default function Sidebar({
 
       <div className="nav-section" style={{ padding: "12px 8px 4px" }}>
         <div
-          className="nav-label"
+          className="nav-header"
           style={{
-            fontFamily: "var(--mono)",
-            fontSize: "10px",
-            color: "var(--gh-muted)",
-            textTransform: "uppercase",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
             padding: "0 8px 6px",
           }}
         >
-          Projects
+          <div
+            className="nav-label"
+            style={{
+              fontFamily: "var(--mono)",
+              fontSize: "10px",
+              color: "var(--gh-muted)",
+              textTransform: "uppercase",
+            }}
+          >
+            Projects
+          </div>
+          <button
+            onClick={() => setIsAdding(!isAdding)}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "var(--gh-muted)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "2px",
+              borderRadius: "4px",
+              transition: "all 0.15s ease",
+            }}
+            title="Add New Project"
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "var(--gh-text)";
+              e.currentTarget.style.background = "var(--gh-surface2)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "var(--gh-muted)";
+              e.currentTarget.style.background = "none";
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M7.75 2a.75.75 0 01.75.75V7h4.25a.75.75 0 010 1.5H8.5v4.25a.75.75 0 01-1.5 0V8.5H2.75a.75.75 0 010-1.5H7V2.75A.75.75 0 017.75 2z" />
+            </svg>
+          </button>
         </div>
-        <ProjectItem
-          color="#58a6ff"
-          label="HubSpot Integration"
-          active={currentProject === "HubSpot Integration"}
-          onClick={() => {
-            setCurrentProject("HubSpot Integration");
-            if (currentView !== "today" && currentView !== "backlog") {
-              setCurrentView("today");
-            }
-          }}
-        />
-        <ProjectItem
-          color="#3fb950"
-          label="Bill of Material"
-          active={currentProject === "Bill of Material"}
-          onClick={() => {
-            setCurrentProject("Bill of Material");
-            if (currentView !== "today" && currentView !== "backlog") {
-              setCurrentView("today");
-            }
-          }}
-        />
-        <ProjectItem
-          color="#bc8cff"
-          label="GitHub Logs Backup"
-          active={currentProject === "GitHub Logs Backup"}
-          onClick={() => {
-            setCurrentProject("GitHub Logs Backup");
-            if (currentView !== "today" && currentView !== "backlog") {
-              setCurrentView("today");
-            }
-          }}
-        />
-        <ProjectItem
-          color="#8b949e"
-          label="Inbox"
-          active={currentProject === "Inbox"}
-          onClick={() => {
-            setCurrentProject("Inbox");
-            if (currentView !== "today" && currentView !== "backlog") {
-              setCurrentView("today");
-            }
-          }}
-        />
+
+        {isAdding && (
+          <div
+            style={{
+              padding: "10px",
+              background: "var(--gh-surface2)",
+              border: "1px solid var(--gh-border2)",
+              borderRadius: "6px",
+              marginBottom: "8px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "8px",
+              transition: "all 0.2s ease",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "6px",
+                justifyContent: "center",
+              }}
+            >
+              {CURATED_COLORS.map((c) => (
+                <div
+                  key={c}
+                  onClick={() => setNewProjectColor(c)}
+                  style={{
+                    width: "16px",
+                    height: "16px",
+                    borderRadius: "50%",
+                    background: c,
+                    cursor: "pointer",
+                    border:
+                      newProjectColor === c
+                        ? "2px solid #fff"
+                        : "1px solid rgba(255,255,255,0.1)",
+                    boxShadow:
+                      newProjectColor === c
+                        ? "0 0 0 1px var(--gh-blue)"
+                        : "none",
+                    transform:
+                      newProjectColor === c ? "scale(1.15)" : "scale(1)",
+                    transition: "all 0.15s ease",
+                  }}
+                  title={c}
+                />
+              ))}
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                background: "var(--gh-surface)",
+                border: "1px solid var(--gh-border)",
+                borderRadius: "6px",
+                padding: "4px 8px",
+              }}
+            >
+              <div
+                style={{
+                  width: "10px",
+                  height: "10px",
+                  borderRadius: "50%",
+                  background: newProjectColor,
+                  flexShrink: 0,
+                  transition: "background 0.25s ease",
+                }}
+              />
+              <input
+                type="text"
+                value={newProjectName}
+                onChange={(e) => setNewProjectName(e.target.value)}
+                placeholder="Project name..."
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleSave();
+                  } else if (e.key === "Escape") {
+                    handleCancel();
+                  }
+                }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--gh-text)",
+                  fontFamily: "var(--sans)",
+                  fontSize: "13px",
+                  outline: "none",
+                  flex: 1,
+                  padding: "2px 0",
+                }}
+              />
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: "6px",
+              }}
+            >
+              <button
+                onClick={handleCancel}
+                style={{
+                  background: "none",
+                  border: "1px solid var(--gh-border)",
+                  borderRadius: "4px",
+                  color: "var(--gh-muted)",
+                  fontSize: "11px",
+                  padding: "4px 8px",
+                  cursor: "pointer",
+                  fontFamily: "var(--sans)",
+                  transition: "all 0.1s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = "var(--gh-border2)";
+                  e.currentTarget.style.color = "var(--gh-text)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = "var(--gh-border)";
+                  e.currentTarget.style.color = "var(--gh-muted)";
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                style={{
+                  background: "var(--gh-green-dim)",
+                  border: "none",
+                  borderRadius: "4px",
+                  color: "#fff",
+                  fontSize: "11px",
+                  fontWeight: "600",
+                  padding: "4px 10px",
+                  cursor: "pointer",
+                  fontFamily: "var(--sans)",
+                  transition: "all 0.1s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "var(--gh-green)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "var(--gh-green-dim)";
+                }}
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        )}
+
+        {projects.map((proj) => (
+          <ProjectItem
+            key={proj.name}
+            color={proj.color}
+            label={proj.name}
+            active={currentProject === proj.name}
+            onClick={() => {
+              setCurrentProject(proj.name);
+              if (currentView !== "today" && currentView !== "backlog") {
+                setCurrentView("today");
+              }
+            }}
+            onDelete={onDeleteProject}
+          />
+        ))}
       </div>
 
       <div
@@ -373,6 +570,7 @@ export default function Sidebar({
         </div>
         <div
           className="settings-btn"
+          onClick={onOpenSettings}
           style={{
             padding: "6px",
             borderRadius: "6px",

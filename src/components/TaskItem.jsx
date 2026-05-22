@@ -33,7 +33,17 @@ export default function TaskItem({
   onSelect,
   onToggle,
   loggedTime,
+  projects = [],
 }) {
+  const getProjectColor = (pName) => {
+    const found = projects.find((proj) => proj.name === pName);
+    return found ? found.color : "#bc8cff";
+  };
+
+  const pColor = getProjectColor(task.project);
+  const isHex = pColor.startsWith("#");
+  const borderColor = isHex ? `${pColor}4d` : "rgba(188, 140, 255, 0.3)";
+  const backgroundColor = isHex ? `${pColor}14` : "rgba(188, 140, 255, 0.08)";
   const totalSeconds = (task.sessions || []).reduce(
     (acc, sess) => acc + (sess.end - sess.start) / 1000,
     0,
@@ -104,7 +114,15 @@ export default function TaskItem({
             marginTop: 6,
           }}
         >
-          <span className="task-tag tag-project" style={{ fontSize: "11px" }}>
+          <span
+            className="task-tag"
+            style={{
+              fontSize: "11px",
+              color: pColor,
+              borderColor: borderColor,
+              background: backgroundColor,
+            }}
+          >
             {task.project}
           </span>
           {task.due && (

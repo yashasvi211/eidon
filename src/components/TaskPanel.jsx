@@ -34,6 +34,7 @@ export default function TaskPanel({
   handleQuickAdd,
   currentView,
   currentProject,
+  projects = [],
 }) {
   return (
     <div
@@ -99,6 +100,7 @@ export default function TaskPanel({
               loggedTime={timeLogs
                 .filter((l) => l.taskId === task.id)
                 .reduce((a, l) => a + l.seconds, 0)}
+              projects={projects}
             />
           ))}
       </div>

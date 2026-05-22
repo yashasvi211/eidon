@@ -8,6 +8,7 @@ import TimeTracking from "./components/TimeTracking";
 import AddTaskModal from "./components/AddTaskModal";
 import ScheduledView from "./components/ScheduledView";
 import LoadingScreen from "./components/LoadingScreen";
+import SettingsModal from "./components/SettingsModal";
 
 // ============================================================
 // UTILITIES
@@ -32,6 +33,77 @@ function App() {
   const [currentFilter, setCurrentFilter] = useState("all");
   const [currentProject, setCurrentProject] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  // Settings State
+  const [settings, setSettings] = useState(() => {
+    const saved = localStorage.getItem("eidon_settings");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse settings from localStorage", e);
+      }
+    }
+    return { appSize: 100 };
+  });
+
+  useEffect(() => {
+    localStorage.setItem("eidon_settings", JSON.stringify(settings));
+  }, [settings]);
+
+  // Dynamic Projects State with localStorage support
+  const [projects, setProjects] = useState(() => {
+    const saved = localStorage.getItem("eidon_projects");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse projects from localStorage", e);
+      }
+    }
+    return [
+      { name: "HubSpot Integration", color: "#58a6ff" },
+      { name: "Bill of Material", color: "#3fb950" },
+      { name: "GitHub Logs Backup", color: "#bc8cff" },
+      { name: "Inbox", color: "#8b949e" },
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem("eidon_projects", JSON.stringify(projects));
+  }, [projects]);
+
+  const handleAddProject = (name, color) => {
+    if (!name.trim()) return;
+    if (
+      projects.some((p) => p.name.toLowerCase() === name.trim().toLowerCase())
+    ) {
+      return;
+    }
+    const newProj = { name: name.trim(), color };
+    setProjects([...projects, newProj]);
+    setCurrentProject(newProj.name);
+    setCurrentView("today");
+  };
+
+  const handleDeleteProject = (projectName) => {
+    if (projectName === "Inbox") return;
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete project "${projectName}"? Tasks will be moved to Inbox.`,
+    );
+    if (!confirmDelete) return;
+
+    setProjects(projects.filter((p) => p.name !== projectName));
+    setTasks(
+      tasks.map((t) =>
+        t.project === projectName ? { ...t, project: "Inbox" } : t,
+      ),
+    );
+    if (currentProject === projectName) {
+      setCurrentProject(null);
+    }
+  };
 
   // Timer State
   const [timerSeconds, setTimerSeconds] = useState(0);
@@ -185,6 +257,7 @@ function App() {
           handleQuickAdd={handleQuickAdd}
           currentView={currentView}
           currentProject={currentProject}
+          projects={projects}
         />
 
         <DetailPanel
@@ -195,6 +268,7 @@ function App() {
           onStartTimer={handleStartTimer}
           onStopTimer={handleStopTimer}
           timerSeconds={timerSeconds}
+          projects={projects}
         />
       </>
     );
@@ -208,6 +282,7 @@ function App() {
         width: "100%",
         height: "100vh",
         animation: "contentFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1)",
+        zoom: settings.appSize / 100,
       }}
     >
       <Sidebar
@@ -216,6 +291,10 @@ function App() {
         tasks={tasks}
         currentProject={currentProject}
         setCurrentProject={setCurrentProject}
+        projects={projects}
+        onAddProject={handleAddProject}
+        onDeleteProject={handleDeleteProject}
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
       <div
@@ -247,6 +326,16 @@ function App() {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onAdd={handleAddTask}
+        projects={projects}
+      />
+
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        projects={projects}
+        setProjects={setProjects}
+        settings={settings}
+        setSettings={setSettings}
       />
     </div>
   );
