@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -314,11 +315,58 @@ export default function DetailPanel({
           background: "var(--gh-surface)",
           display: "flex",
           flexDirection: "column",
-          padding: "20px",
-          color: "var(--gh-muted)",
+          borderLeft: "1px solid var(--gh-border)",
         }}
       >
-        Select a task to see details
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "16px",
+            padding: "40px 20px",
+            color: "var(--gh-muted)",
+          }}
+        >
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <motion.svg
+              width="48"
+              height="48"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              animate={{ opacity: [0.4, 1, 0.4] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            >
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+            </motion.svg>
+          </motion.div>
+          <motion.div
+            initial={{ y: 10, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ duration: 0.4, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+            style={{
+              fontSize: "14px",
+              fontWeight: 500,
+              textAlign: "center",
+              lineHeight: "1.5",
+            }}
+          >
+            Select a task to see details
+          </motion.div>
+        </div>
       </div>
     );
 

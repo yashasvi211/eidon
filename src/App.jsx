@@ -196,6 +196,11 @@ function App() {
     fetchData();
   }, []);
 
+  // Close right sidebar when switching views/workspaces
+  useEffect(() => {
+    setSelectedTaskId(null);
+  }, [currentView, currentProject]);
+
   useEffect(() => {
     let interval = null;
     if (isTimerRunning) {

@@ -1,33 +1,8 @@
-import React, { useState } from "react";
 import TaskItem from "./TaskItem";
-
-function FilterTag({ active, onClick, label }) {
-  return (
-    <span
-      className={`section-tag ${active ? "active" : ""}`}
-      onClick={onClick}
-      style={{
-        fontFamily: "var(--mono)",
-        fontSize: "11px",
-        background: active ? "rgba(31,111,235,0.1)" : "var(--gh-surface2)",
-        border: `1px solid ${active ? "var(--gh-blue-dim)" : "var(--gh-border)"}`,
-        borderRadius: "20px",
-        padding: "2px 10px",
-        color: active ? "var(--gh-blue)" : "var(--gh-muted)",
-        cursor: "pointer",
-        transition: "all 0.15s",
-      }}
-    >
-      {label}
-    </span>
-  );
-}
 
 export default function TaskPanel({
   tasks,
   timeLogs,
-  currentFilter,
-  setCurrentFilter,
   selectedTaskId,
   setSelectedTaskId,
   toggleDone,
@@ -47,31 +22,6 @@ export default function TaskPanel({
         borderRight: "1px solid var(--gh-border)",
       }}
     >
-      <div
-        className="task-panel-header"
-        style={{
-          padding: "12px 16px",
-          borderBottom: "1px solid var(--gh-border)",
-          display: "flex",
-          gap: "10px",
-        }}
-      >
-        <FilterTag
-          active={currentFilter === "all"}
-          onClick={() => setCurrentFilter("all")}
-          label="All"
-        />
-        <FilterTag
-          active={currentFilter === "active"}
-          onClick={() => setCurrentFilter("active")}
-          label="Active"
-        />
-        <FilterTag
-          active={currentFilter === "done"}
-          onClick={() => setCurrentFilter("done")}
-          label="Done"
-        />
-      </div>
       <div
         className="task-list"
         style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}
@@ -93,12 +43,8 @@ export default function TaskPanel({
               return t.target === currentView && !backlog;
             })
             .filter((t) => {
-              if (!showCompleted && t.done && currentFilter !== "done") return false;
-              return currentFilter === "all"
-                ? true
-                : currentFilter === "active"
-                  ? !t.done
-                  : t.done;
+              if (!showCompleted && t.done) return false;
+              return true;
             });
 
           const renderList = (list) => list.map((task) => (
