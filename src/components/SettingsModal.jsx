@@ -263,6 +263,62 @@ export default function SettingsModal({
         </div>
 
         <div style={{ padding: "20px", overflowY: "auto", flex: 1 }}>
+          <section style={{ marginBottom: "24px", borderBottom: "1px solid var(--gh-border)", paddingBottom: "20px" }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <div>
+                <label
+                  style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "600",
+                    color: "var(--gh-text)",
+                    marginBottom: "4px",
+                  }}
+                >
+                  Show Completed Tasks
+                </label>
+                <span style={{ fontSize: "11px", color: "var(--gh-muted)" }}>
+                  Display finished tasks in your lists
+                </span>
+              </div>
+              <div
+                onClick={() => setSettings({ ...settings, showCompleted: settings.showCompleted !== false ? false : true })}
+                style={{
+                  width: "44px",
+                  height: "24px",
+                  borderRadius: "12px",
+                  background: settings.showCompleted !== false ? "var(--gh-blue)" : "var(--gh-surface2)",
+                  border: "1px solid var(--gh-border2)",
+                  position: "relative",
+                  cursor: "pointer",
+                  transition: "background-color 0.2s ease, border-color 0.2s ease",
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                <motion.div
+                  layout
+                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  style={{
+                    width: "18px",
+                    height: "18px",
+                    borderRadius: "50%",
+                    background: "var(--gh-text)",
+                    position: "absolute",
+                    left: settings.showCompleted !== false ? "22px" : "3px",
+                    boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
+                  }}
+                />
+              </div>
+            </div>
+          </section>
+
           <section style={{ marginBottom: "24px" }}>
             <div
               style={{

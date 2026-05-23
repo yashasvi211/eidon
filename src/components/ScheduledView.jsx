@@ -4,7 +4,7 @@ const fmtDateISO = (d) => {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 };
 
-export default function ScheduledView({ tasks, setSelectedTaskId, setCurrentView }) {
+export default function ScheduledView({ tasks, setSelectedTaskId, setCurrentView, showCompleted = true }) {
   const [viewDate, setViewDate] = useState(new Date());
 
   const calendarData = useMemo(() => {
@@ -54,7 +54,7 @@ export default function ScheduledView({ tasks, setSelectedTaskId, setCurrentView
 
   const getTasksForDate = (date) => {
     const iso = fmtDateISO(date);
-    return tasks.filter(t => t.due === iso);
+    return tasks.filter(t => t.due === iso && (showCompleted || !t.done));
   };
 
   return (

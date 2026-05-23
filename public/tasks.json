@@ -10,24 +10,87 @@
       "done": false,
       "target": "today",
       "subtasks": [
-        { "id": "s1", "title": "Implement new type system in PostgreSQL", "done": true },
-        { "id": "s2", "title": "Refactor Site ID validation logic", "done": true },
-        { "id": "s3", "title": "Optimize scaling algorithms for large datasets", "done": true },
-        { "id": "s4", "title": "Connect frontend React components to new API", "done": true },
-        { "id": "s5", "title": "Research and document adjustment logic", "done": true },
-        { "id": "s6", "title": "Fix layout issues in Item Spec Tab", "done": true },
-        { "id": "s7", "title": "Conduct peer review for the entire module", "done": false },
-        { "id": "s8", "title": "Write end-to-end integration tests", "done": false },
-        { "id": "s9", "title": "Benchmark query performance with 50k items", "done": false },
-        { "id": "s10", "title": "Update API documentation and OpenAPI spec", "done": false }
+        {
+          "id": "s1",
+          "title": "Implement new type system in PostgreSQL",
+          "done": true
+        },
+        {
+          "id": "s2",
+          "title": "Refactor Site ID validation logic",
+          "done": true
+        },
+        {
+          "id": "s3",
+          "title": "Optimize scaling algorithms for large datasets",
+          "done": true
+        },
+        {
+          "id": "s4",
+          "title": "Connect frontend React components to new API",
+          "done": true
+        },
+        {
+          "id": "s5",
+          "title": "Research and document adjustment logic",
+          "done": true
+        },
+        {
+          "id": "s6",
+          "title": "Fix layout issues in Item Spec Tab",
+          "done": true
+        },
+        {
+          "id": "s7",
+          "title": "Conduct peer review for the entire module",
+          "done": false
+        },
+        {
+          "id": "s8",
+          "title": "Write end-to-end integration tests",
+          "done": false
+        },
+        {
+          "id": "s9",
+          "title": "Benchmark query performance with 50k items",
+          "done": false
+        },
+        {
+          "id": "s10",
+          "title": "Update API documentation and OpenAPI spec",
+          "done": false
+        }
       ],
       "sessions": [
-        { "id": "sess1", "start": 1743465600000, "end": 1743469200000 },
-        { "id": "sess2", "start": 1743472800000, "end": 1743476400000 },
-        { "id": "sess3", "start": 1743552000000, "end": 1743556800000 },
-        { "id": "sess4", "start": 1743638400000, "end": 1743643200000 },
-        { "id": "sess5", "start": 1743724800000, "end": 1743729600000 }
-      ]
+        {
+          "id": "sess1",
+          "start": 1743465600000,
+          "end": 1743469200000
+        },
+        {
+          "id": "sess2",
+          "start": 1743472800000,
+          "end": 1743476400000
+        },
+        {
+          "id": "sess3",
+          "start": 1743552000000,
+          "end": 1743556800000
+        },
+        {
+          "id": "sess4",
+          "start": 1743638400000,
+          "end": 1743643200000
+        },
+        {
+          "id": "sess5",
+          "start": 1743724800000,
+          "end": 1743729600000
+        }
+      ],
+      "createdAt": 1743379200000,
+      "completedAt": null,
+      "auditLog": []
     },
     {
       "id": "t2",
@@ -39,19 +102,62 @@
       "done": false,
       "target": "today",
       "subtasks": [
-        { "id": "s11", "title": "Create developer portal app in HubSpot", "done": true },
-        { "id": "s12", "title": "Configure redirect URIs and OAuth scopes", "done": true },
-        { "id": "s13", "title": "Implement token exchange logic with PKCE", "done": true },
-        { "id": "s14", "title": "Build refresh token rotation with secure storage", "done": false },
-        { "id": "s15", "title": "Handle HubSpot API rate limiting with backoff", "done": false },
-        { "id": "s16", "title": "Implement contact sync webhook handler", "done": false },
-        { "id": "s17", "title": "Add deal stage change event processing", "done": false },
-        { "id": "s18", "title": "Write integration tests with sandbox account", "done": false }
+        {
+          "id": "s11",
+          "title": "Create developer portal app in HubSpot",
+          "done": true
+        },
+        {
+          "id": "s12",
+          "title": "Configure redirect URIs and OAuth scopes",
+          "done": true
+        },
+        {
+          "id": "s13",
+          "title": "Implement token exchange logic with PKCE",
+          "done": true
+        },
+        {
+          "id": "s14",
+          "title": "Build refresh token rotation with secure storage",
+          "done": false
+        },
+        {
+          "id": "s15",
+          "title": "Handle HubSpot API rate limiting with backoff",
+          "done": false
+        },
+        {
+          "id": "s16",
+          "title": "Implement contact sync webhook handler",
+          "done": false
+        },
+        {
+          "id": "s17",
+          "title": "Add deal stage change event processing",
+          "done": false
+        },
+        {
+          "id": "s18",
+          "title": "Write integration tests with sandbox account",
+          "done": false
+        }
       ],
       "sessions": [
-        { "id": "sess6", "start": 1743811200000, "end": 1743814800000 },
-        { "id": "sess7", "start": 1743897600000, "end": 1743902400000 }
-      ]
+        {
+          "id": "sess6",
+          "start": 1743811200000,
+          "end": 1743814800000
+        },
+        {
+          "id": "sess7",
+          "start": 1743897600000,
+          "end": 1743902400000
+        }
+      ],
+      "createdAt": 1743724800000,
+      "completedAt": null,
+      "auditLog": []
     },
     {
       "id": "t3",
@@ -63,18 +169,57 @@
       "done": false,
       "target": "today",
       "subtasks": [
-        { "id": "s19", "title": "Write log extraction script using GitHub API", "done": true },
-        { "id": "s20", "title": "Setup S3 bucket with server-side encryption", "done": true },
-        { "id": "s21", "title": "Configure IAM roles and least-privilege policies", "done": true },
-        { "id": "s22", "title": "Implement incremental backup diff logic", "done": false },
-        { "id": "s23", "title": "Schedule nightly cron job with monitoring", "done": false },
-        { "id": "s24", "title": "Add failure alerts to PagerDuty", "done": false },
-        { "id": "s25", "title": "Document disaster recovery procedure", "done": false }
+        {
+          "id": "s19",
+          "title": "Write log extraction script using GitHub API",
+          "done": true
+        },
+        {
+          "id": "s20",
+          "title": "Setup S3 bucket with server-side encryption",
+          "done": true
+        },
+        {
+          "id": "s21",
+          "title": "Configure IAM roles and least-privilege policies",
+          "done": true
+        },
+        {
+          "id": "s22",
+          "title": "Implement incremental backup diff logic",
+          "done": false
+        },
+        {
+          "id": "s23",
+          "title": "Schedule nightly cron job with monitoring",
+          "done": false
+        },
+        {
+          "id": "s24",
+          "title": "Add failure alerts to PagerDuty",
+          "done": false
+        },
+        {
+          "id": "s25",
+          "title": "Document disaster recovery procedure",
+          "done": false
+        }
       ],
       "sessions": [
-        { "id": "sess8", "start": 1743984000000, "end": 1743987600000 },
-        { "id": "sess9", "start": 1744070400000, "end": 1744072200000 }
-      ]
+        {
+          "id": "sess8",
+          "start": 1743984000000,
+          "end": 1743987600000
+        },
+        {
+          "id": "sess9",
+          "start": 1744070400000,
+          "end": 1744072200000
+        }
+      ],
+      "createdAt": 1743897600000,
+      "completedAt": null,
+      "auditLog": []
     },
     {
       "id": "t4",
@@ -86,13 +231,32 @@
       "done": true,
       "target": "scheduled",
       "subtasks": [
-        { "id": "s26", "title": "Prepare Miro retro board", "done": true },
-        { "id": "s27", "title": "Compile sprint velocity report", "done": true },
-        { "id": "s28", "title": "Send calendar invite with agenda", "done": true }
+        {
+          "id": "s26",
+          "title": "Prepare Miro retro board",
+          "done": true
+        },
+        {
+          "id": "s27",
+          "title": "Compile sprint velocity report",
+          "done": true
+        },
+        {
+          "id": "s28",
+          "title": "Send calendar invite with agenda",
+          "done": true
+        }
       ],
       "sessions": [
-        { "id": "sess10", "start": 1744156800000, "end": 1744162200000 }
-      ]
+        {
+          "id": "sess10",
+          "start": 1744156800000,
+          "end": 1744162200000
+        }
+      ],
+      "createdAt": 1744070400000,
+      "completedAt": 1744162200000,
+      "auditLog": []
     },
     {
       "id": "t5",
@@ -104,14 +268,41 @@
       "done": false,
       "target": "scheduled",
       "subtasks": [
-        { "id": "s29", "title": "Run dependency vulnerability scan", "done": true },
-        { "id": "s30", "title": "Review IAM policy compliance against least-privilege", "done": false },
-        { "id": "s31", "title": "Audit CloudTrail for anomalous access patterns", "done": false },
-        { "id": "s32", "title": "Verify TLS 1.2+ enforcement across all services", "done": false },
-        { "id": "s33", "title": "Check Docker image CVEs in ECR registry", "done": false },
-        { "id": "s34", "title": "Generate security posture report for CISO", "done": false }
+        {
+          "id": "s29",
+          "title": "Run dependency vulnerability scan",
+          "done": true
+        },
+        {
+          "id": "s30",
+          "title": "Review IAM policy compliance against least-privilege",
+          "done": false
+        },
+        {
+          "id": "s31",
+          "title": "Audit CloudTrail for anomalous access patterns",
+          "done": false
+        },
+        {
+          "id": "s32",
+          "title": "Verify TLS 1.2+ enforcement across all services",
+          "done": false
+        },
+        {
+          "id": "s33",
+          "title": "Check Docker image CVEs in ECR registry",
+          "done": false
+        },
+        {
+          "id": "s34",
+          "title": "Generate security posture report for CISO",
+          "done": false
+        }
       ],
-      "sessions": []
+      "sessions": [],
+      "createdAt": 1743292800000,
+      "completedAt": null,
+      "auditLog": []
     },
     {
       "id": "t6",
@@ -123,14 +314,37 @@
       "done": false,
       "target": "backlog",
       "subtasks": [
-        { "id": "s35", "title": "Research Style Dictionary token format", "done": true },
-        { "id": "s36", "title": "Prototype dark/light theme switching", "done": false },
-        { "id": "s37", "title": "Build Figma token sync proof-of-concept", "done": false },
-        { "id": "s38", "title": "Write migration guide for component library", "done": false }
+        {
+          "id": "s35",
+          "title": "Research Style Dictionary token format",
+          "done": true
+        },
+        {
+          "id": "s36",
+          "title": "Prototype dark/light theme switching",
+          "done": false
+        },
+        {
+          "id": "s37",
+          "title": "Build Figma token sync proof-of-concept",
+          "done": false
+        },
+        {
+          "id": "s38",
+          "title": "Write migration guide for component library",
+          "done": false
+        }
       ],
       "sessions": [
-        { "id": "sess11", "start": 1744243200000, "end": 1744246800000 }
-      ]
+        {
+          "id": "sess11",
+          "start": 1744243200000,
+          "end": 1744246800000
+        }
+      ],
+      "createdAt": 1744156800000,
+      "completedAt": null,
+      "auditLog": []
     },
     {
       "id": "t7",
@@ -142,16 +356,47 @@
       "done": false,
       "target": "today",
       "subtasks": [
-        { "id": "s39", "title": "Design rate limit schema and Redis key structure", "done": true },
-        { "id": "s40", "title": "Implement sliding window counter algorithm", "done": false },
-        { "id": "s41", "title": "Add per-tenant and per-endpoint configuration", "done": false },
-        { "id": "s42", "title": "Return proper 429 with Retry-After headers", "done": false },
-        { "id": "s43", "title": "Build monitoring dashboard with rate limit metrics", "done": false },
-        { "id": "s44", "title": "Write load tests to verify behavior under pressure", "done": false }
+        {
+          "id": "s39",
+          "title": "Design rate limit schema and Redis key structure",
+          "done": true
+        },
+        {
+          "id": "s40",
+          "title": "Implement sliding window counter algorithm",
+          "done": false
+        },
+        {
+          "id": "s41",
+          "title": "Add per-tenant and per-endpoint configuration",
+          "done": false
+        },
+        {
+          "id": "s42",
+          "title": "Return proper 429 with Retry-After headers",
+          "done": false
+        },
+        {
+          "id": "s43",
+          "title": "Build monitoring dashboard with rate limit metrics",
+          "done": false
+        },
+        {
+          "id": "s44",
+          "title": "Write load tests to verify behavior under pressure",
+          "done": false
+        }
       ],
       "sessions": [
-        { "id": "sess12", "start": 1744329600000, "end": 1744333200000 }
-      ]
+        {
+          "id": "sess12",
+          "start": 1744329600000,
+          "end": 1744333200000
+        }
+      ],
+      "createdAt": 1744243200000,
+      "completedAt": null,
+      "auditLog": []
     },
     {
       "id": "t8",
@@ -163,15 +408,46 @@
       "done": false,
       "target": "backlog",
       "subtasks": [
-        { "id": "s45", "title": "Map HubSpot deal stages to internal pipeline", "done": false },
-        { "id": "s46", "title": "Implement webhook receiver for deal changes", "done": false },
-        { "id": "s47", "title": "Build custom property mapping configuration", "done": false },
-        { "id": "s48", "title": "Implement conflict resolution strategy (last-write-wins)", "done": false },
-        { "id": "s49", "title": "Build manual reconciliation UI component", "done": false },
-        { "id": "s50", "title": "Add sync audit logging to compliance database", "done": false },
-        { "id": "s51", "title": "Write end-to-end sync test suite", "done": false }
+        {
+          "id": "s45",
+          "title": "Map HubSpot deal stages to internal pipeline",
+          "done": false
+        },
+        {
+          "id": "s46",
+          "title": "Implement webhook receiver for deal changes",
+          "done": false
+        },
+        {
+          "id": "s47",
+          "title": "Build custom property mapping configuration",
+          "done": false
+        },
+        {
+          "id": "s48",
+          "title": "Implement conflict resolution strategy (last-write-wins)",
+          "done": false
+        },
+        {
+          "id": "s49",
+          "title": "Build manual reconciliation UI component",
+          "done": false
+        },
+        {
+          "id": "s50",
+          "title": "Add sync audit logging to compliance database",
+          "done": false
+        },
+        {
+          "id": "s51",
+          "title": "Write end-to-end sync test suite",
+          "done": false
+        }
       ],
-      "sessions": []
+      "sessions": [],
+      "createdAt": 1743292800000,
+      "completedAt": null,
+      "auditLog": []
     },
     {
       "id": "t9",
@@ -183,18 +459,57 @@
       "done": false,
       "target": "today",
       "subtasks": [
-        { "id": "s52", "title": "Design auto-scaling architecture with ASG", "done": true },
-        { "id": "s53", "title": "Create AMI with runner registration script", "done": true },
-        { "id": "s54", "title": "Implement scale-up based on GitHub queue depth", "done": false },
-        { "id": "s55", "title": "Implement scale-down with graceful job drain", "done": false },
-        { "id": "s56", "title": "Configure spot instance interruption handling", "done": false },
-        { "id": "s57", "title": "Add CloudWatch dashboards for runner utilization", "done": false },
-        { "id": "s58", "title": "Document cost analysis vs GitHub hosted runners", "done": false }
+        {
+          "id": "s52",
+          "title": "Design auto-scaling architecture with ASG",
+          "done": true
+        },
+        {
+          "id": "s53",
+          "title": "Create AMI with runner registration script",
+          "done": true
+        },
+        {
+          "id": "s54",
+          "title": "Implement scale-up based on GitHub queue depth",
+          "done": false
+        },
+        {
+          "id": "s55",
+          "title": "Implement scale-down with graceful job drain",
+          "done": false
+        },
+        {
+          "id": "s56",
+          "title": "Configure spot instance interruption handling",
+          "done": false
+        },
+        {
+          "id": "s57",
+          "title": "Add CloudWatch dashboards for runner utilization",
+          "done": false
+        },
+        {
+          "id": "s58",
+          "title": "Document cost analysis vs GitHub hosted runners",
+          "done": false
+        }
       ],
       "sessions": [
-        { "id": "sess13", "start": 1744416000000, "end": 1744419600000 },
-        { "id": "sess14", "start": 1744502400000, "end": 1744507200000 }
-      ]
+        {
+          "id": "sess13",
+          "start": 1744416000000,
+          "end": 1744419600000
+        },
+        {
+          "id": "sess14",
+          "start": 1744502400000,
+          "end": 1744507200000
+        }
+      ],
+      "createdAt": 1744329600000,
+      "completedAt": null,
+      "auditLog": []
     },
     {
       "id": "t10",
@@ -206,13 +521,36 @@
       "done": false,
       "target": "backlog",
       "subtasks": [
-        { "id": "s59", "title": "Analyze current pool config and PG settings", "done": true },
-        { "id": "s60", "title": "Identify connection leak suspects via pg_stat_activity", "done": true },
-        { "id": "s61", "title": "Set up pgbouncer in transaction mode", "done": false },
-        { "id": "s62", "title": "Implement statement timeout and connection limits", "done": false },
-        { "id": "s63", "title": "Add Datadog monitoring for pool metrics", "done": false }
+        {
+          "id": "s59",
+          "title": "Analyze current pool config and PG settings",
+          "done": true
+        },
+        {
+          "id": "s60",
+          "title": "Identify connection leak suspects via pg_stat_activity",
+          "done": true
+        },
+        {
+          "id": "s61",
+          "title": "Set up pgbouncer in transaction mode",
+          "done": false
+        },
+        {
+          "id": "s62",
+          "title": "Implement statement timeout and connection limits",
+          "done": false
+        },
+        {
+          "id": "s63",
+          "title": "Add Datadog monitoring for pool metrics",
+          "done": false
+        }
       ],
-      "sessions": []
+      "sessions": [],
+      "createdAt": 1743292800000,
+      "completedAt": null,
+      "auditLog": []
     },
     {
       "id": "t11",
@@ -224,11 +562,26 @@
       "done": false,
       "target": "scheduled",
       "subtasks": [
-        { "id": "s64", "title": "Collect dietary restrictions from team", "done": true },
-        { "id": "s65", "title": "Make reservation for 8 at 12:30", "done": false },
-        { "id": "s66", "title": "Confirm attendance in Slack", "done": false }
+        {
+          "id": "s64",
+          "title": "Collect dietary restrictions from team",
+          "done": true
+        },
+        {
+          "id": "s65",
+          "title": "Make reservation for 8 at 12:30",
+          "done": false
+        },
+        {
+          "id": "s66",
+          "title": "Confirm attendance in Slack",
+          "done": false
+        }
       ],
-      "sessions": []
+      "sessions": [],
+      "createdAt": 1743292800000,
+      "completedAt": null,
+      "auditLog": []
     },
     {
       "id": "t12",
@@ -240,13 +593,32 @@
       "done": false,
       "target": "scheduled",
       "subtasks": [
-        { "id": "s67", "title": "Review PRs from junior devs this sprint", "done": true },
-        { "id": "s68", "title": "Prepare personal growth plan updates", "done": false },
-        { "id": "s69", "title": "Pair program on error handling patterns", "done": false }
+        {
+          "id": "s67",
+          "title": "Review PRs from junior devs this sprint",
+          "done": true
+        },
+        {
+          "id": "s68",
+          "title": "Prepare personal growth plan updates",
+          "done": false
+        },
+        {
+          "id": "s69",
+          "title": "Pair program on error handling patterns",
+          "done": false
+        }
       ],
       "sessions": [
-        { "id": "sess15", "start": 1744588800000, "end": 1744596000000 }
-      ]
+        {
+          "id": "sess15",
+          "start": 1744588800000,
+          "end": 1744596000000
+        }
+      ],
+      "createdAt": 1744502400000,
+      "completedAt": null,
+      "auditLog": []
     },
     {
       "id": "t13",
@@ -258,19 +630,62 @@
       "done": false,
       "target": "backlog",
       "subtasks": [
-        { "id": "s70", "title": "Audit existing Jenkins pipelines and their steps", "done": true },
-        { "id": "s71", "title": "Design GH Actions workflow structure and matrix", "done": true },
-        { "id": "s72", "title": "Build parallel test execution workflow", "done": false },
-        { "id": "s73", "title": "Build Docker image build and push workflow", "done": false },
-        { "id": "s74", "title": "Set up deployment approval gates with environments", "done": false },
-        { "id": "s75", "title": "Migrate secrets from Jenkins to GitHub secrets", "done": false },
-        { "id": "s76", "title": "Run parallel old vs new CI for regression validation", "done": false },
-        { "id": "s77", "title": "Decommission Jenkins server and document migration", "done": false }
+        {
+          "id": "s70",
+          "title": "Audit existing Jenkins pipelines and their steps",
+          "done": true
+        },
+        {
+          "id": "s71",
+          "title": "Design GH Actions workflow structure and matrix",
+          "done": true
+        },
+        {
+          "id": "s72",
+          "title": "Build parallel test execution workflow",
+          "done": false
+        },
+        {
+          "id": "s73",
+          "title": "Build Docker image build and push workflow",
+          "done": false
+        },
+        {
+          "id": "s74",
+          "title": "Set up deployment approval gates with environments",
+          "done": false
+        },
+        {
+          "id": "s75",
+          "title": "Migrate secrets from Jenkins to GitHub secrets",
+          "done": false
+        },
+        {
+          "id": "s76",
+          "title": "Run parallel old vs new CI for regression validation",
+          "done": false
+        },
+        {
+          "id": "s77",
+          "title": "Decommission Jenkins server and document migration",
+          "done": false
+        }
       ],
       "sessions": [
-        { "id": "sess16", "start": 1744675200000, "end": 1744678800000 },
-        { "id": "sess17", "start": 1744761600000, "end": 1744767000000 }
-      ]
+        {
+          "id": "sess16",
+          "start": 1744675200000,
+          "end": 1744678800000
+        },
+        {
+          "id": "sess17",
+          "start": 1744761600000,
+          "end": 1744767000000
+        }
+      ],
+      "createdAt": 1744588800000,
+      "completedAt": null,
+      "auditLog": []
     },
     {
       "id": "t14",
@@ -282,12 +697,31 @@
       "done": false,
       "target": "backlog",
       "subtasks": [
-        { "id": "s78", "title": "Design tags database schema", "done": false },
-        { "id": "s79", "title": "Build tag picker component with autocomplete", "done": false },
-        { "id": "s80", "title": "Implement AND/OR filter combination logic", "done": false },
-        { "id": "s81", "title": "Add saved filter preset feature", "done": false }
+        {
+          "id": "s78",
+          "title": "Design tags database schema",
+          "done": false
+        },
+        {
+          "id": "s79",
+          "title": "Build tag picker component with autocomplete",
+          "done": false
+        },
+        {
+          "id": "s80",
+          "title": "Implement AND/OR filter combination logic",
+          "done": false
+        },
+        {
+          "id": "s81",
+          "title": "Add saved filter preset feature",
+          "done": false
+        }
       ],
-      "sessions": []
+      "sessions": [],
+      "createdAt": 1743292800000,
+      "completedAt": null,
+      "auditLog": []
     },
     {
       "id": "t15",
@@ -299,15 +733,42 @@
       "done": true,
       "target": "scheduled",
       "subtasks": [
-        { "id": "s82", "title": "Take heap snapshot and identify leak source", "done": true },
-        { "id": "s83", "title": "Audit event listener cleanup in disconnect handler", "done": true },
-        { "id": "s84", "title": "Deploy hotfix to production with monitoring", "done": true },
-        { "id": "s85", "title": "Write postmortem and update runbook", "done": true }
+        {
+          "id": "s82",
+          "title": "Take heap snapshot and identify leak source",
+          "done": true
+        },
+        {
+          "id": "s83",
+          "title": "Audit event listener cleanup in disconnect handler",
+          "done": true
+        },
+        {
+          "id": "s84",
+          "title": "Deploy hotfix to production with monitoring",
+          "done": true
+        },
+        {
+          "id": "s85",
+          "title": "Write postmortem and update runbook",
+          "done": true
+        }
       ],
       "sessions": [
-        { "id": "sess18", "start": 1744848000000, "end": 1744851600000 },
-        { "id": "sess19", "start": 1744934400000, "end": 1744936200000 }
-      ]
+        {
+          "id": "sess18",
+          "start": 1744848000000,
+          "end": 1744851600000
+        },
+        {
+          "id": "sess19",
+          "start": 1744934400000,
+          "end": 1744936200000
+        }
+      ],
+      "createdAt": 1744761600000,
+      "completedAt": 1744936200000,
+      "auditLog": []
     },
     {
       "id": "t16",
@@ -319,16 +780,47 @@
       "done": false,
       "target": "today",
       "subtasks": [
-        { "id": "s86", "title": "Extract VPA recommendations for all namespaces", "done": true },
-        { "id": "s87", "title": "Analyze 30-day CPU and memory usage patterns", "done": true },
-        { "id": "s88", "title": "Update resource requests/limits in Helm values", "done": false },
-        { "id": "s89", "title": "Deploy to staging and verify no regressions", "done": false },
-        { "id": "s90", "title": "Roll out to production with gradual rollout", "done": false },
-        { "id": "s91", "title": "Document optimization methodology and results", "done": false }
+        {
+          "id": "s86",
+          "title": "Extract VPA recommendations for all namespaces",
+          "done": true
+        },
+        {
+          "id": "s87",
+          "title": "Analyze 30-day CPU and memory usage patterns",
+          "done": true
+        },
+        {
+          "id": "s88",
+          "title": "Update resource requests/limits in Helm values",
+          "done": false
+        },
+        {
+          "id": "s89",
+          "title": "Deploy to staging and verify no regressions",
+          "done": false
+        },
+        {
+          "id": "s90",
+          "title": "Roll out to production with gradual rollout",
+          "done": false
+        },
+        {
+          "id": "s91",
+          "title": "Document optimization methodology and results",
+          "done": false
+        }
       ],
       "sessions": [
-        { "id": "sess20", "start": 1745020800000, "end": 1745024400000 }
-      ]
+        {
+          "id": "sess20",
+          "start": 1745020800000,
+          "end": 1745024400000
+        }
+      ],
+      "createdAt": 1744934400000,
+      "completedAt": null,
+      "auditLog": []
     },
     {
       "id": "t17",
@@ -340,12 +832,31 @@
       "done": false,
       "target": "backlog",
       "subtasks": [
-        { "id": "s92", "title": "Review current onboarding docs for stale content", "done": true },
-        { "id": "s93", "title": "Update architecture diagrams (draw.io)", "done": false },
-        { "id": "s94", "title": "Record Loom walkthrough of dev environment setup", "done": false },
-        { "id": "s95", "title": "PR for review with the newest hire as reviewer", "done": false }
+        {
+          "id": "s92",
+          "title": "Review current onboarding docs for stale content",
+          "done": true
+        },
+        {
+          "id": "s93",
+          "title": "Update architecture diagrams (draw.io)",
+          "done": false
+        },
+        {
+          "id": "s94",
+          "title": "Record Loom walkthrough of dev environment setup",
+          "done": false
+        },
+        {
+          "id": "s95",
+          "title": "PR for review with the newest hire as reviewer",
+          "done": false
+        }
       ],
-      "sessions": []
+      "sessions": [],
+      "createdAt": 1743292800000,
+      "completedAt": null,
+      "auditLog": []
     },
     {
       "id": "t18",
@@ -357,14 +868,41 @@
       "done": false,
       "target": "backlog",
       "subtasks": [
-        { "id": "s96", "title": "Scaffold ESLint plugin package structure", "done": false },
-        { "id": "s97", "title": "Write rule: no-direct-dom-mutation", "done": false },
-        { "id": "s98", "title": "Write rule: require-jsdoc-on-exports", "done": false },
-        { "id": "s99", "title": "Write rule: enforce-import-order", "done": false },
-        { "id": "s100", "title": "Set up automated release with semantic-release", "done": false },
-        { "id": "s101", "title": "Integrate with pre-commit hooks and CI pipeline", "done": false }
+        {
+          "id": "s96",
+          "title": "Scaffold ESLint plugin package structure",
+          "done": false
+        },
+        {
+          "id": "s97",
+          "title": "Write rule: no-direct-dom-mutation",
+          "done": false
+        },
+        {
+          "id": "s98",
+          "title": "Write rule: require-jsdoc-on-exports",
+          "done": false
+        },
+        {
+          "id": "s99",
+          "title": "Write rule: enforce-import-order",
+          "done": false
+        },
+        {
+          "id": "s100",
+          "title": "Set up automated release with semantic-release",
+          "done": false
+        },
+        {
+          "id": "s101",
+          "title": "Integrate with pre-commit hooks and CI pipeline",
+          "done": false
+        }
       ],
-      "sessions": []
+      "sessions": [],
+      "createdAt": 1743292800000,
+      "completedAt": null,
+      "auditLog": []
     },
     {
       "id": "t19",
@@ -376,17 +914,52 @@
       "done": false,
       "target": "today",
       "subtasks": [
-        { "id": "s102", "title": "Write k6 test scripts for BOM CRUD endpoints", "done": true },
-        { "id": "s103", "title": "Set up distributed k6 execution environment", "done": false },
-        { "id": "s104", "title": "Run baseline test at 100 concurrent users", "done": false },
-        { "id": "s105", "title": "Run ramp-up test from 100 to 10k users", "done": false },
-        { "id": "s106", "title": "Analyze bottlenecks from test results", "done": false },
-        { "id": "s107", "title": "Write optimization recommendations report", "done": false }
+        {
+          "id": "s102",
+          "title": "Write k6 test scripts for BOM CRUD endpoints",
+          "done": true
+        },
+        {
+          "id": "s103",
+          "title": "Set up distributed k6 execution environment",
+          "done": false
+        },
+        {
+          "id": "s104",
+          "title": "Run baseline test at 100 concurrent users",
+          "done": false
+        },
+        {
+          "id": "s105",
+          "title": "Run ramp-up test from 100 to 10k users",
+          "done": false
+        },
+        {
+          "id": "s106",
+          "title": "Analyze bottlenecks from test results",
+          "done": false
+        },
+        {
+          "id": "s107",
+          "title": "Write optimization recommendations report",
+          "done": false
+        }
       ],
       "sessions": [
-        { "id": "sess21", "start": 1745107200000, "end": 1745110800000 },
-        { "id": "sess22", "start": 1745193600000, "end": 1745198400000 }
-      ]
+        {
+          "id": "sess21",
+          "start": 1745107200000,
+          "end": 1745110800000
+        },
+        {
+          "id": "sess22",
+          "start": 1745193600000,
+          "end": 1745198400000
+        }
+      ],
+      "createdAt": 1745020800000,
+      "completedAt": null,
+      "auditLog": []
     },
     {
       "id": "t20",
@@ -398,13 +971,36 @@
       "done": false,
       "target": "backlog",
       "subtasks": [
-        { "id": "s108", "title": "Install and configure Turborepo with remote caching", "done": false },
-        { "id": "s109", "title": "Migrate shared packages one at a time", "done": false },
-        { "id": "s110", "title": "Update CI workflows for Turborepo pipeline", "done": false },
-        { "id": "s111", "title": "Benchmark CI speed before vs after migration", "done": false },
-        { "id": "s112", "title": "Document migration for other teams", "done": false }
+        {
+          "id": "s108",
+          "title": "Install and configure Turborepo with remote caching",
+          "done": false
+        },
+        {
+          "id": "s109",
+          "title": "Migrate shared packages one at a time",
+          "done": false
+        },
+        {
+          "id": "s110",
+          "title": "Update CI workflows for Turborepo pipeline",
+          "done": false
+        },
+        {
+          "id": "s111",
+          "title": "Benchmark CI speed before vs after migration",
+          "done": false
+        },
+        {
+          "id": "s112",
+          "title": "Document migration for other teams",
+          "done": false
+        }
       ],
-      "sessions": []
+      "sessions": [],
+      "createdAt": 1743292800000,
+      "completedAt": null,
+      "auditLog": []
     },
     {
       "id": "t21",
@@ -416,13 +1012,36 @@
       "done": false,
       "target": "backlog",
       "subtasks": [
-        { "id": "s113", "title": "Verify extension compatibility with PG 16", "done": true },
-        { "id": "s114", "title": "Test upgrade on staging environment", "done": false },
-        { "id": "s115", "title": "Benchmark query performance pre and post upgrade", "done": false },
-        { "id": "s116", "title": "Schedule production upgrade window", "done": false },
-        { "id": "s117", "title": "Execute production upgrade with rollback plan", "done": false }
+        {
+          "id": "s113",
+          "title": "Verify extension compatibility with PG 16",
+          "done": true
+        },
+        {
+          "id": "s114",
+          "title": "Test upgrade on staging environment",
+          "done": false
+        },
+        {
+          "id": "s115",
+          "title": "Benchmark query performance pre and post upgrade",
+          "done": false
+        },
+        {
+          "id": "s116",
+          "title": "Schedule production upgrade window",
+          "done": false
+        },
+        {
+          "id": "s117",
+          "title": "Execute production upgrade with rollback plan",
+          "done": false
+        }
       ],
-      "sessions": []
+      "sessions": [],
+      "createdAt": 1743292800000,
+      "completedAt": null,
+      "auditLog": []
     },
     {
       "id": "t22",
@@ -434,13 +1053,36 @@
       "done": false,
       "target": "backlog",
       "subtasks": [
-        { "id": "s118", "title": "Scaffold CLI project with Commander.js", "done": false },
-        { "id": "s119", "title": "Implement component scaffold command", "done": false },
-        { "id": "s120", "title": "Implement migration run command", "done": false },
-        { "id": "s121", "title": "Implement deployment trigger command", "done": false },
-        { "id": "s122", "title": "Add auto-update with update-notifier", "done": false }
+        {
+          "id": "s118",
+          "title": "Scaffold CLI project with Commander.js",
+          "done": false
+        },
+        {
+          "id": "s119",
+          "title": "Implement component scaffold command",
+          "done": false
+        },
+        {
+          "id": "s120",
+          "title": "Implement migration run command",
+          "done": false
+        },
+        {
+          "id": "s121",
+          "title": "Implement deployment trigger command",
+          "done": false
+        },
+        {
+          "id": "s122",
+          "title": "Add auto-update with update-notifier",
+          "done": false
+        }
       ],
-      "sessions": []
+      "sessions": [],
+      "createdAt": 1743292800000,
+      "completedAt": null,
+      "auditLog": []
     },
     {
       "id": "t23",
@@ -452,14 +1094,37 @@
       "done": false,
       "target": "today",
       "subtasks": [
-        { "id": "s123", "title": "Crawl codebase for inline button styles", "done": true },
-        { "id": "s124", "title": "Document all button variants and their usage", "done": true },
-        { "id": "s125", "title": "Fix 10 priority-inconsistency violations", "done": false },
-        { "id": "s126", "title": "Add loading spinner variant to Button component", "done": false }
+        {
+          "id": "s123",
+          "title": "Crawl codebase for inline button styles",
+          "done": true
+        },
+        {
+          "id": "s124",
+          "title": "Document all button variants and their usage",
+          "done": true
+        },
+        {
+          "id": "s125",
+          "title": "Fix 10 priority-inconsistency violations",
+          "done": false
+        },
+        {
+          "id": "s126",
+          "title": "Add loading spinner variant to Button component",
+          "done": false
+        }
       ],
       "sessions": [
-        { "id": "sess23", "start": 1745280000000, "end": 1745283600000 }
-      ]
+        {
+          "id": "sess23",
+          "start": 1745280000000,
+          "end": 1745283600000
+        }
+      ],
+      "createdAt": 1745193600000,
+      "completedAt": null,
+      "auditLog": []
     },
     {
       "id": "t24",
@@ -471,14 +1136,37 @@
       "done": false,
       "target": "today",
       "subtasks": [
-        { "id": "s127", "title": "Write anonymized DB seed scripts", "done": true },
-        { "id": "s128", "title": "Configure mock API servers (WireMock)", "done": false },
-        { "id": "s129", "title": "Set up sample file storage with realistic fixtures", "done": false },
-        { "id": "s130", "title": "Document staging setup procedure in README", "done": false }
+        {
+          "id": "s127",
+          "title": "Write anonymized DB seed scripts",
+          "done": true
+        },
+        {
+          "id": "s128",
+          "title": "Configure mock API servers (WireMock)",
+          "done": false
+        },
+        {
+          "id": "s129",
+          "title": "Set up sample file storage with realistic fixtures",
+          "done": false
+        },
+        {
+          "id": "s130",
+          "title": "Document staging setup procedure in README",
+          "done": false
+        }
       ],
       "sessions": [
-        { "id": "sess24", "start": 1745366400000, "end": 1745370000000 }
-      ]
+        {
+          "id": "sess24",
+          "start": 1745366400000,
+          "end": 1745370000000
+        }
+      ],
+      "createdAt": 1745280000000,
+      "completedAt": null,
+      "auditLog": []
     }
   ]
 }

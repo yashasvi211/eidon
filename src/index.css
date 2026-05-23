@@ -132,16 +132,91 @@ body {
     background: rgba(188, 140, 255, 0.08);
 }
 
+/* ── Deadline urgency levels ── */
 .tag-due {
     color: var(--gh-amber);
     border-color: rgba(210, 153, 34, 0.3);
     background: rgba(210, 153, 34, 0.08);
 }
 
+/* > 7 days away — calm green */
+.tag-due.due-safe {
+    color: #3fb950;
+    border-color: rgba(63, 185, 80, 0.3);
+    background: rgba(63, 185, 80, 0.08);
+}
+
+/* 3–7 days — amber caution */
+.tag-due.due-soon {
+    color: #d29922;
+    border-color: rgba(210, 153, 34, 0.35);
+    background: rgba(210, 153, 34, 0.1);
+}
+
+/* 1–2 days — orange warning */
+.tag-due.due-urgent {
+    color: #f0883e;
+    border-color: rgba(240, 136, 62, 0.4);
+    background: rgba(240, 136, 62, 0.12);
+}
+
+/* Overdue — red danger with subtle pulse */
 .tag-due.overdue {
-    color: var(--gh-red);
+    color: #f85149;
+    border-color: rgba(248, 81, 73, 0.45);
+    background: rgba(248, 81, 73, 0.12);
+    animation: overduePulse 2s ease-in-out infinite;
+}
+
+@keyframes overduePulse {
+    0%, 100% { background: rgba(248, 81, 73, 0.12); }
+    50% { background: rgba(248, 81, 73, 0.22); }
+}
+
+/* Due today — special highlight */
+.tag-due.due-today {
+    color: #e3b341;
+    border-color: rgba(227, 179, 65, 0.4);
+    background: rgba(227, 179, 65, 0.1);
+    font-weight: 600;
+    box-shadow: 0 0 4px rgba(227, 179, 65, 0.15);
+}
+
+/* ── Subtask progress levels ── */
+
+/* 0% — not started, muted red */
+.tag-subtask.progress-none {
+    color: #f85149;
     border-color: rgba(248, 81, 73, 0.3);
     background: rgba(248, 81, 73, 0.08);
+}
+
+/* 1–39% — early progress, orange */
+.tag-subtask.progress-low {
+    color: #f0883e;
+    border-color: rgba(240, 136, 62, 0.3);
+    background: rgba(240, 136, 62, 0.08);
+}
+
+/* 40–69% — making progress, amber */
+.tag-subtask.progress-mid {
+    color: #d29922;
+    border-color: rgba(210, 153, 34, 0.3);
+    background: rgba(210, 153, 34, 0.08);
+}
+
+/* 70–99% — almost there, teal/cyan */
+.tag-subtask.progress-high {
+    color: #56d4dd;
+    border-color: rgba(86, 212, 221, 0.3);
+    background: rgba(86, 212, 221, 0.08);
+}
+
+/* 100% — complete, vibrant green */
+.tag-subtask.progress-done {
+    color: #3fb950;
+    border-color: rgba(63, 185, 80, 0.35);
+    background: rgba(63, 185, 80, 0.1);
 }
 
 .tag-time {
@@ -154,4 +229,369 @@ body {
     color: var(--gh-amber);
     border-color: rgba(210, 153, 34, 0.3);
     background: rgba(210, 153, 34, 0.08);
+}
+
+/* ── Subtask progress bar in detail panel ── */
+.subtask-progress-bar {
+    width: 100%;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--gh-border);
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+.subtask-progress-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.4s ease, background 0.4s ease;
+}
+
+/* Deadline indicator dot for detail panel */
+.deadline-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+/* ── Audit Log Timeline ── */
+.audit-log {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    position: relative;
+}
+
+.audit-log::before {
+    content: '';
+    position: absolute;
+    left: 9px;
+    top: 12px;
+    bottom: 12px;
+    width: 2px;
+    background: var(--gh-border);
+    border-radius: 1px;
+}
+
+.audit-entry {
+    display: flex;
+    gap: 12px;
+    padding: 10px 0;
+    position: relative;
+    z-index: 1;
+}
+
+.audit-dot {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    flex-shrink: 0;
+    border: 2px solid var(--gh-surface);
+}
+
+.audit-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.audit-action {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--gh-text);
+    margin-bottom: 2px;
+}
+
+.audit-reason {
+    font-size: 12px;
+    color: var(--gh-muted);
+    font-style: italic;
+    margin-top: 2px;
+    padding: 4px 8px;
+    background: var(--gh-surface2);
+    border-radius: 4px;
+    border-left: 2px solid var(--gh-border2);
+}
+
+.audit-time {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--gh-muted);
+}
+
+/* ── Danger Zone ── */
+.danger-zone {
+    border: 1px solid rgba(248, 81, 73, 0.3);
+    border-radius: 10px;
+    padding: 16px;
+    background: rgba(248, 81, 73, 0.04);
+}
+
+.danger-zone-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--gh-red);
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.confirm-input {
+    background: var(--gh-surface2);
+    border: 1px solid var(--gh-border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: var(--gh-text);
+    font-family: var(--mono);
+    font-size: 13px;
+    outline: none;
+    width: 100%;
+    transition: all 0.15s;
+}
+
+.confirm-input:focus {
+    border-color: var(--gh-red);
+    box-shadow: 0 0 0 2px rgba(248, 81, 73, 0.15);
+}
+
+.confirm-input.matched {
+    border-color: var(--gh-red);
+    background: rgba(248, 81, 73, 0.08);
+}
+
+/* ── Timer Pulse ── */
+@keyframes timerPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.timer-pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--gh-green);
+    animation: timerPulse 1.5s ease-in-out infinite;
+    display: inline-block;
+}
+
+/* ── Edit Modal Sections ── */
+.edit-section {
+    margin-bottom: 20px;
+}
+
+.edit-section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--gh-muted);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    letter-spacing: 0.5px;
+}
+
+.edit-field-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.edit-field-label {
+    font-size: 13px;
+    color: var(--gh-muted);
+    width: 100px;
+    flex-shrink: 0;
+}
+
+.edit-field-input {
+    flex: 1;
+    background: var(--gh-surface2);
+    border: 1px solid var(--gh-border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: var(--gh-text);
+    font-family: var(--sans);
+    font-size: 13px;
+    outline: none;
+    transition: all 0.15s;
+}
+
+.edit-field-input:focus {
+    border-color: #2383e2;
+    box-shadow: 0 0 0 2px rgba(35, 131, 226, 0.2);
+}
+
+.reason-textarea {
+    width: 100%;
+    background: var(--gh-surface2);
+    border: 1px solid var(--gh-border);
+    border-radius: 6px;
+    padding: 10px 12px;
+    color: var(--gh-text);
+    font-family: var(--sans);
+    font-size: 13px;
+    outline: none;
+    resize: vertical;
+    min-height: 60px;
+    transition: all 0.15s;
+}
+
+.reason-textarea:focus {
+    border-color: #2383e2;
+    box-shadow: 0 0 0 2px rgba(35, 131, 226, 0.2);
+}
+
+/* ── Detail Panel Tabs ── */
+.detail-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--gh-border);
+    background: var(--gh-surface);
+    position: relative;
+    padding: 0 12px;
+    gap: 0;
+    flex-shrink: 0;
+}
+
+.detail-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--gh-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    position: relative;
+    transition: color 0.2s ease, background 0.2s ease;
+    font-family: var(--sans);
+    white-space: nowrap;
+    border-radius: 6px 6px 0 0;
+}
+
+.detail-tab:hover {
+    color: var(--gh-text);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.detail-tab.active {
+    color: var(--gh-text);
+}
+
+.detail-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 8px;
+    right: 8px;
+    height: 2px;
+    background: var(--gh-blue);
+    border-radius: 2px 2px 0 0;
+    animation: tabIndicatorIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes tabIndicatorIn {
+    from {
+        transform: scaleX(0);
+        opacity: 0;
+    }
+    to {
+        transform: scaleX(1);
+        opacity: 1;
+    }
+}
+
+/* ── Slide to Start ── */
+.slide-track {
+    position: relative;
+    overflow: hidden;
+    user-select: none;
+    touch-action: none;
+}
+
+.slide-thumb {
+    z-index: 2;
+}
+
+.slide-thumb:hover {
+    box-shadow: 0 4px 20px rgba(63, 185, 80, 0.5) !important;
+    filter: brightness(1.1);
+}
+
+.slide-thumb:active {
+    cursor: grabbing !important;
+}
+
+/* ── Expandable Session Cards ── */
+.session-expand-icon {
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    flex-shrink: 0;
+    color: var(--gh-muted);
+}
+
+.session-expand-icon.expanded {
+    transform: rotate(90deg);
+}
+
+.session-expanded-content {
+    overflow: hidden;
+    animation: sessionExpandIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes sessionExpandIn {
+    from {
+        opacity: 0;
+        max-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+    to {
+        opacity: 1;
+        max-height: 400px;
+        padding-top: 10px;
+        padding-bottom: 12px;
+    }
+}
+
+/* ── Timer Note Modal ── */
+.timer-note-modal textarea:focus {
+    border-color: var(--gh-green-dim) !important;
+    box-shadow: 0 0 0 2px rgba(63, 185, 80, 0.15) !important;
+}
+
+/* ── History Tab Empty State ── */
+.history-empty-state {
+    text-align: center;
+    padding: 48px 16px;
+    color: var(--gh-muted);
+}
+
+.history-empty-icon {
+    font-size: 32px;
+    margin-bottom: 12px;
+    opacity: 0.6;
+}
+
+/* ── Session card hover ── */
+.session-card {
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.session-card:hover {
+    border-color: var(--gh-border2);
+}
+
+.session-card.expandable {
+    cursor: pointer;
+}
+
+.session-card.expandable:hover {
+    background: rgba(255, 255, 255, 0.02);
 }

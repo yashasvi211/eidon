@@ -27,6 +27,46 @@ const fmtSeconds = (s) => {
   return m + "m";
 };
 
+const getDeadlineClass = (dueDate) => {
+  if (!dueDate) return "";
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const due = new Date(dueDate + "T00:00:00");
+  const diffMs = due - now;
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) return "overdue";
+  if (diffDays === 0) return "due-today";
+  if (diffDays <= 2) return "due-urgent";
+  if (diffDays <= 7) return "due-soon";
+  return "due-safe";
+};
+
+const getDeadlineLabel = (dueDate) => {
+  if (!dueDate) return "";
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const due = new Date(dueDate + "T00:00:00");
+  const diffMs = due - now;
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) return " · " + Math.abs(diffDays) + "d overdue";
+  if (diffDays === 0) return " · Today";
+  if (diffDays === 1) return " · Tomorrow";
+  if (diffDays <= 7) return " · " + diffDays + "d left";
+  return "";
+};
+
+const getSubtaskProgressClass = (done, total) => {
+  if (total === 0) return "";
+  const pct = (done / total) * 100;
+  if (pct === 0) return "progress-none";
+  if (pct < 40) return "progress-low";
+  if (pct < 70) return "progress-mid";
+  if (pct < 100) return "progress-high";
+  return "progress-done";
+};
+
 export default function TaskItem({
   task,
   active,
@@ -126,8 +166,8 @@ export default function TaskItem({
             {task.project}
           </span>
           {task.due && (
-            <span className="task-tag tag-due" style={{ fontSize: "11px" }}>
-              {fmtDateDisplay(task.due)}
+            <span className={`task-tag tag-due ${getDeadlineClass(task.due)}`} style={{ fontSize: "11px" }}>
+              {fmtDateDisplay(task.due)}{getDeadlineLabel(task.due)}
             </span>
           )}
           {task.est && task.est !== "0h" && (
@@ -137,15 +177,10 @@ export default function TaskItem({
           )}
           {totalSubtasks > 0 && (
             <span
-              className="task-tag"
-              style={{
-                fontSize: "11px",
-                color: "var(--gh-orange)",
-                borderColor: "rgba(227,179,65,0.3)",
-                background: "rgba(227,179,65,0.08)",
-              }}
+              className={`task-tag tag-subtask ${getSubtaskProgressClass(subtasksDone, totalSubtasks)}`}
+              style={{ fontSize: "11px" }}
             >
-              {subtasksDone}/{totalSubtasks}
+              ✓ {subtasksDone}/{totalSubtasks}
             </span>
           )}
         </div>

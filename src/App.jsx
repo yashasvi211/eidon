@@ -10,7 +10,8 @@ import AddTaskModal from "./components/AddTaskModal";
 import ScheduledView from "./components/ScheduledView";
 import LoadingScreen from "./components/LoadingScreen";
 import SettingsModal from "./components/SettingsModal";
-import ConfirmationModal from "./components/ConfirmationModal";
+import EditTaskModal from "./components/EditTaskModal";
+import StartTimerModal from "./components/StartTimerModal";
 
 // ============================================================
 // UTILITIES
@@ -36,19 +37,20 @@ function App() {
   const [currentProject, setCurrentProject] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [taskToDelete, setTaskToDelete] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // Settings State
   const [settings, setSettings] = useState(() => {
     const saved = localStorage.getItem("eidon_settings");
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        return { showCompleted: true, ...parsed };
       } catch (e) {
         console.error("Failed to parse settings from localStorage", e);
       }
     }
-    return { appSize: 100 };
+    return { appSize: 100, showCompleted: true };
   });
 
   useEffect(() => {
@@ -114,13 +116,57 @@ function App() {
       const remaining = tasks.filter((t) => t.id !== taskId);
       setSelectedTaskId(remaining.length > 0 ? remaining[0].id : null);
     }
-    setTaskToDelete(null);
+    setIsEditModalOpen(false);
+  };
+
+  const handleEditTask = (taskId, changes, reason) => {
+    setTasks(
+      tasks.map((t) => {
+        if (t.id !== taskId) return t;
+        const newAuditEntries = [];
+        const updated = { ...t };
+
+        if ("due" in changes) {
+          newAuditEntries.push({
+            id: "audit" + Date.now() + "a",
+            timestamp: Date.now(),
+            action: "due_changed",
+            details: {
+              from: changes.oldDue || "(none)",
+              to: changes.due || "(none)",
+              reason,
+            },
+          });
+          updated.due = changes.due;
+        }
+
+        if ("est" in changes) {
+          newAuditEntries.push({
+            id: "audit" + Date.now() + "b",
+            timestamp: Date.now(),
+            action: "estimate_changed",
+            details: {
+              from: changes.oldEst || "(none)",
+              to: changes.est || "(none)",
+              reason,
+            },
+          });
+          updated.est = changes.est;
+        }
+
+        updated.auditLog = [...(updated.auditLog || []), ...newAuditEntries];
+        return updated;
+      }),
+    );
   };
 
   // Timer State
   const [timerSeconds, setTimerSeconds] = useState(0);
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [activeSessionStart, setActiveSessionStart] = useState(null);
+  const [isTimerNoteModalOpen, setIsTimerNoteModalOpen] = useState(false);
+  const [timerNote, setTimerNote] = useState("");
+  const [sessionSubtasksCompleted, setSessionSubtasksCompleted] = useState([]);
 
   useEffect(() => {
     // Fetch tasks from JSON with a 5-second delay
@@ -164,7 +210,24 @@ function App() {
   );
 
   const toggleDone = (id) => {
-    setTasks(tasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+    setTasks(
+      tasks.map((t) => {
+        if (t.id !== id) return t;
+        const nowDone = !t.done;
+        const auditEntry = {
+          id: "audit" + Date.now(),
+          timestamp: Date.now(),
+          action: nowDone ? "completed" : "uncompleted",
+          details: {},
+        };
+        return {
+          ...t,
+          done: nowDone,
+          completedAt: nowDone ? Date.now() : null,
+          auditLog: [...(t.auditLog || []), auditEntry],
+        };
+      }),
+    );
   };
 
   const handleQuickAdd = (title) => {
@@ -180,6 +243,16 @@ function App() {
       target: currentView === "backlog" ? "backlog" : "today",
       subtasks: [],
       sessions: [],
+      createdAt: Date.now(),
+      completedAt: null,
+      auditLog: [
+        {
+          id: "audit" + Date.now(),
+          timestamp: Date.now(),
+          action: "created",
+          details: {},
+        },
+      ],
     };
     setTasks([...tasks, newTask]);
     setSelectedTaskId(newTask.id);
@@ -192,6 +265,16 @@ function App() {
       done: false,
       subtasks: [],
       sessions: [],
+      createdAt: Date.now(),
+      completedAt: null,
+      auditLog: [
+        {
+          id: "audit" + Date.now(),
+          timestamp: Date.now(),
+          action: "created",
+          details: {},
+        },
+      ],
     };
     setTasks([...tasks, newTask]);
     setSelectedTaskId(newTask.id);
@@ -206,17 +289,47 @@ function App() {
 
   const handleStartTimer = () => {
     if (!selectedTaskId) return;
+    setIsTimerNoteModalOpen(true);
+  };
+
+  const handleConfirmStartTimer = (note) => {
+    setIsTimerNoteModalOpen(false);
+    setTimerNote(note);
     setIsTimerRunning(true);
     setActiveSessionStart(Date.now());
+    setSessionSubtasksCompleted([]);
+
+    // Audit log entry for timer start
+    setTasks(
+      tasks.map((t) =>
+        t.id === selectedTaskId
+          ? {
+              ...t,
+              auditLog: [
+                ...(t.auditLog || []),
+                {
+                  id: "audit" + Date.now(),
+                  timestamp: Date.now(),
+                  action: "timer_started",
+                  details: { note: note || undefined },
+                },
+              ],
+            }
+          : t,
+      ),
+    );
   };
 
   const handleStopTimer = () => {
     if (!selectedTaskId || !isTimerRunning) return;
     const endTime = Date.now();
+    const durationSec = Math.round((endTime - activeSessionStart) / 1000);
     const newSession = {
       id: "sess" + Date.now(),
       start: activeSessionStart,
       end: endTime,
+      note: timerNote || undefined,
+      subtasksCompleted: sessionSubtasksCompleted.length > 0 ? [...sessionSubtasksCompleted] : undefined,
     };
 
     setTasks(
@@ -225,6 +338,15 @@ function App() {
           ? {
               ...t,
               sessions: [...t.sessions, newSession],
+              auditLog: [
+                ...(t.auditLog || []),
+                {
+                  id: "audit" + Date.now() + "s",
+                  timestamp: Date.now(),
+                  action: "timer_stopped",
+                  details: { duration: durationSec, note: timerNote || undefined },
+                },
+              ],
             }
           : t,
       ),
@@ -233,6 +355,69 @@ function App() {
     setIsTimerRunning(false);
     setTimerSeconds(0);
     setActiveSessionStart(null);
+    setTimerNote("");
+    setSessionSubtasksCompleted([]);
+  };
+
+  const handleToggleSubtask = (taskId, subId) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    const subtask = task.subtasks.find((s) => s.id === subId);
+    if (!subtask) return;
+
+    const willBeCompleted = !subtask.done;
+    const subtaskTitle = subtask.title;
+
+    const auditEntry = {
+      id: "audit" + Date.now() + Math.floor(Math.random() * 1000),
+      timestamp: Date.now(),
+      action: willBeCompleted ? "subtask_completed" : "subtask_uncompleted",
+      details: { subtaskTitle },
+    };
+
+    setTasks(
+      tasks.map((t) => {
+        if (t.id !== taskId) return t;
+        return {
+          ...t,
+          subtasks: t.subtasks.map((s) =>
+            s.id === subId ? { ...s, done: !s.done } : s,
+          ),
+          auditLog: [...(t.auditLog || []), auditEntry],
+        };
+      }),
+    );
+
+    // Track subtask completions during active timer session
+    if (isTimerRunning && taskId === selectedTaskId && willBeCompleted) {
+      setSessionSubtasksCompleted((prev) => [
+        ...prev,
+        { id: subId, title: subtaskTitle, timestamp: Date.now() },
+      ]);
+    }
+  };
+
+  const handleAddSubtask = (taskId, title) => {
+    if (!title.trim()) return;
+    const sub = { id: "s" + Date.now(), title: title.trim(), done: false };
+
+    const auditEntry = {
+      id: "audit" + Date.now() + "sub",
+      timestamp: Date.now(),
+      action: "subtask_added",
+      details: { subtaskTitle: title.trim() },
+    };
+
+    setTasks(
+      tasks.map((t) => {
+        if (t.id !== taskId) return t;
+        return {
+          ...t,
+          subtasks: [...t.subtasks, sub],
+          auditLog: [...(t.auditLog || []), auditEntry],
+        };
+      }),
+    );
   };
 
   if (loading) {
@@ -252,6 +437,7 @@ function App() {
           tasks={tasks}
           setSelectedTaskId={setSelectedTaskId}
           setCurrentView={setCurrentView}
+          showCompleted={settings.showCompleted !== false}
         />
       );
     }
@@ -270,6 +456,7 @@ function App() {
           currentView={currentView}
           currentProject={currentProject}
           projects={projects}
+          showCompleted={settings.showCompleted !== false}
         />
 
         <DetailPanel
@@ -281,7 +468,11 @@ function App() {
           onStopTimer={handleStopTimer}
           timerSeconds={timerSeconds}
           projects={projects}
-          onDeleteTask={() => setTaskToDelete(selectedTask)}
+          onOpenEditModal={() => setIsEditModalOpen(true)}
+          onToggleSubtask={handleToggleSubtask}
+          onAddSubtask={handleAddSubtask}
+          activeSessionStart={activeSessionStart}
+          timerNote={timerNote}
         />
       </>
     );
@@ -358,13 +549,21 @@ function App() {
           />
         )}
 
-        {taskToDelete && (
-          <ConfirmationModal
-            isOpen={!!taskToDelete}
-            onClose={() => setTaskToDelete(null)}
-            onConfirm={() => handleDeleteTask(taskToDelete.id)}
-            title="Delete Task"
-            message={`Are you sure you want to delete "${taskToDelete?.title}"? This action cannot be undone.`}
+        {isEditModalOpen && selectedTask && (
+          <EditTaskModal
+            isOpen={isEditModalOpen}
+            onClose={() => setIsEditModalOpen(false)}
+            task={selectedTask}
+            onSave={handleEditTask}
+            onDelete={handleDeleteTask}
+          />
+        )}
+
+        {isTimerNoteModalOpen && (
+          <StartTimerModal
+            isOpen={isTimerNoteModalOpen}
+            onClose={() => setIsTimerNoteModalOpen(false)}
+            onStart={handleConfirmStartTimer}
           />
         )}
       </AnimatePresence>
