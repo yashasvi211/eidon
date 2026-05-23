@@ -10,6 +10,7 @@ export default function EditTaskModal({
 }) {
   const [dueDate, setDueDate] = useState("");
   const [estimate, setEstimate] = useState("");
+  const [notes, setNotes] = useState("");
   const [reason, setReason] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [hasChanges, setHasChanges] = useState(false);
@@ -18,6 +19,7 @@ export default function EditTaskModal({
     if (isOpen && task) {
       setDueDate(task.due || "");
       setEstimate(task.est || "");
+      setNotes(task.notes || "");
       setReason("");
       setDeleteConfirm("");
       setHasChanges(false);
@@ -36,9 +38,10 @@ export default function EditTaskModal({
     if (task) {
       const dueDiff = dueDate !== (task.due || "");
       const estDiff = estimate !== (task.est || "");
-      setHasChanges(dueDiff || estDiff);
+      const notesDiff = notes !== (task.notes || "");
+      setHasChanges(dueDiff || estDiff || notesDiff);
     }
-  }, [dueDate, estimate, task]);
+  }, [dueDate, estimate, notes, task]);
 
   const handleSave = () => {
     if (!hasChanges || !reason.trim()) return;
@@ -52,12 +55,15 @@ export default function EditTaskModal({
       changes.est = estimate;
       changes.oldEst = task.est;
     }
+    if (notes !== (task.notes || "")) {
+      changes.notes = notes;
+    }
 
     onSave(task.id, changes, reason.trim());
     onClose();
   };
 
-  const confirmText = `delete ${task?.title || ""}`.toLowerCase();
+  const confirmText = "permanently delete";
   const isDeleteMatch = deleteConfirm.toLowerCase().trim() === confirmText;
 
   const handleDelete = () => {
@@ -195,6 +201,23 @@ export default function EditTaskModal({
               />
             </div>
 
+            <div className="edit-field-row" style={{ alignItems: "flex-start" }}>
+              <span className="edit-field-label" style={{ marginTop: "10px" }}>Notes</span>
+              <textarea
+                className="edit-field-input"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Task notes..."
+                style={{
+                  fontFamily: "var(--mono)",
+                  fontSize: "12px",
+                  resize: "vertical",
+                  minHeight: "140px",
+                  lineHeight: "1.5",
+                }}
+              />
+            </div>
+
             {hasChanges && (
               <div
                 style={{
@@ -255,6 +278,7 @@ export default function EditTaskModal({
                   onClick={() => {
                     setDueDate(task.due || "");
                     setEstimate(task.est || "");
+                    setNotes(task.notes || "");
                     setReason("");
                   }}
                   style={{ justifyContent: "center" }}
@@ -287,7 +311,7 @@ export default function EditTaskModal({
               >
                 <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
-              Danger Zone
+              Permanent Delete
             </div>
             <p
               style={{
@@ -297,8 +321,8 @@ export default function EditTaskModal({
                 marginBottom: "12px",
               }}
             >
-              This action is <strong style={{ color: "var(--gh-red)" }}>permanent</strong> and
-              cannot be undone. To confirm deletion, type{" "}
+              This action <strong style={{ color: "var(--gh-red)" }}>permanently deletes</strong> this
+              task and all its data. It cannot be undone. To confirm, type{" "}
               <code
                 style={{
                   fontFamily: "var(--mono)",
@@ -310,7 +334,7 @@ export default function EditTaskModal({
                   border: "1px solid rgba(248,81,73,0.2)",
                 }}
               >
-                delete {task.title.toLowerCase()}
+                permanently delete
               </code>{" "}
               below.
             </p>
@@ -319,7 +343,7 @@ export default function EditTaskModal({
               className={`confirm-input ${isDeleteMatch ? "matched" : ""}`}
               value={deleteConfirm}
               onChange={(e) => setDeleteConfirm(e.target.value)}
-              placeholder={`Type "delete ${task.title.toLowerCase()}" to confirm`}
+              placeholder='Type "permanently delete" to confirm'
               style={{ marginBottom: "12px" }}
             />
             <button
@@ -347,7 +371,7 @@ export default function EditTaskModal({
               >
                 <path d="M3 6h18m-2 0v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6m3 0V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
               </svg>
-              Delete this task permanently
+              Permanently delete this task
             </button>
           </div>
         </div>

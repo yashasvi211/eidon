@@ -154,6 +154,10 @@ function App() {
           updated.est = changes.est;
         }
 
+        if ("notes" in changes) {
+          updated.notes = changes.notes;
+        }
+
         updated.auditLog = [...(updated.auditLog || []), ...newAuditEntries];
         return updated;
       }),

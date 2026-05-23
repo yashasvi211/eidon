@@ -473,7 +473,6 @@ body {
     transition: color 0.2s ease, background 0.2s ease;
     font-family: var(--sans);
     white-space: nowrap;
-    border-radius: 6px 6px 0 0;
 }
 
 .detail-tab:hover {
@@ -493,7 +492,6 @@ body {
     right: 8px;
     height: 2px;
     background: var(--gh-blue);
-    border-radius: 2px 2px 0 0;
     animation: tabIndicatorIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 

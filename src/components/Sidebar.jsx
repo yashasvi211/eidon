@@ -8,9 +8,9 @@ function NavItem({ active, onClick, icon, label, badge }) {
       style={{
         display: "flex",
         alignItems: "center",
-        gap: "8px",
-        padding: "6px 8px",
-        borderRadius: "6px",
+        gap: "9px",
+        padding: "7px 9px",
+        borderRadius: "7px",
         cursor: "pointer",
         color: active ? "var(--gh-text)" : "var(--gh-muted)",
         fontSize: "13px",
@@ -31,7 +31,7 @@ function NavItem({ active, onClick, icon, label, badge }) {
             background: "var(--gh-surface)",
             border: "1px solid var(--gh-border)",
             borderRadius: "20px",
-            padding: "1px 6px",
+            padding: "1px 7px",
             fontFamily: "var(--mono)",
             fontSize: "10px",
           }}
@@ -64,9 +64,9 @@ function ProjectItem({ color, label, active, onClick }) {
       style={{
         display: "flex",
         alignItems: "center",
-        gap: "8px",
-        padding: "5px 8px",
-        borderRadius: "6px",
+        gap: "9px",
+        padding: "6px 9px",
+        borderRadius: "7px",
         cursor: "pointer",
         color: active ? "var(--gh-text)" : "var(--gh-muted)",
         fontSize: "13px",
@@ -78,8 +78,8 @@ function ProjectItem({ color, label, active, onClick }) {
       <div
         className="project-dot"
         style={{
-          width: "8px",
-          height: "8px",
+          width: "9px",
+          height: "9px",
           borderRadius: "50%",
           background: color,
           flexShrink: 0,
@@ -182,14 +182,14 @@ export default function Sidebar({
     <aside
       className="sidebar"
       style={{
-        width: "240px",
+        width: "235px",
         background: "var(--gh-surface)",
         borderRight: "1px solid var(--gh-border)",
         display: "flex",
         flexDirection: "column",
       }}
     >
-      <div className="nav-section" style={{ padding: "24px 8px 4px" }}>
+      <div className="nav-section" style={{ padding: "25px 9px 7px" }}>
         <div
           className="nav-label"
           style={{
@@ -251,7 +251,7 @@ export default function Sidebar({
         />
       </div>
 
-      <div className="nav-section" style={{ padding: "12px 8px 4px" }}>
+      <div className="nav-section" style={{ padding: "12px 9px 7px" }}>
         <div
           className="nav-header"
           style={{
@@ -445,11 +445,11 @@ export default function Sidebar({
         className="sidebar-footer"
         style={{
           marginTop: "auto",
-          padding: "12px 16px",
+          padding: "12px 14px",
           borderTop: "1px solid var(--gh-border)",
           display: "flex",
           alignItems: "center",
-          gap: "12px",
+          gap: "10px",
         }}
       >
         <div
@@ -458,7 +458,7 @@ export default function Sidebar({
           style={{
             width: "32px",
             height: "32px",
-            borderRadius: "6px",
+            borderRadius: "7px",
             cursor: "pointer",
             color: "var(--gh-muted)",
             display: "flex",
@@ -507,7 +507,7 @@ export default function Sidebar({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "11px",
+              fontSize: "12px",
               fontWeight: "600",
               color: "#fff",
             }}
