@@ -45,17 +45,51 @@ function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        return { showCompleted: true, ...parsed };
+        return { 
+          showCompleted: true, 
+          sleepStart: "22:00", 
+          sleepEnd: "07:00", 
+          ...parsed 
+        };
       } catch (e) {
         console.error("Failed to parse settings from localStorage", e);
       }
     }
-    return { appSize: 100, showCompleted: true };
+    return { 
+      appSize: 100, 
+      showCompleted: true, 
+      sleepStart: "22:00", 
+      sleepEnd: "07:00" 
+    };
   });
 
   useEffect(() => {
     localStorage.setItem("eidon_settings", JSON.stringify(settings));
   }, [settings]);
+  const [isSleeping, setIsSleeping] = useState(() => {
+    const saved = localStorage.getItem("eidon_is_sleeping");
+    return saved === "true";
+  });
+
+  useEffect(() => {
+    localStorage.setItem("eidon_is_sleeping", isSleeping);
+  }, [isSleeping]);
+
+  const [sleepStartTime, setSleepStartTime] = useState(() => {
+    const saved = localStorage.getItem("eidon_sleep_start");
+    return saved ? Number(saved) : null;
+  });
+
+  useEffect(() => {
+    if (isSleeping && !sleepStartTime) {
+      const now = Date.now();
+      setSleepStartTime(now);
+      localStorage.setItem("eidon_sleep_start", String(now));
+    } else if (!isSleeping && sleepStartTime) {
+      setSleepStartTime(null);
+      localStorage.removeItem("eidon_sleep_start");
+    }
+  }, [isSleeping]);
 
   // Dynamic Projects State with localStorage support
   const [projects, setProjects] = useState(() => {
@@ -438,7 +472,7 @@ function App() {
       return <DeepStats tasks={tasks} />;
     }
     if (currentView === "timetracking") {
-      return <TimeTracking tasks={tasks} />;
+      return <TimeTracking tasks={tasks} isSleeping={isSleeping} sleepStartTime={sleepStartTime} settings={settings} />;
     }
     if (currentView === "scheduled") {
       return (
@@ -466,6 +500,8 @@ function App() {
           currentProject={currentProject}
           projects={projects}
           showCompleted={settings.showCompleted !== false}
+          isSleeping={isSleeping}
+          settings={settings}
         />
 
         <DetailPanel
@@ -509,6 +545,8 @@ function App() {
         onAddProject={handleAddProject}
         onDeleteProject={handleDeleteProject}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        isSleeping={isSleeping}
+        setIsSleeping={setIsSleeping}
       />
 
       <div
@@ -526,6 +564,9 @@ function App() {
           onOpenModal={() => setIsModalOpen(true)}
           currentProject={currentProject}
           setCurrentProject={setCurrentProject}
+          isSleeping={isSleeping}
+          setIsSleeping={setIsSleeping}
+          settings={settings}
         />
 
         <div
@@ -586,7 +627,48 @@ function Topbar({
   onOpenModal,
   currentProject,
   setCurrentProject,
+  isSleeping,
+  setIsSleeping,
+  settings,
 }) {
+
+  const [sleepCountdown, setSleepCountdown] = useState("");
+
+  useEffect(() => {
+    const updateTimer = () => {
+      const now = new Date();
+      const [sHours, sMinutes] = settings.sleepStart.split(":").map(Number);
+
+      if (!isSleeping) {
+        let sleepTime = new Date();
+        sleepTime.setHours(sHours, sMinutes, 0, 0);
+        if (now > sleepTime) {
+          sleepTime.setDate(sleepTime.getDate() + 1);
+        }
+        const diff = sleepTime - now;
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        setSleepCountdown(h + "h " + m + "m until sleep");
+      } else {
+        const [eHours, eMinutes] = settings.sleepEnd.split(":").map(Number);
+        let wakeUp = new Date();
+        wakeUp.setHours(eHours, eMinutes, 0, 0);
+        if (now > wakeUp) {
+          wakeUp.setDate(wakeUp.getDate() + 1);
+        }
+        const diff = wakeUp - now;
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        setSleepCountdown(h + "h " + m + "m " + s + "s until wake");
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, [isSleeping, settings.sleepStart, settings.sleepEnd]);
+
   const titles = {
     today: "Today's Tasks",
     scheduled: "Scheduled Calendar",
@@ -657,12 +739,30 @@ function Topbar({
           })}
         </span>
         <span style={{ color: "var(--gh-border2)" }}>·</span>
-        <span style={{ color: "var(--gh-green)" }}>
-          {tasks.filter((t) => t.target === "today" && !t.done).length} tasks
-          remaining
-        </span>
+        {isSleeping ? (
+          <span style={{ color: "var(--gh-blue)", fontWeight: "600" }}>
+            Sleeping · {sleepCountdown}
+          </span>
+        ) : (
+          <span style={{ color: "var(--gh-green)" }}>
+            {sleepCountdown} · {tasks.filter((t) => t.target === "today" && !t.done).length} tasks remaining
+          </span>
+        )}
       </div>
-      <div className="topbar-actions" style={{ marginLeft: "auto" }}>
+      <div className="topbar-actions" style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
+        {isSleeping && (
+          <button 
+            className="btn" 
+            onClick={() => setIsSleeping(false)}
+            style={{ 
+              borderColor: "var(--gh-blue)", 
+              color: "var(--gh-blue)",
+              background: "rgba(88, 166, 255, 0.1)"
+            }}
+          >
+            Wake Up
+          </button>
+        )}
         <button className="btn btn-primary" onClick={onOpenModal}>
           <svg
             width="12"

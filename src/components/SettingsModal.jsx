@@ -264,6 +264,57 @@ export default function SettingsModal({
 
         <div style={{ padding: "20px", overflowY: "auto", flex: 1 }}>
           <section style={{ marginBottom: "24px", borderBottom: "1px solid var(--gh-border)", paddingBottom: "20px" }}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "12px",
+                fontWeight: "600",
+                color: "var(--gh-muted)",
+                textTransform: "uppercase",
+                marginBottom: "12px",
+              }}
+            >
+              Sleep Schedule
+            </label>
+            <div style={{ display: "flex", gap: "20px" }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: "block", fontSize: "11px", color: "var(--gh-muted)", marginBottom: "4px" }}>Sleep Start</label>
+                <input
+                  type="time"
+                  value={settings.sleepStart || "22:00"}
+                  onChange={(e) => setSettings({ ...settings, sleepStart: e.target.value })}
+                  style={{
+                    width: "100%",
+                    background: "var(--gh-surface2)",
+                    border: "1px solid var(--gh-border2)",
+                    borderRadius: "6px",
+                    padding: "6px 10px",
+                    color: "var(--gh-text)",
+                    fontSize: "13px"
+                  }}
+                />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: "block", fontSize: "11px", color: "var(--gh-muted)", marginBottom: "4px" }}>Wake Up</label>
+                <input
+                  type="time"
+                  value={settings.sleepEnd || "07:00"}
+                  onChange={(e) => setSettings({ ...settings, sleepEnd: e.target.value })}
+                  style={{
+                    width: "100%",
+                    background: "var(--gh-surface2)",
+                    border: "1px solid var(--gh-border2)",
+                    borderRadius: "6px",
+                    padding: "6px 10px",
+                    color: "var(--gh-text)",
+                    fontSize: "13px"
+                  }}
+                />
+              </div>
+            </div>
+          </section>
+
+          <section style={{ marginBottom: "24px", borderBottom: "1px solid var(--gh-border)", paddingBottom: "20px" }}>
             <div
               style={{
                 display: "flex",

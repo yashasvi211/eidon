@@ -11,6 +11,8 @@ export default function TaskPanel({
   currentProject,
   projects = [],
   showCompleted = true,
+  isSleeping,
+  settings,
 }) {
   return (
     <div
