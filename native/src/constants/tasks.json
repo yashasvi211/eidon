@@ -1,0 +1,1172 @@
+{
+  "tasks": [
+    {
+      "id": "t1",
+      "title": "Bill of Material Core Redesign",
+      "project": "Bill of Material",
+      "due": "2026-04-25",
+      "est": "12h",
+      "notes": "Complete overhaul of the BOM module to support multi-level assemblies. Requires database schema migration, new API endpoints, and a completely reworked frontend. The new type system must support hierarchical relationships between components, and the UI needs to handle large assemblies (10k+ items) without performance degradation. Coordinate with QA for regression testing.",
+      "done": false,
+      "target": "today",
+      "subtasks": [
+        {
+          "id": "s1",
+          "title": "Implement new type system in PostgreSQL",
+          "done": true
+        },
+        {
+          "id": "s2",
+          "title": "Refactor Site ID validation logic",
+          "done": true
+        },
+        {
+          "id": "s3",
+          "title": "Optimize scaling algorithms for large datasets",
+          "done": true
+        },
+        {
+          "id": "s4",
+          "title": "Connect frontend React components to new API",
+          "done": true
+        },
+        {
+          "id": "s5",
+          "title": "Research and document adjustment logic",
+          "done": true
+        },
+        {
+          "id": "s6",
+          "title": "Fix layout issues in Item Spec Tab",
+          "done": true
+        },
+        {
+          "id": "s7",
+          "title": "Conduct peer review for the entire module",
+          "done": false
+        },
+        {
+          "id": "s8",
+          "title": "Write end-to-end integration tests",
+          "done": false
+        },
+        {
+          "id": "s9",
+          "title": "Benchmark query performance with 50k items",
+          "done": false
+        },
+        {
+          "id": "s10",
+          "title": "Update API documentation and OpenAPI spec",
+          "done": false
+        }
+      ],
+      "sessions": [
+        {
+          "id": "sess1",
+          "start": 1743465600000,
+          "end": 1743469200000
+        },
+        {
+          "id": "sess2",
+          "start": 1743472800000,
+          "end": 1743476400000
+        },
+        {
+          "id": "sess3",
+          "start": 1743552000000,
+          "end": 1743556800000
+        },
+        {
+          "id": "sess4",
+          "start": 1743638400000,
+          "end": 1743643200000
+        },
+        {
+          "id": "sess5",
+          "start": 1743724800000,
+          "end": 1743729600000
+        }
+      ],
+      "createdAt": 1743379200000,
+      "completedAt": null,
+      "auditLog": []
+    },
+    {
+      "id": "t2",
+      "title": "HubSpot OAuth Integration",
+      "project": "HubSpot Integration",
+      "due": "2026-05-23",
+      "est": "8h",
+      "notes": "Implement secure OAuth2 authorization code flow for HubSpot API. Must support token refresh rotation, handle rate limiting, and store encrypted tokens. Need to create a developer app in HubSpot marketplace first. The integration should expose contact sync, deal tracking, and webhook event processing. Security review required before production deployment.",
+      "done": false,
+      "target": "today",
+      "subtasks": [
+        {
+          "id": "s11",
+          "title": "Create developer portal app in HubSpot",
+          "done": true
+        },
+        {
+          "id": "s12",
+          "title": "Configure redirect URIs and OAuth scopes",
+          "done": true
+        },
+        {
+          "id": "s13",
+          "title": "Implement token exchange logic with PKCE",
+          "done": true
+        },
+        {
+          "id": "s14",
+          "title": "Build refresh token rotation with secure storage",
+          "done": false
+        },
+        {
+          "id": "s15",
+          "title": "Handle HubSpot API rate limiting with backoff",
+          "done": false
+        },
+        {
+          "id": "s16",
+          "title": "Implement contact sync webhook handler",
+          "done": false
+        },
+        {
+          "id": "s17",
+          "title": "Add deal stage change event processing",
+          "done": false
+        },
+        {
+          "id": "s18",
+          "title": "Write integration tests with sandbox account",
+          "done": false
+        }
+      ],
+      "sessions": [
+        {
+          "id": "sess6",
+          "start": 1743811200000,
+          "end": 1743814800000
+        },
+        {
+          "id": "sess7",
+          "start": 1743897600000,
+          "end": 1743902400000
+        }
+      ],
+      "createdAt": 1743724800000,
+      "completedAt": null,
+      "auditLog": []
+    },
+    {
+      "id": "t3",
+      "title": "Nightly Audit Log Backup System",
+      "project": "GitHub Logs Backup",
+      "due": "2026-05-21",
+      "est": "4h",
+      "notes": "Automated system to export GitHub Enterprise audit logs to AWS S3 for compliance. Must handle pagination across large orgs, support incremental backups, and include alerting on failure. Need to set up IAM roles with least-privilege policies and configure lifecycle rules on the S3 bucket for log retention.",
+      "done": false,
+      "target": "today",
+      "subtasks": [
+        {
+          "id": "s19",
+          "title": "Write log extraction script using GitHub API",
+          "done": true
+        },
+        {
+          "id": "s20",
+          "title": "Setup S3 bucket with server-side encryption",
+          "done": true
+        },
+        {
+          "id": "s21",
+          "title": "Configure IAM roles and least-privilege policies",
+          "done": true
+        },
+        {
+          "id": "s22",
+          "title": "Implement incremental backup diff logic",
+          "done": false
+        },
+        {
+          "id": "s23",
+          "title": "Schedule nightly cron job with monitoring",
+          "done": false
+        },
+        {
+          "id": "s24",
+          "title": "Add failure alerts to PagerDuty",
+          "done": false
+        },
+        {
+          "id": "s25",
+          "title": "Document disaster recovery procedure",
+          "done": false
+        }
+      ],
+      "sessions": [
+        {
+          "id": "sess8",
+          "start": 1743984000000,
+          "end": 1743987600000
+        },
+        {
+          "id": "sess9",
+          "start": 1744070400000,
+          "end": 1744072200000
+        }
+      ],
+      "createdAt": 1743897600000,
+      "completedAt": null,
+      "auditLog": []
+    },
+    {
+      "id": "t4",
+      "title": "Sprint Retrospective Meeting",
+      "project": "Inbox",
+      "due": "2026-05-20",
+      "est": "1.5h",
+      "notes": "Bi-weekly team retrospective to reflect on sprint 12. Agenda: review velocity metrics, discuss what went well (API performance improvements, test coverage increase), what didn't (missed deadline on BOM migration, flaky E2E tests), and action items for next sprint. Prepare Miro board ahead of time.",
+      "done": true,
+      "target": "scheduled",
+      "subtasks": [
+        {
+          "id": "s26",
+          "title": "Prepare Miro retro board",
+          "done": true
+        },
+        {
+          "id": "s27",
+          "title": "Compile sprint velocity report",
+          "done": true
+        },
+        {
+          "id": "s28",
+          "title": "Send calendar invite with agenda",
+          "done": true
+        }
+      ],
+      "sessions": [
+        {
+          "id": "sess10",
+          "start": 1744156800000,
+          "end": 1744162200000
+        }
+      ],
+      "createdAt": 1744070400000,
+      "completedAt": 1744162200000,
+      "auditLog": []
+    },
+    {
+      "id": "t5",
+      "title": "Quarterly Security Audit",
+      "project": "Inbox",
+      "due": "2026-05-25",
+      "est": "6h",
+      "notes": "Full Q2 security audit of all production infrastructure. Review dependency vulnerabilities (npm, pip, Docker images), check IAM policy compliance, audit access logs for unusual patterns, and verify encryption at rest and in transit. Must produce a report for the CISO by end of quarter. Use AWS Config and GuardDuty findings as starting point.",
+      "done": false,
+      "target": "scheduled",
+      "subtasks": [
+        {
+          "id": "s29",
+          "title": "Run dependency vulnerability scan",
+          "done": true
+        },
+        {
+          "id": "s30",
+          "title": "Review IAM policy compliance against least-privilege",
+          "done": false
+        },
+        {
+          "id": "s31",
+          "title": "Audit CloudTrail for anomalous access patterns",
+          "done": false
+        },
+        {
+          "id": "s32",
+          "title": "Verify TLS 1.2+ enforcement across all services",
+          "done": false
+        },
+        {
+          "id": "s33",
+          "title": "Check Docker image CVEs in ECR registry",
+          "done": false
+        },
+        {
+          "id": "s34",
+          "title": "Generate security posture report for CISO",
+          "done": false
+        }
+      ],
+      "sessions": [],
+      "createdAt": 1743292800000,
+      "completedAt": null,
+      "auditLog": []
+    },
+    {
+      "id": "t6",
+      "title": "Explore Modern UI Design Tokens",
+      "project": "Inbox",
+      "due": "",
+      "est": "5h",
+      "notes": "Research and prototype migration to a more robust design token system. Evaluate approaches: CSS custom properties vs Style Dictionary vs Tailwind v4 theming. Need to support light/dark mode switching, component-level overrides, and runtime theme switching. Build a proof-of-concept with 3 components migrated to the new system.",
+      "done": false,
+      "target": "backlog",
+      "subtasks": [
+        {
+          "id": "s35",
+          "title": "Research Style Dictionary token format",
+          "done": true
+        },
+        {
+          "id": "s36",
+          "title": "Prototype dark/light theme switching",
+          "done": false
+        },
+        {
+          "id": "s37",
+          "title": "Build Figma token sync proof-of-concept",
+          "done": false
+        },
+        {
+          "id": "s38",
+          "title": "Write migration guide for component library",
+          "done": false
+        }
+      ],
+      "sessions": [
+        {
+          "id": "sess11",
+          "start": 1744243200000,
+          "end": 1744246800000
+        }
+      ],
+      "createdAt": 1744156800000,
+      "completedAt": null,
+      "auditLog": []
+    },
+    {
+      "id": "t7",
+      "title": "API Rate Limiting Middleware",
+      "project": "Bill of Material",
+      "due": "2026-05-28",
+      "est": "6h",
+      "notes": "Implement a configurable rate limiting middleware for the BOM API gateway. Support per-tenant and per-endpoint limits with Redis-backed sliding window. Should return proper 429 responses with Retry-After headers and expose current limits via response headers. Include dashboard for monitoring rate limit usage.",
+      "done": false,
+      "target": "today",
+      "subtasks": [
+        {
+          "id": "s39",
+          "title": "Design rate limit schema and Redis key structure",
+          "done": true
+        },
+        {
+          "id": "s40",
+          "title": "Implement sliding window counter algorithm",
+          "done": false
+        },
+        {
+          "id": "s41",
+          "title": "Add per-tenant and per-endpoint configuration",
+          "done": false
+        },
+        {
+          "id": "s42",
+          "title": "Return proper 429 with Retry-After headers",
+          "done": false
+        },
+        {
+          "id": "s43",
+          "title": "Build monitoring dashboard with rate limit metrics",
+          "done": false
+        },
+        {
+          "id": "s44",
+          "title": "Write load tests to verify behavior under pressure",
+          "done": false
+        }
+      ],
+      "sessions": [
+        {
+          "id": "sess12",
+          "start": 1744329600000,
+          "end": 1744333200000
+        }
+      ],
+      "createdAt": 1744243200000,
+      "completedAt": null,
+      "auditLog": []
+    },
+    {
+      "id": "t8",
+      "title": "HubSpot Deal Pipeline Sync",
+      "project": "HubSpot Integration",
+      "due": "2026-06-01",
+      "est": "10h",
+      "notes": "Build bidirectional deal pipeline sync between HubSpot and internal CRM. Must handle deal stage changes, custom property mapping, and conflict resolution. Support webhook-triggered syncs and scheduled full syncs. Include detailed logging for audit trail and a manual reconciliation UI for resolving conflicts.",
+      "done": false,
+      "target": "backlog",
+      "subtasks": [
+        {
+          "id": "s45",
+          "title": "Map HubSpot deal stages to internal pipeline",
+          "done": false
+        },
+        {
+          "id": "s46",
+          "title": "Implement webhook receiver for deal changes",
+          "done": false
+        },
+        {
+          "id": "s47",
+          "title": "Build custom property mapping configuration",
+          "done": false
+        },
+        {
+          "id": "s48",
+          "title": "Implement conflict resolution strategy (last-write-wins)",
+          "done": false
+        },
+        {
+          "id": "s49",
+          "title": "Build manual reconciliation UI component",
+          "done": false
+        },
+        {
+          "id": "s50",
+          "title": "Add sync audit logging to compliance database",
+          "done": false
+        },
+        {
+          "id": "s51",
+          "title": "Write end-to-end sync test suite",
+          "done": false
+        }
+      ],
+      "sessions": [],
+      "createdAt": 1743292800000,
+      "completedAt": null,
+      "auditLog": []
+    },
+    {
+      "id": "t9",
+      "title": "GitHub Actions Runner Auto-Scaler",
+      "project": "GitHub Logs Backup",
+      "due": "2026-05-30",
+      "est": "8h",
+      "notes": "Build an auto-scaling solution for self-hosted GitHub Actions runners on AWS EC2. Use spot instances to reduce cost. Scale up based on pending job queue depth, scale down after idle timeout. Include graceful shutdown (drain running jobs before termination). Tag instances for cost tracking and implement lifecycle hooks for termination protection.",
+      "done": false,
+      "target": "today",
+      "subtasks": [
+        {
+          "id": "s52",
+          "title": "Design auto-scaling architecture with ASG",
+          "done": true
+        },
+        {
+          "id": "s53",
+          "title": "Create AMI with runner registration script",
+          "done": true
+        },
+        {
+          "id": "s54",
+          "title": "Implement scale-up based on GitHub queue depth",
+          "done": false
+        },
+        {
+          "id": "s55",
+          "title": "Implement scale-down with graceful job drain",
+          "done": false
+        },
+        {
+          "id": "s56",
+          "title": "Configure spot instance interruption handling",
+          "done": false
+        },
+        {
+          "id": "s57",
+          "title": "Add CloudWatch dashboards for runner utilization",
+          "done": false
+        },
+        {
+          "id": "s58",
+          "title": "Document cost analysis vs GitHub hosted runners",
+          "done": false
+        }
+      ],
+      "sessions": [
+        {
+          "id": "sess13",
+          "start": 1744416000000,
+          "end": 1744419600000
+        },
+        {
+          "id": "sess14",
+          "start": 1744502400000,
+          "end": 1744507200000
+        }
+      ],
+      "createdAt": 1744329600000,
+      "completedAt": null,
+      "auditLog": []
+    },
+    {
+      "id": "t10",
+      "title": "Database Connection Pool Tuning",
+      "project": "Bill of Material",
+      "due": "2026-06-03",
+      "est": "4h",
+      "notes": "Investigate and resolve connection pool exhaustion issues in production. Analyze current pool configuration, review connection leak suspects, tune max connections per pool, configure statement timeout, and implement connection monitoring with pgbouncer. Target: reduce connection wait events by 90%.",
+      "done": false,
+      "target": "backlog",
+      "subtasks": [
+        {
+          "id": "s59",
+          "title": "Analyze current pool config and PG settings",
+          "done": true
+        },
+        {
+          "id": "s60",
+          "title": "Identify connection leak suspects via pg_stat_activity",
+          "done": true
+        },
+        {
+          "id": "s61",
+          "title": "Set up pgbouncer in transaction mode",
+          "done": false
+        },
+        {
+          "id": "s62",
+          "title": "Implement statement timeout and connection limits",
+          "done": false
+        },
+        {
+          "id": "s63",
+          "title": "Add Datadog monitoring for pool metrics",
+          "done": false
+        }
+      ],
+      "sessions": [],
+      "createdAt": 1743292800000,
+      "completedAt": null,
+      "auditLog": []
+    },
+    {
+      "id": "t11",
+      "title": "Team Lunch — Thai Restaurant",
+      "project": "Inbox",
+      "due": "2026-05-22",
+      "est": "1h",
+      "notes": "Team lunch at the new Thai place downtown to celebrate shipping Q2 releases. RSVP by Thursday. Need to check dietary restrictions — Sarah is vegan, Mark has gluten intolerance. Make reservation for 8 people at 12:30.",
+      "done": false,
+      "target": "scheduled",
+      "subtasks": [
+        {
+          "id": "s64",
+          "title": "Collect dietary restrictions from team",
+          "done": true
+        },
+        {
+          "id": "s65",
+          "title": "Make reservation for 8 at 12:30",
+          "done": false
+        },
+        {
+          "id": "s66",
+          "title": "Confirm attendance in Slack",
+          "done": false
+        }
+      ],
+      "sessions": [],
+      "createdAt": 1743292800000,
+      "completedAt": null,
+      "auditLog": []
+    },
+    {
+      "id": "t12",
+      "title": "One-on-One with Junior Devs",
+      "project": "Inbox",
+      "due": "2026-05-20",
+      "est": "2h",
+      "notes": "Monthly mentoring sessions with the three junior engineers. Prepare feedback on their recent PRs, review their personal growth goals, and pair-program on a complex feature to demonstrate best practices. Topics this month: error handling patterns, writing testable code, and async/await pitfalls.",
+      "done": false,
+      "target": "scheduled",
+      "subtasks": [
+        {
+          "id": "s67",
+          "title": "Review PRs from junior devs this sprint",
+          "done": true
+        },
+        {
+          "id": "s68",
+          "title": "Prepare personal growth plan updates",
+          "done": false
+        },
+        {
+          "id": "s69",
+          "title": "Pair program on error handling patterns",
+          "done": false
+        }
+      ],
+      "sessions": [
+        {
+          "id": "sess15",
+          "start": 1744588800000,
+          "end": 1744596000000
+        }
+      ],
+      "createdAt": 1744502400000,
+      "completedAt": null,
+      "auditLog": []
+    },
+    {
+      "id": "t13",
+      "title": "Migrate Legacy CI to GitHub Actions",
+      "project": "GitHub Logs Backup",
+      "due": "2026-06-10",
+      "est": "16h",
+      "notes": "Full migration from Jenkins to GitHub Actions for all CI pipelines. Must replicate: multi-branch builds, parallel test execution, artifact publishing, Docker image builds, and deployment approval gates. Set up matrix builds for Node 18/20/22, Python 3.11/3.12, and Postgres 15/16. Estimated 16 hours across 2 weeks.",
+      "done": false,
+      "target": "backlog",
+      "subtasks": [
+        {
+          "id": "s70",
+          "title": "Audit existing Jenkins pipelines and their steps",
+          "done": true
+        },
+        {
+          "id": "s71",
+          "title": "Design GH Actions workflow structure and matrix",
+          "done": true
+        },
+        {
+          "id": "s72",
+          "title": "Build parallel test execution workflow",
+          "done": false
+        },
+        {
+          "id": "s73",
+          "title": "Build Docker image build and push workflow",
+          "done": false
+        },
+        {
+          "id": "s74",
+          "title": "Set up deployment approval gates with environments",
+          "done": false
+        },
+        {
+          "id": "s75",
+          "title": "Migrate secrets from Jenkins to GitHub secrets",
+          "done": false
+        },
+        {
+          "id": "s76",
+          "title": "Run parallel old vs new CI for regression validation",
+          "done": false
+        },
+        {
+          "id": "s77",
+          "title": "Decommission Jenkins server and document migration",
+          "done": false
+        }
+      ],
+      "sessions": [
+        {
+          "id": "sess16",
+          "start": 1744675200000,
+          "end": 1744678800000
+        },
+        {
+          "id": "sess17",
+          "start": 1744761600000,
+          "end": 1744767000000
+        }
+      ],
+      "createdAt": 1744588800000,
+      "completedAt": null,
+      "auditLog": []
+    },
+    {
+      "id": "t14",
+      "title": "Add Task Tagging and Filtering System",
+      "project": "Bill of Material",
+      "due": "",
+      "est": "6h",
+      "notes": "Implement a flexible tagging system for tasks to support better organization and filtering. Tags should be user-creatable, color-coded, and searchable. Build a filter bar that supports AND/OR tag combinations, text search, and saved filter presets. Backend: add tags table, frontend: tag picker component with autocomplete.",
+      "done": false,
+      "target": "backlog",
+      "subtasks": [
+        {
+          "id": "s78",
+          "title": "Design tags database schema",
+          "done": false
+        },
+        {
+          "id": "s79",
+          "title": "Build tag picker component with autocomplete",
+          "done": false
+        },
+        {
+          "id": "s80",
+          "title": "Implement AND/OR filter combination logic",
+          "done": false
+        },
+        {
+          "id": "s81",
+          "title": "Add saved filter preset feature",
+          "done": false
+        }
+      ],
+      "sessions": [],
+      "createdAt": 1743292800000,
+      "completedAt": null,
+      "auditLog": []
+    },
+    {
+      "id": "t15",
+      "title": "Fix Production Memory Leak in WebSocket Handler",
+      "project": "HubSpot Integration",
+      "due": "2026-05-19",
+      "est": "3h",
+      "notes": "URGENT: Production incident — WebSocket connections are leaking memory in the HubSpot event handler. Heap snapshots show closed connections not being garbage collected due to lingering event listener references. Need to audit listener cleanup in disconnect handler, verify WeakRef usage, and deploy hotfix. PagerDuty alert threshold exceeded 3 times today.",
+      "done": true,
+      "target": "scheduled",
+      "subtasks": [
+        {
+          "id": "s82",
+          "title": "Take heap snapshot and identify leak source",
+          "done": true
+        },
+        {
+          "id": "s83",
+          "title": "Audit event listener cleanup in disconnect handler",
+          "done": true
+        },
+        {
+          "id": "s84",
+          "title": "Deploy hotfix to production with monitoring",
+          "done": true
+        },
+        {
+          "id": "s85",
+          "title": "Write postmortem and update runbook",
+          "done": true
+        }
+      ],
+      "sessions": [
+        {
+          "id": "sess18",
+          "start": 1744848000000,
+          "end": 1744851600000
+        },
+        {
+          "id": "sess19",
+          "start": 1744934400000,
+          "end": 1744936200000
+        }
+      ],
+      "createdAt": 1744761600000,
+      "completedAt": 1744936200000,
+      "auditLog": []
+    },
+    {
+      "id": "t16",
+      "title": "Kubernetes Pod Resource Optimization",
+      "project": "GitHub Logs Backup",
+      "due": "2026-06-05",
+      "est": "5h",
+      "notes": "Right-size Kubernetes resource requests and limits for all production workloads. Use VPA recommendations and actual usage metrics from the last 30 days. Target: reduce total CPU requests by 25% and memory requests by 15% without impacting performance. Document the methodology for quarterly review.",
+      "done": false,
+      "target": "today",
+      "subtasks": [
+        {
+          "id": "s86",
+          "title": "Extract VPA recommendations for all namespaces",
+          "done": true
+        },
+        {
+          "id": "s87",
+          "title": "Analyze 30-day CPU and memory usage patterns",
+          "done": true
+        },
+        {
+          "id": "s88",
+          "title": "Update resource requests/limits in Helm values",
+          "done": false
+        },
+        {
+          "id": "s89",
+          "title": "Deploy to staging and verify no regressions",
+          "done": false
+        },
+        {
+          "id": "s90",
+          "title": "Roll out to production with gradual rollout",
+          "done": false
+        },
+        {
+          "id": "s91",
+          "title": "Document optimization methodology and results",
+          "done": false
+        }
+      ],
+      "sessions": [
+        {
+          "id": "sess20",
+          "start": 1745020800000,
+          "end": 1745024400000
+        }
+      ],
+      "createdAt": 1744934400000,
+      "completedAt": null,
+      "auditLog": []
+    },
+    {
+      "id": "t17",
+      "title": "Update Employee Onboarding Docs",
+      "project": "Inbox",
+      "due": "2026-06-15",
+      "est": "2h",
+      "notes": "Revamp the engineering onboarding documentation for new hires. Current docs are outdated (reference old CI system, missing service architecture diagrams). Need to update: environment setup guide, architecture overview, deployment workflow, common troubleshooting, and team contact list. Also record Loom walkthrough for async onboarding.",
+      "done": false,
+      "target": "backlog",
+      "subtasks": [
+        {
+          "id": "s92",
+          "title": "Review current onboarding docs for stale content",
+          "done": true
+        },
+        {
+          "id": "s93",
+          "title": "Update architecture diagrams (draw.io)",
+          "done": false
+        },
+        {
+          "id": "s94",
+          "title": "Record Loom walkthrough of dev environment setup",
+          "done": false
+        },
+        {
+          "id": "s95",
+          "title": "PR for review with the newest hire as reviewer",
+          "done": false
+        }
+      ],
+      "sessions": [],
+      "createdAt": 1743292800000,
+      "completedAt": null,
+      "auditLog": []
+    },
+    {
+      "id": "t18",
+      "title": "ESLint Plugin for Custom Rules",
+      "project": "Bill of Material",
+      "due": "",
+      "est": "10h",
+      "notes": "Create a custom ESLint plugin to enforce team-specific coding standards: no direct DOM mutations in React, require JSDoc on exported functions, enforce import ordering, and ban certain deprecated patterns. Package as internal npm module with automated release pipeline. Should integrate with pre-commit hooks and CI.",
+      "done": false,
+      "target": "backlog",
+      "subtasks": [
+        {
+          "id": "s96",
+          "title": "Scaffold ESLint plugin package structure",
+          "done": false
+        },
+        {
+          "id": "s97",
+          "title": "Write rule: no-direct-dom-mutation",
+          "done": false
+        },
+        {
+          "id": "s98",
+          "title": "Write rule: require-jsdoc-on-exports",
+          "done": false
+        },
+        {
+          "id": "s99",
+          "title": "Write rule: enforce-import-order",
+          "done": false
+        },
+        {
+          "id": "s100",
+          "title": "Set up automated release with semantic-release",
+          "done": false
+        },
+        {
+          "id": "s101",
+          "title": "Integrate with pre-commit hooks and CI pipeline",
+          "done": false
+        }
+      ],
+      "sessions": [],
+      "createdAt": 1743292800000,
+      "completedAt": null,
+      "auditLog": []
+    },
+    {
+      "id": "t19",
+      "title": "Load Test BOM API for 10k Concurrent Users",
+      "project": "Bill of Material",
+      "due": "2026-05-27",
+      "est": "8h",
+      "notes": "Run comprehensive load tests against the BOM API to validate it can handle 10k concurrent users. Use k6 with distributed execution. Key metrics: p95 latency under 500ms, error rate under 0.1%, zero timeouts. Gradually ramp up from 100 to 10k users. Identify bottlenecks in API gateway, application servers, and database. Provide detailed report with recommendations.",
+      "done": false,
+      "target": "today",
+      "subtasks": [
+        {
+          "id": "s102",
+          "title": "Write k6 test scripts for BOM CRUD endpoints",
+          "done": true
+        },
+        {
+          "id": "s103",
+          "title": "Set up distributed k6 execution environment",
+          "done": false
+        },
+        {
+          "id": "s104",
+          "title": "Run baseline test at 100 concurrent users",
+          "done": false
+        },
+        {
+          "id": "s105",
+          "title": "Run ramp-up test from 100 to 10k users",
+          "done": false
+        },
+        {
+          "id": "s106",
+          "title": "Analyze bottlenecks from test results",
+          "done": false
+        },
+        {
+          "id": "s107",
+          "title": "Write optimization recommendations report",
+          "done": false
+        }
+      ],
+      "sessions": [
+        {
+          "id": "sess21",
+          "start": 1745107200000,
+          "end": 1745110800000
+        },
+        {
+          "id": "sess22",
+          "start": 1745193600000,
+          "end": 1745198400000
+        }
+      ],
+      "createdAt": 1745020800000,
+      "completedAt": null,
+      "auditLog": []
+    },
+    {
+      "id": "t20",
+      "title": "Refactor Monorepo to Turborepo",
+      "project": "HubSpot Integration",
+      "due": "2026-06-20",
+      "est": "12h",
+      "notes": "Migrate the current npm workspaces monorepo to Turborepo for better caching, parallel execution, and dependency graph optimization. Must preserve all existing scripts and workflows. Key benefits: 70% faster CI, remote caching for developer machines, and better task orchestration. Plan migration in phases with each package migrated independently.",
+      "done": false,
+      "target": "backlog",
+      "subtasks": [
+        {
+          "id": "s108",
+          "title": "Install and configure Turborepo with remote caching",
+          "done": false
+        },
+        {
+          "id": "s109",
+          "title": "Migrate shared packages one at a time",
+          "done": false
+        },
+        {
+          "id": "s110",
+          "title": "Update CI workflows for Turborepo pipeline",
+          "done": false
+        },
+        {
+          "id": "s111",
+          "title": "Benchmark CI speed before vs after migration",
+          "done": false
+        },
+        {
+          "id": "s112",
+          "title": "Document migration for other teams",
+          "done": false
+        }
+      ],
+      "sessions": [],
+      "createdAt": 1743292800000,
+      "completedAt": null,
+      "auditLog": []
+    },
+    {
+      "id": "t21",
+      "title": "Upgrade PostgreSQL 15 to 16",
+      "project": "GitHub Logs Backup",
+      "due": "2026-06-12",
+      "est": "6h",
+      "notes": "Plan and execute PostgreSQL upgrade from version 15 to 16 across all environments. Use pg_upgrade for in-place upgrade. Must: take full base backup, test on staging first, verify all extensions are compatible (pg_stat_statements, postgis, pg_partman), benchmark query performance before and after, and have rollback plan ready.",
+      "done": false,
+      "target": "backlog",
+      "subtasks": [
+        {
+          "id": "s113",
+          "title": "Verify extension compatibility with PG 16",
+          "done": true
+        },
+        {
+          "id": "s114",
+          "title": "Test upgrade on staging environment",
+          "done": false
+        },
+        {
+          "id": "s115",
+          "title": "Benchmark query performance pre and post upgrade",
+          "done": false
+        },
+        {
+          "id": "s116",
+          "title": "Schedule production upgrade window",
+          "done": false
+        },
+        {
+          "id": "s117",
+          "title": "Execute production upgrade with rollback plan",
+          "done": false
+        }
+      ],
+      "sessions": [],
+      "createdAt": 1743292800000,
+      "completedAt": null,
+      "auditLog": []
+    },
+    {
+      "id": "t22",
+      "title": "Build Internal CLI Tool for Dev Workflows",
+      "project": "Inbox",
+      "due": "",
+      "est": "8h",
+      "notes": "Create a CLI tool (eidon-cli) to automate common development workflows: scaffold new components, generate CRUD boilerplate, run database migrations, manage feature flags, and trigger deployments. Use Commander.js for CLI framework, with interactive prompts via Inquirer. Package as npm global tool with auto-update.",
+      "done": false,
+      "target": "backlog",
+      "subtasks": [
+        {
+          "id": "s118",
+          "title": "Scaffold CLI project with Commander.js",
+          "done": false
+        },
+        {
+          "id": "s119",
+          "title": "Implement component scaffold command",
+          "done": false
+        },
+        {
+          "id": "s120",
+          "title": "Implement migration run command",
+          "done": false
+        },
+        {
+          "id": "s121",
+          "title": "Implement deployment trigger command",
+          "done": false
+        },
+        {
+          "id": "s122",
+          "title": "Add auto-update with update-notifier",
+          "done": false
+        }
+      ],
+      "sessions": [],
+      "createdAt": 1743292800000,
+      "completedAt": null,
+      "auditLog": []
+    },
+    {
+      "id": "t23",
+      "title": "Design System: Button Component Audit",
+      "project": "Bill of Material",
+      "due": "2026-05-26",
+      "est": "3h",
+      "notes": "Audit all button component variants across the app for consistency. Check: size variants (sm/md/lg), color variants (primary/secondary/danger/ghost), loading state, disabled state, icon positioning, and keyboard accessibility. Document inconsistencies and create migration plan. Target: all buttons use the shared Button component by end of sprint.",
+      "done": false,
+      "target": "today",
+      "subtasks": [
+        {
+          "id": "s123",
+          "title": "Crawl codebase for inline button styles",
+          "done": true
+        },
+        {
+          "id": "s124",
+          "title": "Document all button variants and their usage",
+          "done": true
+        },
+        {
+          "id": "s125",
+          "title": "Fix 10 priority-inconsistency violations",
+          "done": false
+        },
+        {
+          "id": "s126",
+          "title": "Add loading spinner variant to Button component",
+          "done": false
+        }
+      ],
+      "sessions": [
+        {
+          "id": "sess23",
+          "start": 1745280000000,
+          "end": 1745283600000
+        }
+      ],
+      "createdAt": 1745193600000,
+      "completedAt": null,
+      "auditLog": []
+    },
+    {
+      "id": "t24",
+      "title": "Setup Staging Environment with Realistic Data",
+      "project": "HubSpot Integration",
+      "due": "2026-05-29",
+      "est": "4h",
+      "notes": "Configure the staging environment to mirror production with anonymized realistic data. Set up: database seed scripts with representative data volumes, sample file storage, and mock external API responses (HubSpot, GitHub). Ensure data anonymization strips PII but preserves relational integrity. Document the setup process for reproducibility.",
+      "done": false,
+      "target": "today",
+      "subtasks": [
+        {
+          "id": "s127",
+          "title": "Write anonymized DB seed scripts",
+          "done": true
+        },
+        {
+          "id": "s128",
+          "title": "Configure mock API servers (WireMock)",
+          "done": false
+        },
+        {
+          "id": "s129",
+          "title": "Set up sample file storage with realistic fixtures",
+          "done": false
+        },
+        {
+          "id": "s130",
+          "title": "Document staging setup procedure in README",
+          "done": false
+        }
+      ],
+      "sessions": [
+        {
+          "id": "sess24",
+          "start": 1745366400000,
+          "end": 1745370000000
+        }
+      ],
+      "createdAt": 1745280000000,
+      "completedAt": null,
+      "auditLog": []
+    }
+  ]
+}

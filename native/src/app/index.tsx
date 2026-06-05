@@ -11,6 +11,7 @@ import { Colors } from '../constants/theme';
 import Header from '../components/Header';
 import AddTaskModal from '../components/AddTaskModal';
 import Animated, { SlideInRight, SlideOutRight, Easing, useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
+import tasksData from '../constants/tasks.json';
 
 export default function AppIndex() {
   const { width } = useWindowDimensions();
@@ -54,116 +55,7 @@ export default function AppIndex() {
   const [showCompleted, setShowCompleted] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
 
-  // Seed tasks with the full data structure matching tasks.json
-  const [tasks, setTasks] = useState<Task[]>([
-    {
-      id: 't1',
-      title: 'Bill of Material Core Redesign',
-      project: 'Bill of Material',
-      due: '2026-04-25',
-      est: '12h',
-      notes: 'Complete overhaul of the BOM module to support multi-level assemblies. Requires database schema migration, new API endpoints, and a completely reworked frontend. Coordinate with QA for regression testing.',
-      done: false,
-      target: 'today',
-      subtasks: [
-        { id: 's1', title: 'Implement new type system in PostgreSQL', done: true },
-        { id: 's2', title: 'Refactor Site ID validation logic', done: true },
-        { id: 's3', title: 'Optimize scaling algorithms for large datasets', done: false },
-        { id: 's4', title: 'Connect frontend React components to new API', done: false }
-      ],
-      sessions: [
-        { id: 'sess1', start: 1743465600000, end: 1743469200000 },
-        { id: 'sess2', start: 1743472800000, end: 1743476400000 }
-      ],
-      createdAt: 1743379200000,
-      completedAt: null,
-      auditLog: [
-        { timestamp: 1743379200000, action: 'created' }
-      ]
-    },
-    {
-      id: 't2',
-      title: 'HubSpot OAuth Integration',
-      project: 'HubSpot Integration',
-      due: '2026-05-23',
-      est: '8h',
-      notes: 'Implement secure OAuth2 authorization code flow for HubSpot API. Must support token refresh rotation, handle rate limiting, and store encrypted tokens.',
-      done: false,
-      target: 'today',
-      subtasks: [
-        { id: 's11', title: 'Create developer portal app in HubSpot', done: true },
-        { id: 's12', title: 'Configure redirect URIs and OAuth scopes', done: true },
-        { id: 's13', title: 'Implement token exchange logic with PKCE', done: false }
-      ],
-      sessions: [
-        { id: 'sess6', start: 1743811200000, end: 1743814800000 }
-      ],
-      createdAt: 1743724800000,
-      completedAt: null,
-      auditLog: [
-        { timestamp: 1743724800000, action: 'created' }
-      ]
-    },
-    {
-      id: 't3',
-      title: 'Nightly Audit Log Backup System',
-      project: 'GitHub Logs Backup',
-      due: '2026-05-21',
-      est: '4h',
-      notes: 'Automated system to export GitHub Enterprise audit logs to AWS S3 for compliance. Must handle pagination across large orgs, support incremental backups, and include alerting on failure.',
-      done: false,
-      target: 'today',
-      subtasks: [],
-      sessions: [],
-      createdAt: 1743897600000,
-      completedAt: null,
-      auditLog: [
-        { timestamp: 1743897600000, action: 'created' }
-      ]
-    },
-    {
-      id: 't4',
-      title: 'Sprint Retrospective Meeting',
-      project: 'Inbox',
-      due: '2026-05-20',
-      est: '1.5h',
-      notes: 'Bi-weekly team retrospective to reflect on sprint 12. Agenda: review velocity metrics, discuss what went well, what didn\'t, and action items for next sprint.',
-      done: true,
-      target: 'scheduled',
-      subtasks: [
-        { id: 's26', title: 'Prepare Miro retro board', done: true },
-        { id: 's27', title: 'Compile sprint velocity report', done: true }
-      ],
-      sessions: [
-        { id: 'sess10', start: 1744156800000, end: 1744162200000 }
-      ],
-      createdAt: 1744070400000,
-      completedAt: 1744162200000,
-      auditLog: [
-        { timestamp: 1744070400000, action: 'created' },
-        { timestamp: 1744162200000, action: 'completed' }
-      ]
-    },
-    {
-      id: 't5',
-      title: 'Explore Modern UI Design Tokens',
-      project: 'Inbox',
-      due: '',
-      est: '5h',
-      notes: 'Research and prototype migration to a more robust design token system. Evaluate approaches: CSS custom properties vs Style Dictionary vs Tailwind v4 theming.',
-      done: false,
-      target: 'backlog',
-      subtasks: [
-        { id: 's35', title: 'Research Style Dictionary token format', done: true }
-      ],
-      sessions: [],
-      createdAt: 1744156800000,
-      completedAt: null,
-      auditLog: [
-        { timestamp: 1744156800000, action: 'created' }
-      ]
-    }
-  ]);
+  const [tasks, setTasks] = useState<Task[]>(tasksData.tasks);
   
   const [currentView, setCurrentView] = useState('today');
   const [currentProject, setCurrentProject] = useState<string | null>(null);
@@ -351,6 +243,7 @@ export default function AppIndex() {
           tasks={tasks} 
           onSelectTask={(t) => { setSelectedTaskId(t.id); }} 
           showCompleted={showCompleted}
+          onSwipeRight={!isLargeScreen ? openSidebar : undefined}
         />
       );
     }
@@ -387,6 +280,7 @@ export default function AppIndex() {
 
   const handleTouchEnd = (e: any) => {
     if (isLargeScreen) return;
+    if (currentView === 'scheduled') return;
     const dx = e.nativeEvent.pageX - touchStartX.current;
     if (dx > 60) openSidebar();
   };

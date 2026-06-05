@@ -1,8 +1,19 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, useColorScheme } from 'react-native';
-import { Colors } from '../constants/theme';
-import { Task } from './DetailPanel';
-import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
+import React from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  useColorScheme,
+} from "react-native";
+import { Colors } from "../constants/theme";
+import { Task } from "./DetailPanel";
+import Animated, {
+  FadeIn,
+  FadeOut,
+  LinearTransition,
+} from "react-native-reanimated";
 
 interface Project {
   name: string;
@@ -32,42 +43,55 @@ const getDeadlineColorAndLabel = (dueDate?: string, colors?: any) => {
   if (!dueDate) return null;
   const now = new Date();
   now.setHours(0, 0, 0, 0);
-  const due = new Date(dueDate + 'T00:00:00');
+  const due = new Date(dueDate + "T00:00:00");
   const diffMs = due.getTime() - now.getTime();
   const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
-  let label = '';
+  let label = "";
   let color = colors.ghAmber;
-  let bg = 'rgba(210, 153, 34, 0.08)';
-  let border = 'rgba(210, 153, 34, 0.3)';
+  let bg = "rgba(210, 153, 34, 0.08)";
+  let border = "rgba(210, 153, 34, 0.3)";
 
   if (diffDays < 0) {
     label = `· ${Math.abs(diffDays)}d overdue`;
     color = colors.ghRed;
-    bg = 'rgba(248, 81, 73, 0.08)';
-    border = 'rgba(248, 81, 73, 0.3)';
+    bg = "rgba(248, 81, 73, 0.08)";
+    border = "rgba(248, 81, 73, 0.3)";
   } else if (diffDays === 0) {
-    label = '· Today';
-    color = '#e3b341';
-    bg = 'rgba(227, 179, 65, 0.1)';
-    border = 'rgba(227, 179, 65, 0.4)';
+    label = "· Today";
+    color = "#e3b341";
+    bg = "rgba(227, 179, 65, 0.1)";
+    border = "rgba(227, 179, 65, 0.4)";
   } else if (diffDays === 1) {
-    label = '· Tomorrow';
-    color = '#f0883e';
-    bg = 'rgba(240, 136, 62, 0.08)';
-    border = 'rgba(240, 136, 62, 0.3)';
+    label = "· Tomorrow";
+    color = "#f0883e";
+    bg = "rgba(240, 136, 62, 0.08)";
+    border = "rgba(240, 136, 62, 0.3)";
   } else if (diffDays <= 7) {
     label = `· ${diffDays}d left`;
-    color = '#d29922';
-    bg = 'rgba(210, 153, 34, 0.08)';
-    border = 'rgba(210, 153, 34, 0.35)';
+    color = "#d29922";
+    bg = "rgba(210, 153, 34, 0.08)";
+    border = "rgba(210, 153, 34, 0.35)";
   } else {
-    const [y, m, d] = dueDate.split('-');
-    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const [y, m, d] = dueDate.split("-");
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
     label = `· ${months[parseInt(m) - 1]} ${parseInt(d)}`;
-    color = '#3fb950';
-    bg = 'rgba(63, 185, 80, 0.08)';
-    border = 'rgba(63, 185, 80, 0.3)';
+    color = "#3fb950";
+    bg = "rgba(63, 185, 80, 0.08)";
+    border = "rgba(63, 185, 80, 0.3)";
   }
 
   return { label, color, bg, border };
@@ -77,29 +101,29 @@ const getSubtaskProgressStyles = (done: number, total: number, colors: any) => {
   if (total === 0) return null;
   const pct = (done / total) * 100;
   let color = colors.ghMuted;
-  let bg = 'rgba(128,128,128,0.05)';
-  let border = 'rgba(128,128,128,0.2)';
+  let bg = "rgba(128,128,128,0.05)";
+  let border = "rgba(128,128,128,0.2)";
 
   if (pct === 0) {
-    color = '#f85149';
-    bg = 'rgba(248, 81, 73, 0.08)';
-    border = 'rgba(248, 81, 73, 0.3)';
+    color = "#f85149";
+    bg = "rgba(248, 81, 73, 0.08)";
+    border = "rgba(248, 81, 73, 0.3)";
   } else if (pct < 40) {
-    color = '#f0883e';
-    bg = 'rgba(240, 136, 62, 0.08)';
-    border = 'rgba(240, 136, 62, 0.3)';
+    color = "#f0883e";
+    bg = "rgba(240, 136, 62, 0.08)";
+    border = "rgba(240, 136, 62, 0.3)";
   } else if (pct < 70) {
-    color = '#d29922';
-    bg = 'rgba(210, 153, 34, 0.08)';
-    border = 'rgba(210, 153, 34, 0.3)';
+    color = "#d29922";
+    bg = "rgba(210, 153, 34, 0.08)";
+    border = "rgba(210, 153, 34, 0.3)";
   } else if (pct < 100) {
-    color = '#56d4dd';
-    bg = 'rgba(86, 212, 221, 0.08)';
-    border = 'rgba(86, 212, 221, 0.3)';
+    color = "#56d4dd";
+    bg = "rgba(86, 212, 221, 0.08)";
+    border = "rgba(86, 212, 221, 0.3)";
   } else {
-    color = '#3fb950';
-    bg = 'rgba(63, 185, 80, 0.1)';
-    border = 'rgba(63, 185, 80, 0.35)';
+    color = "#3fb950";
+    bg = "rgba(63, 185, 80, 0.1)";
+    border = "rgba(63, 185, 80, 0.35)";
   }
 
   return { color, bg, border };
@@ -117,21 +141,26 @@ export default function TaskPanel({
   setShowCompleted,
 }: TaskPanelProps) {
   const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+  const colors = Colors[scheme === "unspecified" ? "light" : scheme];
 
   const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
-  const isTaskBacklog = (t: Task) => t.target === 'backlog' || (t.due && t.due < todayStr);
-  const isTaskCurrent = (t: Task) => !isTaskBacklog(t) && (t.target === 'today' || t.due === todayStr || (!t.due && t.target === 'today'));
+  const isTaskBacklog = (t: Task) =>
+    t.target === "backlog" || (t.due && t.due < todayStr);
+  const isTaskCurrent = (t: Task) =>
+    !isTaskBacklog(t) &&
+    (t.target === "today" ||
+      t.due === todayStr ||
+      (!t.due && t.target === "today"));
 
   // Filtering based on view & project & completed state
   const baseFiltered = tasks
     .filter((t) => {
       if (currentProject) return t.project === currentProject;
       const backlog = isTaskBacklog(t);
-      if (currentView === 'backlog') return backlog;
-      if (currentView === 'today') return !backlog && isTaskCurrent(t);
+      if (currentView === "backlog") return backlog;
+      if (currentView === "today") return !backlog && isTaskCurrent(t);
       return t.target === currentView && !backlog;
     })
     .filter((t) => {
@@ -141,25 +170,31 @@ export default function TaskPanel({
 
   const getProjectColor = (pName: string) => {
     const found = projects.find((proj) => proj.name === pName);
-    return found ? found.color : '#bc8cff';
+    return found ? found.color : "#bc8cff";
   };
 
   const renderTaskItem = (task: Task) => {
     const pColor = getProjectColor(task.project);
-    const isHex = pColor.startsWith('#');
-    const projectBorderColor = isHex ? `${pColor}4d` : 'rgba(188, 140, 255, 0.3)';
-    const projectBgColor = isHex ? `${pColor}14` : 'rgba(188, 140, 255, 0.08)';
+    const isHex = pColor.startsWith("#");
+    const projectBorderColor = isHex
+      ? `${pColor}4d`
+      : "rgba(188, 140, 255, 0.3)";
+    const projectBgColor = isHex ? `${pColor}14` : "rgba(188, 140, 255, 0.08)";
 
     const totalSeconds = (task.sessions || []).reduce(
       (acc, sess) => acc + (sess.end - sess.start) / 1000,
-      0
+      0,
     );
     const subtasksDone = (task.subtasks || []).filter((s) => s.done).length;
     const totalSubtasks = (task.subtasks || []).length;
 
     const isActive = selectedTaskId === task.id;
     const dlInfo = getDeadlineColorAndLabel(task.due, colors);
-    const subtaskStyles = getSubtaskProgressStyles(subtasksDone, totalSubtasks, colors);
+    const subtaskStyles = getSubtaskProgressStyles(
+      subtasksDone,
+      totalSubtasks,
+      colors,
+    );
 
     return (
       <Animated.View
@@ -172,19 +207,24 @@ export default function TaskPanel({
           style={[
             styles.taskItem,
             { borderBottomColor: colors.ghBorder },
-            isActive && { backgroundColor: 'rgba(31,111,235,0.06)' }
+            isActive && { backgroundColor: "rgba(31,111,235,0.06)" },
           ]}
           onPress={() => onOpenDetail(task)}
         >
           {/* Active border bar indicator */}
-          <View style={[styles.activeBar, { backgroundColor: isActive ? colors.ghBlue : 'transparent' }]} />
+          <View
+            style={[
+              styles.activeBar,
+              { backgroundColor: isActive ? colors.ghBlue : "transparent" },
+            ]}
+          />
 
           {/* Custom Checkbox */}
           <TouchableOpacity
             style={[
               styles.checkbox,
               { borderColor: task.done ? colors.ghGreen : colors.ghBorder2 },
-              task.done && { backgroundColor: colors.ghGreen }
+              task.done && { backgroundColor: colors.ghGreen },
             ]}
             onPress={() => toggleDone(task.id)}
           >
@@ -196,7 +236,7 @@ export default function TaskPanel({
               style={[
                 styles.taskTitle,
                 { color: task.done ? colors.ghMuted : colors.ghText },
-                task.done && styles.lineThrough
+                task.done && styles.lineThrough,
               ]}
               numberOfLines={2}
             >
@@ -205,20 +245,47 @@ export default function TaskPanel({
 
             <View style={styles.taskMeta}>
               {/* Project Tag */}
-              <Text style={[styles.taskTag, { color: pColor, borderColor: projectBorderColor, backgroundColor: projectBgColor }]}>
+              <Text
+                style={[
+                  styles.taskTag,
+                  {
+                    color: pColor,
+                    borderColor: projectBorderColor,
+                    backgroundColor: projectBgColor,
+                  },
+                ]}
+              >
                 {task.project}
               </Text>
 
               {/* Deadline Tag */}
               {dlInfo && (
-                <Text style={[styles.taskTag, { color: dlInfo.color, borderColor: dlInfo.border, backgroundColor: dlInfo.bg }]}>
+                <Text
+                  style={[
+                    styles.taskTag,
+                    {
+                      color: dlInfo.color,
+                      borderColor: dlInfo.border,
+                      backgroundColor: dlInfo.bg,
+                    },
+                  ]}
+                >
                   {dlInfo.label}
                 </Text>
               )}
 
               {/* Subtask count */}
               {subtaskStyles && (
-                <Text style={[styles.taskTag, { color: subtaskStyles.color, borderColor: subtaskStyles.border, backgroundColor: subtaskStyles.bg }]}>
+                <Text
+                  style={[
+                    styles.taskTag,
+                    {
+                      color: subtaskStyles.color,
+                      borderColor: subtaskStyles.border,
+                      backgroundColor: subtaskStyles.bg,
+                    },
+                  ]}
+                >
                   ✓ {subtasksDone}/{totalSubtasks}
                 </Text>
               )}
@@ -227,8 +294,18 @@ export default function TaskPanel({
 
           {/* Logged Timer Value */}
           {totalSeconds > 0 && (
-            <View style={[styles.timeLogBadge, { backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder }]}>
-              <Text style={[styles.timeLogBadgeText, { color: colors.ghMuted }]}>
+            <View
+              style={[
+                styles.timeLogBadge,
+                {
+                  backgroundColor: colors.ghSurface2,
+                  borderColor: colors.ghBorder,
+                },
+              ]}
+            >
+              <Text
+                style={[styles.timeLogBadgeText, { color: colors.ghMuted }]}
+              >
                 {fmtSeconds(totalSeconds)}
               </Text>
             </View>
@@ -242,12 +319,16 @@ export default function TaskPanel({
     if (currentProject) {
       const backlogTasks = baseFiltered.filter(isTaskBacklog);
       const currentTasks = baseFiltered.filter(isTaskCurrent);
-      const futureTasks = baseFiltered.filter((t) => !isTaskBacklog(t) && !isTaskCurrent(t));
+      const futureTasks = baseFiltered.filter(
+        (t) => !isTaskBacklog(t) && !isTaskCurrent(t),
+      );
 
       if (baseFiltered.length === 0) {
         return (
           <View style={styles.emptyState}>
-            <Text style={{ color: colors.ghMuted, fontSize: 13 }}>No tasks in this project.</Text>
+            <Text style={{ color: colors.ghMuted, fontSize: 13 }}>
+              No tasks in this project.
+            </Text>
           </View>
         );
       }
@@ -256,19 +337,31 @@ export default function TaskPanel({
         <ScrollView style={styles.taskList}>
           {backlogTasks.length > 0 && (
             <View style={styles.projectSection}>
-              <Text style={[styles.projectSectionTitle, { color: colors.ghMuted }]}>Backlog</Text>
+              <Text
+                style={[styles.projectSectionTitle, { color: colors.ghMuted }]}
+              >
+                Backlog
+              </Text>
               {backlogTasks.map(renderTaskItem)}
             </View>
           )}
           {currentTasks.length > 0 && (
             <View style={styles.projectSection}>
-              <Text style={[styles.projectSectionTitle, { color: colors.ghMuted }]}>Current</Text>
+              <Text
+                style={[styles.projectSectionTitle, { color: colors.ghMuted }]}
+              >
+                Current
+              </Text>
               {currentTasks.map(renderTaskItem)}
             </View>
           )}
           {futureTasks.length > 0 && (
             <View style={styles.projectSection}>
-              <Text style={[styles.projectSectionTitle, { color: colors.ghMuted }]}>Future Date</Text>
+              <Text
+                style={[styles.projectSectionTitle, { color: colors.ghMuted }]}
+              >
+                Future Date
+              </Text>
               {futureTasks.map(renderTaskItem)}
             </View>
           )}
@@ -281,7 +374,9 @@ export default function TaskPanel({
         {baseFiltered.map(renderTaskItem)}
         {baseFiltered.length === 0 && (
           <View style={styles.emptyState}>
-            <Text style={{ color: colors.ghMuted, fontSize: 13 }}>No tasks found here.</Text>
+            <Text style={{ color: colors.ghMuted, fontSize: 13 }}>
+              No tasks found here.
+            </Text>
           </View>
         )}
       </ScrollView>
@@ -298,7 +393,7 @@ export default function TaskPanel({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    flexDirection: 'column',
+    flexDirection: "column",
   },
   taskList: {
     flex: 1,
@@ -308,22 +403,22 @@ const styles = StyleSheet.create({
   },
   projectSectionTitle: {
     fontSize: 10,
-    fontWeight: '700',
-    textTransform: 'uppercase',
+    fontWeight: "700",
+    textTransform: "uppercase",
     letterSpacing: 0.5,
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
   taskItem: {
-    flexDirection: 'row',
+    flexDirection: "row",
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    alignItems: 'center',
-    position: 'relative',
+    alignItems: "center",
+    position: "relative",
   },
   activeBar: {
-    position: 'absolute',
+    position: "absolute",
     left: 0,
     top: 0,
     bottom: 0,
@@ -334,15 +429,15 @@ const styles = StyleSheet.create({
     height: 18,
     borderRadius: 9,
     borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 12,
     flexShrink: 0,
   },
   checkmark: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 11,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   taskBody: {
     flex: 1,
@@ -350,21 +445,23 @@ const styles = StyleSheet.create({
   },
   taskTitle: {
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: "500",
     marginBottom: 4,
   },
   taskMeta: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 6,
-    flexWrap: 'wrap',
+    flexWrap: "wrap",
   },
   taskTag: {
     fontSize: 9,
-    fontFamily: 'monospace',
+    fontFamily: "monospace",
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderWidth: 1,
     borderRadius: 10,
+    alignSelf: "flex-start",
+    overflow: "hidden",
   },
   timeLogBadge: {
     borderWidth: 1,
@@ -374,14 +471,14 @@ const styles = StyleSheet.create({
   },
   timeLogBadgeText: {
     fontSize: 11,
-    fontFamily: 'monospace',
-    fontWeight: '600',
+    fontFamily: "monospace",
+    fontWeight: "600",
   },
   emptyState: {
     padding: 32,
-    alignItems: 'center',
+    alignItems: "center",
   },
   lineThrough: {
-    textDecorationLine: 'line-through',
-  }
+    textDecorationLine: "line-through",
+  },
 });
