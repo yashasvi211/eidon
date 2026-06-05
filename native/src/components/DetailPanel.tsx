@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -8,8 +8,15 @@ import {
   useColorScheme,
   TextInput,
   ActivityIndicator,
+  useWindowDimensions,
 } from "react-native";
 import { Colors } from "../constants/theme";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  useAnimatedScrollHandler,
+  withTiming,
+} from "react-native-reanimated";
 
 export interface Subtask {
   id: string;
@@ -73,6 +80,8 @@ interface DetailPanelProps {
   onStartTimer: (id: string) => void;
   onStopTimer: (note: string) => void;
   activeTimerTaskId: string | null;
+  activeTab?: "details" | "checklist" | "timetracking" | "history";
+  setActiveTab?: (tab: "details" | "checklist" | "timetracking" | "history") => void;
 }
 
 const fmtDateDisplay = (iso?: string) => {
@@ -200,20 +209,102 @@ export default function DetailPanel({
   onStartTimer,
   onStopTimer,
   activeTimerTaskId,
+  activeTab: propActiveTab,
+  setActiveTab: propSetActiveTab,
 }: DetailPanelProps) {
   const scheme = useColorScheme();
   const colors = Colors[scheme === "unspecified" ? "light" : scheme];
+  const { width } = useWindowDimensions();
+  const isLargeScreen = width >= 768;
 
-  const [activeTab, setActiveTab] = useState<
+  const [localActiveTab, setLocalActiveTab] = useState<
     "details" | "checklist" | "timetracking" | "history"
   >("details");
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [sessionNote, setSessionNote] = useState("");
 
-  // Reset tab on task change
+  const activeTab = propActiveTab !== undefined ? propActiveTab : localActiveTab;
+  const setActiveTab = propSetActiveTab !== undefined ? propSetActiveTab : setLocalActiveTab;
+
+  const [tabBarWidth, setTabBarWidth] = useState(0);
+
+  const handleTabBarLayout = (e: any) => {
+    setTabBarWidth(e.nativeEvent.layout.width);
+  };
+
+  const TABS = ["details", "checklist", "timetracking", "history"] as const;
+  const activeIndex = TABS.indexOf(activeTab);
+
+  // Scroll and touch references
+  const scrollViewRef = useRef<any>(null);
+  const detailTouchStartX = useRef(0);
+
+  const scrollX = useSharedValue(0);
+
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollX.value = event.contentOffset.x;
+    },
+  });
+
+  const indicatorAnimatedStyle = useAnimatedStyle(() => {
+    const tabWidth = tabBarWidth / 4;
+    // Map floating indicator left pos to scroll position directly!
+    const leftPos = scrollX.value / 4;
+    return {
+      left: leftPos,
+      width: tabWidth,
+    };
+  }, [tabBarWidth]);
+
+  // Synchronize ScrollView offset when activeTab changes (e.g. from tab buttons or parent gesture)
+  useEffect(() => {
+    const index = TABS.indexOf(activeTab);
+    if (scrollViewRef.current && tabBarWidth > 0) {
+      scrollViewRef.current.scrollTo({
+        x: index * tabBarWidth,
+        animated: true,
+      });
+    }
+  }, [activeTab, tabBarWidth]);
+
+  // Handle horizontal swipe momentum settling on a page
+  const handleScrollEnd = (e: any) => {
+    const offsetX = e.nativeEvent.contentOffset.x;
+    const pageIndex = Math.round(offsetX / tabBarWidth);
+    if (pageIndex >= 0 && pageIndex < TABS.length) {
+      const targetTab = TABS[pageIndex];
+      if (targetTab !== activeTab) {
+        setActiveTab(targetTab);
+      }
+    }
+  };
+
+  const handleDetailTouchStart = (e: any) => {
+    detailTouchStartX.current = e.nativeEvent.pageX;
+  };
+
+  const handleDetailTouchEnd = (e: any) => {
+    if (tabBarWidth === 0) return;
+    const dx = e.nativeEvent.pageX - detailTouchStartX.current;
+    
+    // Swipe Right at details edge -> close
+    if (activeTab === "details" && dx > 60) {
+      onClose();
+    }
+    // Swipe Left at history edge -> close
+    else if (activeTab === "history" && dx < -60) {
+      onClose();
+    }
+  };
+
+  // Reset tab and scroll position on task change
   useEffect(() => {
     setActiveTab("details");
     setSessionNote("");
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({ x: 0, animated: false });
+    }
   }, [task?.id]);
 
   if (!task) {
@@ -221,7 +312,11 @@ export default function DetailPanel({
       <View
         style={[
           styles.emptyContainer,
-          { backgroundColor: colors.ghBg, borderLeftColor: colors.ghBorder },
+          {
+            backgroundColor: colors.ghBg,
+            borderLeftColor: colors.ghBorder,
+            borderLeftWidth: isLargeScreen ? 1 : 0,
+          },
         ]}
       >
         <Text style={{ color: colors.ghMuted, fontSize: 13 }}>
@@ -295,7 +390,11 @@ export default function DetailPanel({
     <View
       style={[
         styles.container,
-        { backgroundColor: colors.ghBg, borderLeftColor: colors.ghBorder },
+        {
+          backgroundColor: colors.ghBg,
+          borderLeftColor: colors.ghBorder,
+          borderLeftWidth: isLargeScreen ? 1 : 0,
+        },
       ]}
     >
       {/* Header */}
@@ -320,6 +419,7 @@ export default function DetailPanel({
             backgroundColor: colors.ghSurface,
           },
         ]}
+        onLayout={handleTabBarLayout}
       >
         {(["details", "checklist", "timetracking", "history"] as const).map(
           (tab) => {
@@ -343,24 +443,38 @@ export default function DetailPanel({
                     totalSubtasks > 0 &&
                     ` (${subtasksDone}/${totalSubtasks})`}
                 </Text>
-                {isActive && (
-                  <View
-                    style={[
-                      styles.tabIndicator,
-                      { backgroundColor: colors.ghBlue },
-                    ]}
-                  />
-                )}
               </TouchableOpacity>
             );
           },
         )}
+        {tabBarWidth > 0 && (
+          <Animated.View
+            style={[
+              styles.tabIndicatorContainer,
+              indicatorAnimatedStyle,
+            ]}
+          >
+            <View style={[styles.tabIndicatorInner, { backgroundColor: colors.ghBlue }]} />
+          </Animated.View>
+        )}
       </View>
 
       {/* Tab Content */}
-      <ScrollView style={styles.scrollContent}>
-        {activeTab === "details" && (
-          <View style={styles.tabSection}>
+      <TabContentContainer
+        isLargeScreen={isLargeScreen}
+        scrollViewRef={scrollViewRef}
+        scrollHandler={scrollHandler}
+        handleScrollEnd={handleScrollEnd}
+        handleDetailTouchStart={handleDetailTouchStart}
+        handleDetailTouchEnd={handleDetailTouchEnd}
+        tabBarWidth={tabBarWidth}
+      >
+        <TabPage
+          isLargeScreen={isLargeScreen}
+          activeTab={activeTab}
+          tabName="details"
+          tabBarWidth={tabBarWidth}
+        >
             <View style={styles.detailSection}>
               <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
                 STATUS
@@ -544,11 +658,14 @@ export default function DetailPanel({
                 </Text>
               )}
             </View>
-          </View>
-        )}
+          </TabPage>
 
-        {activeTab === "checklist" && (
-          <View style={styles.tabSection}>
+        <TabPage
+          isLargeScreen={isLargeScreen}
+          activeTab={activeTab}
+          tabName="checklist"
+          tabBarWidth={tabBarWidth}
+        >
             {/* Progress Bar */}
             <View style={styles.progressContainer}>
               <View style={styles.progressInfo}>
@@ -642,11 +759,14 @@ export default function DetailPanel({
                 onSubmitEditing={handleAddSubtaskSubmit}
               />
             </View>
-          </View>
-        )}
+          </TabPage>
 
-        {activeTab === "timetracking" && (
-          <View style={styles.tabSection}>
+        <TabPage
+          isLargeScreen={isLargeScreen}
+          activeTab={activeTab}
+          tabName="timetracking"
+          tabBarWidth={tabBarWidth}
+        >
             <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
               LOGGED SESSIONS
             </Text>
@@ -714,11 +834,14 @@ export default function DetailPanel({
                 })}
               </View>
             )}
-          </View>
-        )}
+          </TabPage>
 
-        {activeTab === "history" && (
-          <View style={styles.tabSection}>
+        <TabPage
+          isLargeScreen={isLargeScreen}
+          activeTab={activeTab}
+          tabName="history"
+          tabBarWidth={tabBarWidth}
+        >
             <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
               AUDIT LOG TIMELINE
             </Text>
@@ -795,9 +918,8 @@ export default function DetailPanel({
                 })}
               </View>
             )}
-          </View>
-        )}
-      </ScrollView>
+          </TabPage>
+      </TabContentContainer>
     </View>
   );
 }
@@ -856,6 +978,16 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 8,
     right: 8,
+    height: 2,
+  },
+  tabIndicatorContainer: {
+    position: "absolute",
+    bottom: 0,
+    height: 2,
+  },
+  tabIndicatorInner: {
+    flex: 1,
+    marginHorizontal: 8,
     height: 2,
   },
   scrollContent: {
@@ -1109,3 +1241,73 @@ const styles = StyleSheet.create({
     textDecorationLine: "line-through",
   },
 });
+
+interface TabWrapperProps {
+  isLargeScreen: boolean;
+  activeTab: string;
+  tabName: string;
+  tabBarWidth: number;
+  children: React.ReactNode;
+}
+
+function TabPage({ isLargeScreen, activeTab, tabName, tabBarWidth, children }: TabWrapperProps) {
+  if (isLargeScreen) {
+    return (
+      <View style={[styles.tabSection, { display: activeTab === tabName ? "flex" : "none" }]}>
+        {children}
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView style={{ width: tabBarWidth }} showsVerticalScrollIndicator={false}>
+      <View style={styles.tabSection}>
+        {children}
+      </View>
+    </ScrollView>
+  );
+}
+
+interface ParentProps {
+  isLargeScreen: boolean;
+  scrollViewRef: any;
+  scrollHandler: any;
+  handleScrollEnd: any;
+  handleDetailTouchStart: any;
+  handleDetailTouchEnd: any;
+  tabBarWidth: number;
+  children: React.ReactNode;
+}
+
+function TabContentContainer({
+  isLargeScreen,
+  scrollViewRef,
+  scrollHandler,
+  handleScrollEnd,
+  handleDetailTouchStart,
+  handleDetailTouchEnd,
+  tabBarWidth,
+  children,
+}: ParentProps) {
+  if (isLargeScreen) {
+    return <ScrollView style={styles.scrollContent}>{children}</ScrollView>;
+  }
+
+  return (
+    <Animated.ScrollView
+      ref={scrollViewRef}
+      horizontal
+      pagingEnabled
+      showsHorizontalScrollIndicator={false}
+      onScroll={scrollHandler}
+      scrollEventThrottle={16}
+      onMomentumScrollEnd={handleScrollEnd}
+      onTouchStart={handleDetailTouchStart}
+      onTouchEnd={handleDetailTouchEnd}
+      style={styles.scrollContent}
+      contentContainerStyle={{ width: tabBarWidth * 4 }}
+    >
+      {children}
+    </Animated.ScrollView>
+  );
+}

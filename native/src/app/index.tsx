@@ -1,23 +1,42 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, useWindowDimensions, useColorScheme, TouchableOpacity } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Sidebar from '../components/Sidebar';
-import TaskPanel from '../components/TaskPanel';
-import DetailPanel, { Task, Session, AuditEntry } from '../components/DetailPanel';
-import DeepStats from '../components/DeepStats';
-import TimeTracking from '../components/TimeTracking';
-import ScheduledView from '../components/ScheduledView';
-import { Colors } from '../constants/theme';
-import Header from '../components/Header';
-import AddTaskModal from '../components/AddTaskModal';
-import Animated, { SlideInRight, SlideOutRight, Easing, useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
-import tasksData from '../constants/tasks.json';
+import React, { useState, useEffect, useRef } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  useWindowDimensions,
+  useColorScheme,
+  TouchableOpacity,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Sidebar from "../components/Sidebar";
+import TaskPanel from "../components/TaskPanel";
+import DetailPanel, {
+  Task,
+  Session,
+  AuditEntry,
+} from "../components/DetailPanel";
+import DeepStats from "../components/DeepStats";
+import TimeTracking from "../components/TimeTracking";
+import ScheduledView from "../components/ScheduledView";
+import { Colors } from "../constants/theme";
+import Header from "../components/Header";
+import AddTaskModal from "../components/AddTaskModal";
+import Animated, {
+  SlideInRight,
+  SlideOutRight,
+  Easing,
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  runOnJS,
+} from "react-native-reanimated";
+import tasksData from "../constants/tasks.json";
 
 export default function AppIndex() {
   const { width } = useWindowDimensions();
   const isLargeScreen = width >= 768;
   const scheme = useColorScheme();
-  const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+  const colors = Colors[scheme === "unspecified" ? "light" : scheme];
   const insets = useSafeAreaInsets();
   const touchStartX = useRef(0);
 
@@ -27,21 +46,37 @@ export default function AppIndex() {
   const sidebarTranslate = useSharedValue(-SIDEBAR_WIDTH);
   const backdropOpacity = useSharedValue(0);
 
-  const DURATION = 220;
+  const DURATION = 350;
 
   const openSidebar = () => {
     setSidebarVisible(true);
     setIsSidebarOpen(true);
-    sidebarTranslate.value = withTiming(0, { duration: DURATION });
-    backdropOpacity.value = withTiming(1, { duration: DURATION });
+    sidebarTranslate.value = withTiming(0, {
+      duration: DURATION,
+      easing: Easing.out(Easing.cubic),
+    });
+    backdropOpacity.value = withTiming(1, {
+      duration: DURATION,
+      easing: Easing.out(Easing.cubic),
+    });
   };
 
   const closeSidebar = () => {
     setIsSidebarOpen(false);
-    sidebarTranslate.value = withTiming(-SIDEBAR_WIDTH, { duration: DURATION });
-    backdropOpacity.value = withTiming(0, { duration: DURATION }, (finished) => {
-      if (finished) runOnJS(setSidebarVisible)(false);
+    sidebarTranslate.value = withTiming(-SIDEBAR_WIDTH, {
+      duration: DURATION,
+      easing: Easing.out(Easing.cubic),
     });
+    backdropOpacity.value = withTiming(
+      0,
+      {
+        duration: DURATION,
+        easing: Easing.out(Easing.cubic),
+      },
+      (finished) => {
+        if (finished) runOnJS(setSidebarVisible)(false);
+      },
+    );
   };
 
   const sidebarAnimatedStyle = useAnimatedStyle(() => ({
@@ -56,16 +91,19 @@ export default function AppIndex() {
   const [showAddModal, setShowAddModal] = useState(false);
 
   const [tasks, setTasks] = useState<Task[]>(tasksData.tasks);
-  
-  const [currentView, setCurrentView] = useState('today');
+
+  const [currentView, setCurrentView] = useState("today");
   const [currentProject, setCurrentProject] = useState<string | null>(null);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  
+  const [activeTab, setActiveTab] = useState<
+    "details" | "checklist" | "timetracking" | "history"
+  >("details");
+
   const [projects, setProjects] = useState([
-    { name: 'HubSpot Integration', color: '#58a6ff' },
-    { name: 'Bill of Material', color: '#3fb950' },
-    { name: 'GitHub Logs Backup', color: '#bc8cff' },
-    { name: 'Inbox', color: '#8b949e' },
+    { name: "HubSpot Integration", color: "#58a6ff" },
+    { name: "Bill of Material", color: "#3fb950" },
+    { name: "GitHub Logs Backup", color: "#bc8cff" },
+    { name: "Inbox", color: "#8b949e" },
   ]);
 
   // Sleep mode state
@@ -75,8 +113,12 @@ export default function AppIndex() {
   // Timer state
   const [isTimerRunning, setIsTimerRunning] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(0);
-  const [activeTimerTaskId, setActiveTimerTaskId] = useState<string | null>(null);
-  const [timerStartTimestamp, setTimerStartTimestamp] = useState<number | null>(null);
+  const [activeTimerTaskId, setActiveTimerTaskId] = useState<string | null>(
+    null,
+  );
+  const [timerStartTimestamp, setTimerStartTimestamp] = useState<number | null>(
+    null,
+  );
 
   // Live stopwatch ticks
   useEffect(() => {
@@ -103,51 +145,74 @@ export default function AppIndex() {
   }, [isSleeping]);
 
   // Derived selected task
-  const selectedTask = tasks.find(t => t.id === selectedTaskId) || null;
+  const selectedTask = tasks.find((t) => t.id === selectedTaskId) || null;
+
+  const [activeMobileTask, setActiveMobileTask] = useState<Task | null>(null);
+
+  useEffect(() => {
+    if (selectedTask) {
+      setActiveMobileTask(selectedTask);
+    }
+  }, [selectedTask]);
+
+  useEffect(() => {
+    setActiveTab("details");
+  }, [selectedTaskId]);
 
   const toggleDone = (id: string) => {
     setTasks(
       tasks.map((t) => {
         if (t.id !== id) return t;
         const isDone = !t.done;
-        
+
         // Add audit entry
         const auditEntry: AuditEntry = {
           timestamp: Date.now(),
-          action: isDone ? 'completed' : 'uncompleted',
+          action: isDone ? "completed" : "uncompleted",
         };
-        
+
         return {
           ...t,
           done: isDone,
           completedAt: isDone ? Date.now() : null,
           auditLog: [...(t.auditLog || []), auditEntry],
         };
-      })
+      }),
     );
   };
 
   const handleUpdateTask = (updatedTask: Task) => {
-    setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)));
+    setTasks((prev) =>
+      prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)),
+    );
   };
 
-  const handleAddTask = (title: string, project: string = 'Inbox', due?: string) => {
+  const handleAddTask = (
+    title: string,
+    project: string = "Inbox",
+    due?: string,
+  ) => {
     const newTask: Task = {
-      id: 't' + Date.now(),
+      id: "t" + Date.now(),
       title,
       project,
       due,
       done: false,
-      target: currentView === 'backlog' ? 'backlog' : currentView === 'scheduled' ? 'scheduled' : 'today',
+      target:
+        currentView === "backlog"
+          ? "backlog"
+          : currentView === "scheduled"
+            ? "scheduled"
+            : "today",
       subtasks: [],
       sessions: [],
       createdAt: Date.now(),
       auditLog: [
         {
           timestamp: Date.now(),
-          action: 'created',
-        }
-      ]
+          action: "created",
+        },
+      ],
     };
     setTasks((prev) => [...prev, newTask]);
   };
@@ -164,13 +229,13 @@ export default function AppIndex() {
         if (t.id !== taskId) return t;
         const audit: AuditEntry = {
           timestamp: Date.now(),
-          action: 'timer_started',
+          action: "timer_started",
         };
         return {
           ...t,
           auditLog: [...(t.auditLog || []), audit],
         };
-      })
+      }),
     );
   };
 
@@ -180,7 +245,7 @@ export default function AppIndex() {
     const start = timerStartTimestamp;
     const end = Date.now();
     const newSession: Session = {
-      id: 'sess' + Date.now(),
+      id: "sess" + Date.now(),
       start,
       end,
       note: note.trim() || undefined,
@@ -188,7 +253,7 @@ export default function AppIndex() {
 
     const audit: AuditEntry = {
       timestamp: Date.now(),
-      action: 'timer_stopped',
+      action: "timer_stopped",
       details: {
         note: note.trim() || undefined,
       },
@@ -202,7 +267,7 @@ export default function AppIndex() {
           sessions: [...(t.sessions || []), newSession],
           auditLog: [...(t.auditLog || []), audit],
         };
-      })
+      }),
     );
 
     setIsTimerRunning(false);
@@ -212,10 +277,11 @@ export default function AppIndex() {
   };
 
   const handleAddProject = (name: string, color: string) => {
-    if (projects.some((p) => p.name.toLowerCase() === name.toLowerCase())) return;
+    if (projects.some((p) => p.name.toLowerCase() === name.toLowerCase()))
+      return;
     setProjects([...projects, { name, color }]);
     setCurrentProject(name);
-    setCurrentView('today');
+    setCurrentView("today");
   };
 
   const closeSidebarMobile = () => {
@@ -225,23 +291,25 @@ export default function AppIndex() {
   };
 
   const renderMiddlePanel = () => {
-    if (currentView === 'stats') {
+    if (currentView === "stats") {
       return <DeepStats tasks={tasks} />;
     }
-    if (currentView === 'timetracking') {
+    if (currentView === "timetracking") {
       return (
-        <TimeTracking 
-          tasks={tasks} 
-          isSleeping={isSleeping} 
+        <TimeTracking
+          tasks={tasks}
+          isSleeping={isSleeping}
           sleepStartTime={sleepStartTime}
         />
       );
     }
-    if (currentView === 'scheduled') {
+    if (currentView === "scheduled") {
       return (
-        <ScheduledView 
-          tasks={tasks} 
-          onSelectTask={(t) => { setSelectedTaskId(t.id); }} 
+        <ScheduledView
+          tasks={tasks}
+          onSelectTask={(t) => {
+            setSelectedTaskId(t.id);
+          }}
           showCompleted={showCompleted}
           onSwipeRight={!isLargeScreen ? openSidebar : undefined}
         />
@@ -249,13 +317,15 @@ export default function AppIndex() {
     }
 
     return (
-      <TaskPanel 
+      <TaskPanel
         tasks={tasks}
         projects={projects}
         currentView={currentView}
         currentProject={currentProject}
         toggleDone={toggleDone}
-        onOpenDetail={(t) => { setSelectedTaskId(t.id); }}
+        onOpenDetail={(t) => {
+          setSelectedTaskId(t.id);
+        }}
         selectedTaskId={selectedTaskId}
         showCompleted={showCompleted}
         setShowCompleted={setShowCompleted}
@@ -265,14 +335,31 @@ export default function AppIndex() {
 
   const headerRight = (
     <TouchableOpacity
-      style={[styles.addBtn, { backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder }]}
+      style={[
+        styles.addBtn,
+        { backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder },
+      ]}
       onPress={() => setShowAddModal(true)}
     >
-      <Text style={{ color: colors.ghText, fontSize: 12, fontWeight: '600' }}>+ Add Task</Text>
+      <Text style={{ color: colors.ghText, fontSize: 12, fontWeight: "600" }}>
+        + Add Task
+      </Text>
     </TouchableOpacity>
   );
 
-  const headerTitle = currentProject || (currentView === 'today' ? 'Today' : currentView === 'backlog' ? 'Backlog' : currentView === 'scheduled' ? 'Scheduled' : currentView === 'stats' ? 'Deep Stats' : currentView === 'timetracking' ? 'Time Tracking' : currentView.charAt(0).toUpperCase() + currentView.slice(1));
+  const headerTitle =
+    currentProject ||
+    (currentView === "today"
+      ? "Today"
+      : currentView === "backlog"
+        ? "Backlog"
+        : currentView === "scheduled"
+          ? "Scheduled"
+          : currentView === "stats"
+            ? "Deep Stats"
+            : currentView === "timetracking"
+              ? "Time Tracking"
+              : currentView.charAt(0).toUpperCase() + currentView.slice(1));
 
   const handleTouchStart = (e: any) => {
     touchStartX.current = e.nativeEvent.pageX;
@@ -280,9 +367,32 @@ export default function AppIndex() {
 
   const handleTouchEnd = (e: any) => {
     if (isLargeScreen) return;
-    if (currentView === 'scheduled') return;
     const dx = e.nativeEvent.pageX - touchStartX.current;
-    if (dx > 60) openSidebar();
+
+    if (selectedTaskId) {
+      const TABS = ["details", "checklist", "timetracking", "history"] as const;
+      const currentIndex = TABS.indexOf(activeTab);
+
+      if (dx > 60) {
+        // Swipe Right: go forward in tabs, or close if on history tab
+        if (currentIndex < TABS.length - 1) {
+          setActiveTab(TABS[currentIndex + 1]);
+        } else {
+          setSelectedTaskId(null);
+        }
+      } else if (dx < -60) {
+        // Swipe Left: go backward in tabs, or close if on details tab
+        if (currentIndex > 0) {
+          setActiveTab(TABS[currentIndex - 1]);
+        } else {
+          setSelectedTaskId(null);
+        }
+      }
+    } else {
+      if (dx > 60 && currentView !== "scheduled") {
+        openSidebar();
+      }
+    }
   };
 
   return (
@@ -300,7 +410,7 @@ export default function AppIndex() {
       <View style={styles.appRow}>
         {/* Sidebar for Large Screens */}
         {isLargeScreen && (
-          <Sidebar 
+          <Sidebar
             currentView={currentView}
             setCurrentView={setCurrentView}
             currentProject={currentProject}
@@ -315,67 +425,100 @@ export default function AppIndex() {
         )}
 
         {/* Task List / Stats / Time Tracking / Calendar Panel */}
-        {(!selectedTaskId || isLargeScreen) && (
-          <View style={styles.middlePanel}>
-            {renderMiddlePanel()}
+        <View style={styles.middlePanel}>{renderMiddlePanel()}</View>
+
+        {/* Detail Panel for Large Screens */}
+        {isLargeScreen && (
+          <View style={styles.rightPanel}>
+            <DetailPanel
+              task={selectedTask}
+              onClose={() => setSelectedTaskId(null)}
+              onToggleDone={toggleDone}
+              onUpdateTask={handleUpdateTask}
+              isTimerRunning={isTimerRunning}
+              timerSeconds={timerSeconds}
+              onStartTimer={handleStartTimer}
+              onStopTimer={handleStopTimer}
+              activeTimerTaskId={activeTimerTaskId}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+            />
           </View>
         )}
-
-        {/* Detail Panel with stack slide animation on Mobile */}
-        {isLargeScreen ? (
-          <View style={styles.rightPanel}>
-            <DetailPanel 
-              task={selectedTask}
-              onClose={() => setSelectedTaskId(null)}
-              onToggleDone={toggleDone}
-              onUpdateTask={handleUpdateTask}
-              isTimerRunning={isTimerRunning}
-              timerSeconds={timerSeconds}
-              onStartTimer={handleStartTimer}
-              onStopTimer={handleStopTimer}
-              activeTimerTaskId={activeTimerTaskId}
-            />
-          </View>
-        ) : selectedTaskId ? (
-          <Animated.View 
-            entering={SlideInRight.duration(220).easing(Easing.out(Easing.cubic))}
-            exiting={SlideOutRight.duration(180).easing(Easing.in(Easing.cubic))}
-            style={[styles.middlePanel, { paddingTop: insets.top }]}
-          >
-            <DetailPanel 
-              task={selectedTask}
-              onClose={() => setSelectedTaskId(null)}
-              onToggleDone={toggleDone}
-              onUpdateTask={handleUpdateTask}
-              isTimerRunning={isTimerRunning}
-              timerSeconds={timerSeconds}
-              onStartTimer={handleStartTimer}
-              onStopTimer={handleStopTimer}
-              activeTimerTaskId={activeTimerTaskId}
-            />
-          </Animated.View>
-        ) : null}
       </View>
+
+      {/* Detail Panel overlay on Mobile */}
+      {!isLargeScreen && !!selectedTaskId && (
+        <Animated.View
+          entering={SlideInRight.duration(350).easing(
+            Easing.out(Easing.cubic),
+          )}
+          exiting={SlideOutRight.duration(350).easing(
+            Easing.out(Easing.cubic),
+          )}
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: colors.ghBg,
+              zIndex: 90,
+              paddingTop: insets.top,
+            },
+          ]}
+        >
+          <DetailPanel
+            task={activeMobileTask}
+            onClose={() => setSelectedTaskId(null)}
+            onToggleDone={toggleDone}
+            onUpdateTask={handleUpdateTask}
+            isTimerRunning={isTimerRunning}
+            timerSeconds={timerSeconds}
+            onStartTimer={handleStartTimer}
+            onStopTimer={handleStopTimer}
+            activeTimerTaskId={activeTimerTaskId}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+          />
+        </Animated.View>
+      )}
 
       {/* Sidebar Overlay Drawer with slide-in animation for Mobile */}
       {!isLargeScreen && (sidebarVisible || isSidebarOpen) && (
         <View style={styles.sidebarOverlay}>
-          <Animated.View style={[styles.backdropContainer, backdropAnimatedStyle]}>
-            <TouchableOpacity style={styles.backdrop} onPress={() => closeSidebar()} />
+          <Animated.View
+            style={[styles.backdropContainer, backdropAnimatedStyle]}
+          >
+            <TouchableOpacity
+              style={styles.backdrop}
+              onPress={() => closeSidebar()}
+            />
           </Animated.View>
-          <Animated.View style={[styles.sidebarMobileContainer, { backgroundColor: colors.ghSurface }, sidebarAnimatedStyle]}>
+          <Animated.View
+            style={[
+              styles.sidebarMobileContainer,
+              { backgroundColor: colors.ghSurface },
+              sidebarAnimatedStyle,
+            ]}
+          >
             <View style={{ flex: 1 }}>
-              <Sidebar 
+              <Sidebar
                 currentView={currentView}
-                setCurrentView={(v: string) => { setCurrentView(v); closeSidebarMobile(); }}
+                setCurrentView={(v: string) => {
+                  setCurrentView(v);
+                  closeSidebarMobile();
+                }}
                 currentProject={currentProject}
-                setCurrentProject={(p: string | null) => { setCurrentProject(p); closeSidebarMobile(); }}
+                setCurrentProject={(p: string | null) => {
+                  setCurrentProject(p);
+                  closeSidebarMobile();
+                }}
                 projects={projects}
                 onAddProject={handleAddProject}
                 tasks={tasks}
                 isSleeping={isSleeping}
                 setIsSleeping={setIsSleeping}
-                onOpenSettings={() => { closeSidebarMobile(); }}
+                onOpenSettings={() => {
+                  closeSidebarMobile();
+                }}
               />
             </View>
           </Animated.View>
@@ -398,7 +541,7 @@ const styles = StyleSheet.create({
   },
   appRow: {
     flex: 1,
-    flexDirection: 'row',
+    flexDirection: "row",
   },
   middlePanel: {
     flex: 1,
@@ -408,29 +551,29 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   sidebarOverlay: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    flexDirection: 'row',
+    flexDirection: "row",
     zIndex: 100,
   },
   backdropContainer: {
-    position: 'absolute',
+    position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
   },
   backdrop: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    width: "100%",
+    height: "100%",
+    backgroundColor: "rgba(0,0,0,0.5)",
   },
   sidebarMobileContainer: {
     width: 220,
-    height: '100%',
+    height: "100%",
   },
   addBtn: {
     borderWidth: 1,

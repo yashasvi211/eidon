@@ -211,13 +211,6 @@ export default function TaskPanel({
           ]}
           onPress={() => onOpenDetail(task)}
         >
-          {/* Active border bar indicator */}
-          <View
-            style={[
-              styles.activeBar,
-              { backgroundColor: isActive ? colors.ghBlue : "transparent" },
-            ]}
-          />
 
           {/* Custom Checkbox */}
           <TouchableOpacity
