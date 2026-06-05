@@ -217,18 +217,18 @@ export default function Sidebar({
 
 const styles = StyleSheet.create({
   sidebar: {
-    width: 235,
+    width: 220,
     height: '100%',
     borderRightWidth: 1,
     flexDirection: 'column',
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 12,
+    paddingTop: 22,
+    paddingBottom: 14,
   },
   headerText: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
   },
   menuList: {
@@ -240,17 +240,17 @@ const styles = StyleSheet.create({
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 7,
+    paddingVertical: 8,
     paddingHorizontal: 20,
     gap: 9,
     position: 'relative',
-    height: 34,
+    height: 37,
   },
   activeIndicator: {
     position: 'absolute',
     left: 0,
-    top: 7,
-    bottom: 7,
+    top: 8,
+    bottom: 8,
     width: 2,
     borderTopRightRadius: 2,
     borderBottomRightRadius: 2,
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   menuText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '500',
     flex: 1,
   },

@@ -79,7 +79,6 @@ export default function TimeTracking({ tasks, isSleeping, sleepStartTime }: Time
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.ghBg }]}>
-      <Text style={[styles.title, { color: colors.ghText }]}>Time Tracking Record</Text>
 
       {isSleeping && sleepStartTime && (
         <View style={[styles.sleepCard, { backgroundColor: 'rgba(88, 166, 255, 0.05)', borderColor: colors.ghBlue }]}>
@@ -128,11 +127,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 20,
   },
   sleepCard: {
     marginBottom: 24,

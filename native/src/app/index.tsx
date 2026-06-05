@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, useWindowDimensions, useColorScheme, TouchableOpacity } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, useWindowDimensions, useColorScheme, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Sidebar from '../components/Sidebar';
 import TaskPanel from '../components/TaskPanel';
 import DetailPanel, { Task, Session, AuditEntry } from '../components/DetailPanel';
@@ -8,7 +8,9 @@ import DeepStats from '../components/DeepStats';
 import TimeTracking from '../components/TimeTracking';
 import ScheduledView from '../components/ScheduledView';
 import { Colors } from '../constants/theme';
-import Animated, { FadeIn, FadeOut, SlideInLeft, SlideOutLeft, SlideInRight, SlideOutRight, Easing } from 'react-native-reanimated';
+import Header from '../components/Header';
+import AddTaskModal from '../components/AddTaskModal';
+import Animated, { SlideInRight, SlideOutRight, Easing, useSharedValue, useAnimatedStyle, withTiming, runOnJS } from 'react-native-reanimated';
 
 export default function AppIndex() {
   const { width } = useWindowDimensions();
@@ -16,9 +18,41 @@ export default function AppIndex() {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
   const insets = useSafeAreaInsets();
+  const touchStartX = useRef(0);
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [sidebarVisible, setSidebarVisible] = useState(false);
+  const SIDEBAR_WIDTH = 220;
+  const sidebarTranslate = useSharedValue(-SIDEBAR_WIDTH);
+  const backdropOpacity = useSharedValue(0);
+
+  const DURATION = 220;
+
+  const openSidebar = () => {
+    setSidebarVisible(true);
+    setIsSidebarOpen(true);
+    sidebarTranslate.value = withTiming(0, { duration: DURATION });
+    backdropOpacity.value = withTiming(1, { duration: DURATION });
+  };
+
+  const closeSidebar = () => {
+    setIsSidebarOpen(false);
+    sidebarTranslate.value = withTiming(-SIDEBAR_WIDTH, { duration: DURATION });
+    backdropOpacity.value = withTiming(0, { duration: DURATION }, (finished) => {
+      if (finished) runOnJS(setSidebarVisible)(false);
+    });
+  };
+
+  const sidebarAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: sidebarTranslate.value }],
+  }));
+
+  const backdropAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: backdropOpacity.value,
+  }));
+
   const [showCompleted, setShowCompleted] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   // Seed tasks with the full data structure matching tasks.json
   const [tasks, setTasks] = useState<Task[]>([
@@ -294,7 +328,7 @@ export default function AppIndex() {
 
   const closeSidebarMobile = () => {
     if (!isLargeScreen) {
-      setIsSidebarOpen(false);
+      closeSidebar();
     }
   };
 
@@ -307,7 +341,7 @@ export default function AppIndex() {
         <TimeTracking 
           tasks={tasks} 
           isSleeping={isSleeping} 
-          sleepStartTime={sleepStartTime} 
+          sleepStartTime={sleepStartTime}
         />
       );
     }
@@ -316,7 +350,7 @@ export default function AppIndex() {
         <ScheduledView 
           tasks={tasks} 
           onSelectTask={(t) => { setSelectedTaskId(t.id); }} 
-          showCompleted={showCompleted} 
+          showCompleted={showCompleted}
         />
       );
     }
@@ -329,18 +363,46 @@ export default function AppIndex() {
         currentProject={currentProject}
         toggleDone={toggleDone}
         onOpenDetail={(t) => { setSelectedTaskId(t.id); }}
-        onMenuPress={() => setIsSidebarOpen(true)}
-        showMenuBtn={!isLargeScreen}
         selectedTaskId={selectedTaskId}
-        onAddTask={handleAddTask}
         showCompleted={showCompleted}
         setShowCompleted={setShowCompleted}
       />
     );
   };
 
+  const headerRight = (
+    <TouchableOpacity
+      style={[styles.addBtn, { backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder }]}
+      onPress={() => setShowAddModal(true)}
+    >
+      <Text style={{ color: colors.ghText, fontSize: 12, fontWeight: '600' }}>+ Add Task</Text>
+    </TouchableOpacity>
+  );
+
+  const headerTitle = currentProject || (currentView === 'today' ? 'Today' : currentView === 'backlog' ? 'Backlog' : currentView === 'scheduled' ? 'Scheduled' : currentView === 'stats' ? 'Deep Stats' : currentView === 'timetracking' ? 'Time Tracking' : currentView.charAt(0).toUpperCase() + currentView.slice(1));
+
+  const handleTouchStart = (e: any) => {
+    touchStartX.current = e.nativeEvent.pageX;
+  };
+
+  const handleTouchEnd = (e: any) => {
+    if (isLargeScreen) return;
+    const dx = e.nativeEvent.pageX - touchStartX.current;
+    if (dx > 60) openSidebar();
+  };
+
   return (
-    <View style={{ flex: 1, backgroundColor: colors.ghBg }}>
+    <View
+      style={{ flex: 1, backgroundColor: colors.ghBg }}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      <Header
+        title={headerTitle}
+        showMenuBtn={!isLargeScreen}
+        onMenuPress={() => openSidebar()}
+        right={headerRight}
+      />
       <View style={styles.appRow}>
         {/* Sidebar for Large Screens */}
         {isLargeScreen && (
@@ -402,21 +464,13 @@ export default function AppIndex() {
       </View>
 
       {/* Sidebar Overlay Drawer with slide-in animation for Mobile */}
-      {!isLargeScreen && isSidebarOpen && (
+      {!isLargeScreen && (sidebarVisible || isSidebarOpen) && (
         <View style={styles.sidebarOverlay}>
-          <Animated.View 
-            entering={FadeIn.duration(200)}
-            exiting={FadeOut.duration(200)}
-            style={styles.backdropContainer}
-          >
-            <TouchableOpacity style={styles.backdrop} onPress={() => setIsSidebarOpen(false)} />
+          <Animated.View style={[styles.backdropContainer, backdropAnimatedStyle]}>
+            <TouchableOpacity style={styles.backdrop} onPress={() => closeSidebar()} />
           </Animated.View>
-          <Animated.View 
-            entering={SlideInLeft.duration(220).easing(Easing.out(Easing.cubic))}
-            exiting={SlideOutLeft.duration(180).easing(Easing.in(Easing.cubic))}
-            style={[styles.sidebarMobileContainer, { backgroundColor: colors.ghSurface }]}
-          >
-            <SafeAreaView style={{ flex: 1 }} edges={['top', 'bottom', 'left']}>
+          <Animated.View style={[styles.sidebarMobileContainer, { backgroundColor: colors.ghSurface }, sidebarAnimatedStyle]}>
+            <View style={{ flex: 1 }}>
               <Sidebar 
                 currentView={currentView}
                 setCurrentView={(v: string) => { setCurrentView(v); closeSidebarMobile(); }}
@@ -429,10 +483,17 @@ export default function AppIndex() {
                 setIsSleeping={setIsSleeping}
                 onOpenSettings={() => { closeSidebarMobile(); }}
               />
-            </SafeAreaView>
+            </View>
           </Animated.View>
         </View>
       )}
+
+      <AddTaskModal
+        visible={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onAdd={handleAddTask}
+        projects={projects}
+      />
     </View>
   );
 }
@@ -474,12 +535,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   sidebarMobileContainer: {
-    width: 260,
+    width: 220,
     height: '100%',
-    elevation: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 4, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-  }
+  },
+  addBtn: {
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
 });

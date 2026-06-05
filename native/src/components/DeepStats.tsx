@@ -118,35 +118,31 @@ export default function DeepStats({ tasks }: DeepStatsProps) {
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.ghBg }]}>
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: colors.ghText }]}>Deep Stats</Text>
-        
-        <View style={styles.toggleRow}>
-          <TouchableOpacity
-            style={[
-              styles.toggleBtn,
-              viewType === 'daily' && { backgroundColor: colors.ghSurface2, borderColor: colors.ghBlue },
-              { borderColor: colors.ghBorder }
-            ]}
-            onPress={() => setViewType('daily')}
-          >
-            <Text style={[styles.toggleText, { color: viewType === 'daily' ? colors.ghBlue : colors.ghMuted }]}>
-              Daily
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.toggleBtn,
-              viewType === 'weekly' && { backgroundColor: colors.ghSurface2, borderColor: colors.ghBlue },
-              { borderColor: colors.ghBorder }
-            ]}
-            onPress={() => setViewType('weekly')}
-          >
-            <Text style={[styles.toggleText, { color: viewType === 'weekly' ? colors.ghBlue : colors.ghMuted }]}>
-              Weekly
-            </Text>
-          </TouchableOpacity>
-        </View>
+      <View style={styles.toggleRow}>
+        <TouchableOpacity
+          style={[
+            styles.toggleBtn,
+            viewType === 'daily' && { backgroundColor: colors.ghSurface2, borderColor: colors.ghBlue },
+            { borderColor: colors.ghBorder }
+          ]}
+          onPress={() => setViewType('daily')}
+        >
+          <Text style={[styles.toggleText, { color: viewType === 'daily' ? colors.ghBlue : colors.ghMuted }]}>
+            Daily
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.toggleBtn,
+            viewType === 'weekly' && { backgroundColor: colors.ghSurface2, borderColor: colors.ghBlue },
+            { borderColor: colors.ghBorder }
+          ]}
+          onPress={() => setViewType('weekly')}
+        >
+          <Text style={[styles.toggleText, { color: viewType === 'weekly' ? colors.ghBlue : colors.ghMuted }]}>
+            Weekly
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Project Filter Selector */}

@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, useColorScheme, TextInput } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, useColorScheme } from 'react-native';
 import { Colors } from '../constants/theme';
 import { Task } from './DetailPanel';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -17,10 +16,7 @@ interface TaskPanelProps {
   currentProject: string | null;
   toggleDone: (id: string) => void;
   onOpenDetail: (task: Task) => void;
-  onMenuPress: () => void;
-  showMenuBtn: boolean;
   selectedTaskId: string | null;
-  onAddTask: (title: string, project?: string, due?: string) => void;
   showCompleted: boolean;
   setShowCompleted: (val: boolean) => void;
 }
@@ -116,18 +112,12 @@ export default function TaskPanel({
   currentProject,
   toggleDone,
   onOpenDetail,
-  onMenuPress,
-  showMenuBtn,
   selectedTaskId,
-  onAddTask,
   showCompleted,
   setShowCompleted,
 }: TaskPanelProps) {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
-  const insets = useSafeAreaInsets();
-
-  const [quickAddTitle, setQuickAddTitle] = useState('');
 
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -152,24 +142,6 @@ export default function TaskPanel({
   const getProjectColor = (pName: string) => {
     const found = projects.find((proj) => proj.name === pName);
     return found ? found.color : '#bc8cff';
-  };
-
-  const handleQuickAddSubmit = () => {
-    if (!quickAddTitle.trim()) return;
-    // Determine target based on view
-    let target = 'today';
-    let project = currentProject || 'Inbox';
-    let due = undefined;
-
-    if (currentView === 'backlog') {
-      target = 'backlog';
-    } else if (currentView === 'scheduled') {
-      target = 'scheduled';
-      due = todayStr; // default to today for quick add in scheduled
-    }
-
-    onAddTask(quickAddTitle.trim(), project, due);
-    setQuickAddTitle('');
   };
 
   const renderTaskItem = (task: Task) => {
@@ -316,49 +288,9 @@ export default function TaskPanel({
     );
   };
 
-  const titleString = currentProject || (currentView.charAt(0).toUpperCase() + currentView.slice(1));
-
   return (
     <View style={[styles.container, { backgroundColor: colors.ghBg }]}>
-      <View style={[styles.header, { borderBottomColor: colors.ghBorder, paddingTop: insets.top + 10 }]}>
-        <View style={styles.headerLeft}>
-          {showMenuBtn && (
-            <TouchableOpacity onPress={onMenuPress} style={styles.menuBtn}>
-              <Text style={{ color: colors.ghText, fontSize: 20 }}>☰</Text>
-            </TouchableOpacity>
-          )}
-          <Text style={[styles.headerTitle, { color: colors.ghText }]}>
-            {titleString}
-          </Text>
-        </View>
-
-        {/* Show Completed Toggle Button */}
-        <TouchableOpacity
-          style={[
-            styles.filterBtn,
-            { borderColor: colors.ghBorder, backgroundColor: showCompleted ? colors.ghSurface2 : 'transparent' }
-          ]}
-          onPress={() => setShowCompleted(!showCompleted)}
-        >
-          <Text style={{ color: colors.ghText, fontSize: 11, fontWeight: '500' }}>
-            {showCompleted ? 'Hide Completed' : 'Show Completed'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-      
       {renderContent()}
-      
-      <View style={[styles.quickAdd, { borderTopColor: colors.ghBorder, backgroundColor: colors.ghSurface }]}>
-        <TextInput 
-          placeholder="Quick add a task..." 
-          placeholderTextColor={colors.ghMuted}
-          style={[styles.quickAddInput, { color: colors.ghText, backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder }]} 
-          value={quickAddTitle}
-          onChangeText={setQuickAddTitle}
-          onSubmitEditing={handleQuickAddSubmit}
-          returnKeyType="done"
-        />
-      </View>
     </View>
   );
 }
@@ -367,32 +299,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     flexDirection: 'column',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    minHeight: 48,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  menuBtn: {
-    marginRight: 15,
-  },
-  headerTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  filterBtn: {
-    borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
   },
   taskList: {
     flex: 1,
@@ -474,17 +380,6 @@ const styles = StyleSheet.create({
   emptyState: {
     padding: 32,
     alignItems: 'center',
-  },
-  quickAdd: {
-    padding: 12,
-    borderTopWidth: 1,
-  },
-  quickAddInput: {
-    height: 36,
-    borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    fontSize: 13,
   },
   lineThrough: {
     textDecorationLine: 'line-through',
