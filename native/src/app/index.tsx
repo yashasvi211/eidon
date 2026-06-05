@@ -370,23 +370,12 @@ export default function AppIndex() {
     const dx = e.nativeEvent.pageX - touchStartX.current;
 
     if (selectedTaskId) {
-      const TABS = ["details", "checklist", "timetracking", "history"] as const;
-      const currentIndex = TABS.indexOf(activeTab);
-
       if (dx > 60) {
-        // Swipe Right: go forward in tabs, or close if on history tab
-        if (currentIndex < TABS.length - 1) {
-          setActiveTab(TABS[currentIndex + 1]);
-        } else {
-          setSelectedTaskId(null);
-        }
-      } else if (dx < -60) {
-        // Swipe Left: go backward in tabs, or close if on details tab
-        if (currentIndex > 0) {
-          setActiveTab(TABS[currentIndex - 1]);
-        } else {
-          setSelectedTaskId(null);
-        }
+        // Swipe Right: close detail panel
+        setSelectedTaskId(null);
+      } else if (dx < -60 && activeTab === "history") {
+        // Swipe Left on History: close detail panel
+        setSelectedTaskId(null);
       }
     } else {
       if (dx > 60 && currentView !== "scheduled") {
@@ -459,9 +448,8 @@ export default function AppIndex() {
           style={[
             StyleSheet.absoluteFill,
             {
-              backgroundColor: colors.ghBg,
+              backgroundColor: "transparent",
               zIndex: 90,
-              paddingTop: insets.top,
             },
           ]}
         >

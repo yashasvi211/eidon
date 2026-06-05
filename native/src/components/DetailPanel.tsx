@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -9,7 +9,9 @@ import {
   TextInput,
   ActivityIndicator,
   useWindowDimensions,
+  PanResponder,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../constants/theme";
 import Animated, {
   useSharedValue,
@@ -212,6 +214,7 @@ export default function DetailPanel({
   activeTab: propActiveTab,
   setActiveTab: propSetActiveTab,
 }: DetailPanelProps) {
+  const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
   const colors = Colors[scheme === "unspecified" ? "light" : scheme];
   const { width } = useWindowDimensions();
@@ -226,10 +229,12 @@ export default function DetailPanel({
   const activeTab = propActiveTab !== undefined ? propActiveTab : localActiveTab;
   const setActiveTab = propSetActiveTab !== undefined ? propSetActiveTab : setLocalActiveTab;
 
-  const [tabBarWidth, setTabBarWidth] = useState(0);
+  const [tabBarWidth, setTabBarWidth] = useState(isLargeScreen ? 0 : width);
 
   const handleTabBarLayout = (e: any) => {
-    setTabBarWidth(e.nativeEvent.layout.width);
+    if (isLargeScreen) {
+      setTabBarWidth(e.nativeEvent.layout.width);
+    }
   };
 
   const TABS = ["details", "checklist", "timetracking", "history"] as const;
@@ -237,32 +242,75 @@ export default function DetailPanel({
 
   // Scroll and touch references
   const scrollViewRef = useRef<any>(null);
-  const detailTouchStartX = useRef(0);
 
-  const scrollX = useSharedValue(0);
+  const scrollX = useSharedValue(-999);
+  const hasReachedStart = useSharedValue(isLargeScreen ? 1 : 0);
 
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
       scrollX.value = event.contentOffset.x;
+      // Only unlock translations and opacity once we've safely scrolled to the details tab
+      if (!isLargeScreen && tabBarWidth > 0 && event.contentOffset.x >= tabBarWidth - 1 && hasReachedStart.value === 0) {
+        hasReachedStart.value = 1;
+      }
     },
-  });
+  }, [tabBarWidth, isLargeScreen]);
 
   const indicatorAnimatedStyle = useAnimatedStyle(() => {
     const tabWidth = tabBarWidth / 4;
+    if (scrollX.value === -999 || tabBarWidth === 0) {
+      return { left: 0, width: tabWidth };
+    }
     // Map floating indicator left pos to scroll position directly!
-    const leftPos = scrollX.value / 4;
+    // Since we added an empty page at index 0 (width = tabBarWidth),
+    // we subtract tabBarWidth from scrollX to align with the visual tabs.
+    const rawLeftPos = (scrollX.value - tabBarWidth) / 4;
+    
+    // Clamp the indicator position so it doesn't move off-screen when swiping to close
+    const maxLeftPos = tabWidth * 3;
+    const leftPos = Math.max(0, Math.min(rawLeftPos, maxLeftPos));
+    
     return {
       left: leftPos,
       width: tabWidth,
     };
   }, [tabBarWidth]);
 
+  const rootAnimatedStyle = useAnimatedStyle(() => {
+    let tx = 0;
+    if (!isLargeScreen && tabBarWidth > 0 && scrollX.value !== -999 && hasReachedStart.value === 1) {
+      if (scrollX.value < tabBarWidth) {
+        tx = Math.max(0, tabBarWidth - scrollX.value);
+      } else if (scrollX.value > tabBarWidth * 4) {
+        tx = Math.min(0, (tabBarWidth * 4) - scrollX.value);
+      }
+    }
+    return {
+      transform: [{ translateX: tx }],
+    };
+  }, [tabBarWidth, isLargeScreen]);
+
+  const scrollViewAnimatedStyle = useAnimatedStyle(() => {
+    let tx = 0;
+    if (!isLargeScreen && tabBarWidth > 0 && scrollX.value !== -999 && hasReachedStart.value === 1) {
+      if (scrollX.value < tabBarWidth) {
+        tx = Math.max(0, tabBarWidth - scrollX.value);
+      } else if (scrollX.value > tabBarWidth * 4) {
+        tx = Math.min(0, (tabBarWidth * 4) - scrollX.value);
+      }
+    }
+    return {
+      transform: [{ translateX: -tx }],
+      opacity: isLargeScreen ? 1 : hasReachedStart.value,
+    };
+  }, [tabBarWidth, isLargeScreen]);
+
   // Synchronize ScrollView offset when activeTab changes (e.g. from tab buttons or parent gesture)
   useEffect(() => {
     const index = TABS.indexOf(activeTab);
     if (scrollViewRef.current && tabBarWidth > 0) {
       scrollViewRef.current.scrollTo({
-        x: index * tabBarWidth,
+        x: (index + 1) * tabBarWidth, // +1 to account for the empty close page at index 0
         animated: true,
       });
     }
@@ -271,30 +319,21 @@ export default function DetailPanel({
   // Handle horizontal swipe momentum settling on a page
   const handleScrollEnd = (e: any) => {
     const offsetX = e.nativeEvent.contentOffset.x;
-    const pageIndex = Math.round(offsetX / tabBarWidth);
-    if (pageIndex >= 0 && pageIndex < TABS.length) {
-      const targetTab = TABS[pageIndex];
+    const pageIndex = Math.round(offsetX / tabBarWidth); // 0 to 5
+
+    // If swiped to the empty pages at the ends, close the panel
+    if (pageIndex === 0 || pageIndex === 5) {
+      onClose();
+      return;
+    }
+
+    // Valid tab index is pageIndex - 1 (1 to 4 -> 0 to 3)
+    const tabIndex = pageIndex - 1;
+    if (tabIndex >= 0 && tabIndex < TABS.length) {
+      const targetTab = TABS[tabIndex];
       if (targetTab !== activeTab) {
         setActiveTab(targetTab);
       }
-    }
-  };
-
-  const handleDetailTouchStart = (e: any) => {
-    detailTouchStartX.current = e.nativeEvent.pageX;
-  };
-
-  const handleDetailTouchEnd = (e: any) => {
-    if (tabBarWidth === 0) return;
-    const dx = e.nativeEvent.pageX - detailTouchStartX.current;
-    
-    // Swipe Right at details edge -> close
-    if (activeTab === "details" && dx > 60) {
-      onClose();
-    }
-    // Swipe Left at history edge -> close
-    else if (activeTab === "history" && dx < -60) {
-      onClose();
     }
   };
 
@@ -302,10 +341,13 @@ export default function DetailPanel({
   useEffect(() => {
     setActiveTab("details");
     setSessionNote("");
-    if (scrollViewRef.current) {
-      scrollViewRef.current.scrollTo({ x: 0, animated: false });
+    if (!isLargeScreen) {
+      hasReachedStart.value = 0;
     }
-  }, [task?.id]);
+    if (scrollViewRef.current && tabBarWidth > 0) {
+      scrollViewRef.current.scrollTo({ x: tabBarWidth, animated: false }); // start at index 1 (details tab)
+    }
+  }, [task?.id, tabBarWidth, isLargeScreen]);
 
   if (!task) {
     return (
@@ -387,14 +429,16 @@ export default function DetailPanel({
   };
 
   return (
-    <View
+    <Animated.View
       style={[
         styles.container,
         {
           backgroundColor: colors.ghBg,
           borderLeftColor: colors.ghBorder,
           borderLeftWidth: isLargeScreen ? 1 : 0,
+          paddingTop: isLargeScreen ? 0 : insets.top,
         },
+        rootAnimatedStyle,
       ]}
     >
       {/* Header */}
@@ -465,9 +509,8 @@ export default function DetailPanel({
         scrollViewRef={scrollViewRef}
         scrollHandler={scrollHandler}
         handleScrollEnd={handleScrollEnd}
-        handleDetailTouchStart={handleDetailTouchStart}
-        handleDetailTouchEnd={handleDetailTouchEnd}
         tabBarWidth={tabBarWidth}
+        scrollViewAnimatedStyle={scrollViewAnimatedStyle}
       >
         <TabPage
           isLargeScreen={isLargeScreen}
@@ -920,7 +963,7 @@ export default function DetailPanel({
             )}
           </TabPage>
       </TabContentContainer>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -1273,9 +1316,8 @@ interface ParentProps {
   scrollViewRef: any;
   scrollHandler: any;
   handleScrollEnd: any;
-  handleDetailTouchStart: any;
-  handleDetailTouchEnd: any;
   tabBarWidth: number;
+  scrollViewAnimatedStyle?: any;
   children: React.ReactNode;
 }
 
@@ -1284,9 +1326,8 @@ function TabContentContainer({
   scrollViewRef,
   scrollHandler,
   handleScrollEnd,
-  handleDetailTouchStart,
-  handleDetailTouchEnd,
   tabBarWidth,
+  scrollViewAnimatedStyle,
   children,
 }: ParentProps) {
   if (isLargeScreen) {
@@ -1302,12 +1343,14 @@ function TabContentContainer({
       onScroll={scrollHandler}
       scrollEventThrottle={16}
       onMomentumScrollEnd={handleScrollEnd}
-      onTouchStart={handleDetailTouchStart}
-      onTouchEnd={handleDetailTouchEnd}
-      style={styles.scrollContent}
-      contentContainerStyle={{ width: tabBarWidth * 4 }}
+      style={[styles.scrollContent, scrollViewAnimatedStyle]}
+      contentContainerStyle={{ width: tabBarWidth * 6 }} // 4 tabs + 2 empty close pages
     >
+      {/* Empty page to capture right swipe (left-to-right) on details tab to close */}
+      <View style={{ width: tabBarWidth }} />
       {children}
+      {/* Empty page to capture left swipe (right-to-left) on history tab to close */}
+      <View style={{ width: tabBarWidth }} />
     </Animated.ScrollView>
   );
 }
