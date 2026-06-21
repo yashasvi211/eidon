@@ -1,4 +1,4 @@
--- schema/schema.sql
+-- app/schema/schema.sql
 -- Database schema for Eidon Task and Time Tracker
 
 -- 1. Projects Table

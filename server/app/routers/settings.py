@@ -1,8 +1,8 @@
-# routers/settings.py
+# app/routers/settings.py
 from fastapi import APIRouter, Depends, HTTPException
-from database import get_db
-import crud
-import schemas
+from app.database import get_db
+from app import crud
+from app import schemas
 
 router = APIRouter(prefix="/api/settings", tags=["Settings"])
 

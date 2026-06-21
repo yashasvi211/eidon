@@ -1,8 +1,8 @@
-# main.py
+# app/main.py
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import tasks, projects, settings
+from app.routers import tasks, projects, settings
 
 app = FastAPI(title="Eidon Task & Time Tracker Backend API")
 
@@ -25,4 +25,4 @@ def read_root():
     return {"message": "Eidon FastAPI Backend is running!"}
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)

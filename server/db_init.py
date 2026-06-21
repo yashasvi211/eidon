@@ -3,7 +3,7 @@ import os
 import json
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from database import DB_HOST, DB_PORT, DB_USER, DB_NAME, DB_PASS
+from app.database import DB_HOST, DB_PORT, DB_USER, DB_NAME, DB_PASS
 
 def get_connection():
     return psycopg2.connect(
@@ -20,8 +20,8 @@ def init_db():
     conn = get_connection()
     cur = conn.cursor()
     
-    # Read schema/schema.sql
-    schema_path = os.path.join(os.path.dirname(__file__), "schema", "schema.sql")
+    # Read app/schema/schema.sql
+    schema_path = os.path.join(os.path.dirname(__file__), "app", "schema", "schema.sql")
     print(f"Reading schema from {schema_path}...")
     with open(schema_path, "r") as f:
         schema_sql = f.read()
@@ -43,7 +43,7 @@ def init_db():
         return
         
     # Read tasks.json
-    tasks_json_path = os.path.join(os.path.dirname(__file__), "..", "..", "public", "tasks.json")
+    tasks_json_path = os.path.join(os.path.dirname(__file__), "..", "public", "tasks.json")
     if not os.path.exists(tasks_json_path):
         print(f"tasks.json not found at {tasks_json_path}. Cannot seed tasks.")
         cur.close()

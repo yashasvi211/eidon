@@ -1,9 +1,9 @@
-# routers/projects.py
+# app/routers/projects.py
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
-from database import get_db
-import crud
-import schemas
+from app.database import get_db
+from app import crud
+from app import schemas
 
 router = APIRouter(prefix="/api/projects", tags=["Projects"])
 

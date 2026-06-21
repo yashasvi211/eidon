@@ -1,7 +1,7 @@
-# crud.py
+# app/crud.py
 import json
 from psycopg2.extras import RealDictCursor
-from schemas import (
+from app.schemas import (
     TaskCreate, TaskUpdate, 
     SubtaskCreate, SubtaskUpdate, 
     SessionCreate, AuditLogCreate, 
@@ -31,7 +31,6 @@ def create_project(conn, project: ProjectSchema):
 
 def delete_project(conn, name: str):
     cur = conn.cursor()
-    # Move associated tasks to Inbox before deleting project
     cur.execute("UPDATE tasks SET project = 'Inbox' WHERE project = %s;", (name,))
     cur.execute("DELETE FROM projects WHERE name = %s;", (name,))
     conn.commit()
@@ -120,7 +119,6 @@ def get_all_tasks(conn):
 
 def create_task(conn, task: TaskCreate):
     cur = conn.cursor()
-    # Check if project exists, if not default to Inbox
     project_name = task.project or "Inbox"
     cur.execute("SELECT COUNT(*) FROM projects WHERE name = %s;", (project_name,))
     if cur.fetchone()[0] == 0:
