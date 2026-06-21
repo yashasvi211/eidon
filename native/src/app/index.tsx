@@ -671,14 +671,11 @@ export default function AppIndex() {
           />
         )}
 
-        {/* Task List / Stats / Time Tracking / Calendar Panel */}
-        <View style={styles.middlePanel}>{renderMiddlePanel()}</View>
-
-        {/* Detail Panel for Large Screens */}
-        {isLargeScreen && (
-          <View style={styles.rightPanel}>
+        {/* Task List / Stats / Time Tracking / Calendar Panel or Mobile Detail */}
+        <View style={styles.middlePanel}>
+          {!isLargeScreen && !!selectedTaskId ? (
             <DetailPanel
-              task={selectedTask}
+              task={activeMobileTask}
               onClose={() => setSelectedTaskId(null)}
               onToggleDone={toggleDone}
               onUpdateTask={handleUpdateTask}
@@ -690,14 +687,16 @@ export default function AppIndex() {
               activeTab={activeTab}
               setActiveTab={setActiveTab}
             />
-          </View>
-        )}
+          ) : (
+            renderMiddlePanel()
+          )}
+        </View>
 
-        {/* Detail Panel overlay on Mobile — slides up from bottom, Header stays visible */}
-        {!isLargeScreen && !!selectedTaskId && (
-          <View style={styles.mobileDetailOverlay}>
+        {/* Detail Panel for Large Screens */}
+        {isLargeScreen && (
+          <View style={styles.rightPanel}>
             <DetailPanel
-              task={activeMobileTask}
+              task={selectedTask}
               onClose={() => setSelectedTaskId(null)}
               onToggleDone={toggleDone}
               onUpdateTask={handleUpdateTask}
@@ -826,14 +825,6 @@ const styles = StyleSheet.create({
   rightPanel: {
     width: 320,
     flexShrink: 0,
-  },
-  mobileDetailOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 90,
   },
   sidebarOverlay: {
     position: "absolute",
