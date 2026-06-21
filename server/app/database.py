@@ -1,12 +1,17 @@
 # app/database.py
+import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from dotenv import load_dotenv
 
-DB_HOST = "db.vusczbabvvuwmtyylxcx.supabase.co"
-DB_PORT = 5432
-DB_USER = "postgres"
-DB_NAME = "postgres"
-DB_PASS = "YashavipAtlanis@453"
+# Load .env variables
+load_dotenv()
+
+DB_HOST = os.getenv("DB_HOST", "db.vusczbabvvuwmtyylxcx.supabase.co")
+DB_PORT = int(os.getenv("DB_PORT", "5432"))
+DB_USER = os.getenv("DB_USER", "postgres")
+DB_NAME = os.getenv("DB_NAME", "postgres")
+DB_PASS = os.getenv("DB_PASS", "YashavipAtlanis@453")
 
 def get_db_connection():
     return psycopg2.connect(
