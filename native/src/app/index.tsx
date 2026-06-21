@@ -333,6 +333,16 @@ export default function AppIndex() {
     setCurrentView("today");
   };
 
+  const handleDeleteProject = (name: string) => {
+    setProjects(projects.filter((p) => p.name !== name));
+    if (currentProject === name) {
+      setCurrentProject(null);
+      setCurrentView("today");
+    }
+    // Also delete tasks of this project to keep DB clean
+    setTasks(tasks.filter((t) => t.project !== name));
+  };
+
   const closeSidebarMobile = () => {
     if (!isLargeScreen) {
       closeSidebar();
@@ -439,7 +449,6 @@ export default function AppIndex() {
         right={headerRight}
       />
       <View style={styles.appRow}>
-        {/* Sidebar for Large Screens */}
         {isLargeScreen && (
           <Sidebar
             currentView={currentView}
@@ -451,7 +460,9 @@ export default function AppIndex() {
             tasks={tasks}
             isSleeping={isSleeping}
             setIsSleeping={setIsSleeping}
-            onOpenSettings={() => {}}
+            showCompleted={showCompleted}
+            setShowCompleted={setShowCompleted}
+            onDeleteProject={handleDeleteProject}
           />
         )}
 
@@ -532,9 +543,9 @@ export default function AppIndex() {
                 tasks={tasks}
                 isSleeping={isSleeping}
                 setIsSleeping={setIsSleeping}
-                onOpenSettings={() => {
-                  closeSidebarMobile();
-                }}
+                showCompleted={showCompleted}
+                setShowCompleted={setShowCompleted}
+                onDeleteProject={handleDeleteProject}
               />
             </View>
           </Animated.View>

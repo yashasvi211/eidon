@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, useColorScheme } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, useColorScheme, Modal, Switch } from 'react-native';
 import { Colors } from '../constants/theme';
 import { Task } from './DetailPanel';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import { Feather } from '@expo/vector-icons';
 
 interface Project {
   name: string;
@@ -19,7 +20,10 @@ interface SidebarProps {
   tasks: Task[];
   isSleeping: boolean;
   setIsSleeping: (val: boolean) => void;
-  onOpenSettings: () => void;
+  onOpenSettings?: () => void;
+  showCompleted: boolean;
+  setShowCompleted: (val: boolean) => void;
+  onDeleteProject: (name: string) => void;
 }
 
 const CURATED_COLORS = [
@@ -44,6 +48,9 @@ export default function Sidebar({
   isSleeping,
   setIsSleeping,
   onOpenSettings,
+  showCompleted,
+  setShowCompleted,
+  onDeleteProject,
 }: SidebarProps) {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
@@ -51,6 +58,16 @@ export default function Sidebar({
   const [isAdding, setIsAdding] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectColor, setNewProjectColor] = useState('#58a6ff');
+
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [modalNewProjectName, setModalNewProjectName] = useState('');
+  const [modalNewProjectColor, setModalNewProjectColor] = useState('#58a6ff');
+
+  const handleModalSaveProject = () => {
+    if (!modalNewProjectName.trim()) return;
+    onAddProject(modalNewProjectName.trim(), modalNewProjectColor);
+    setModalNewProjectName('');
+  };
 
   const todayBadgeCount = tasks.filter((t) => t.target === 'today' && !t.done).length;
   const backlogBadgeCount = tasks.filter((t) => t.target === 'backlog' && !t.done).length;
@@ -190,27 +207,132 @@ export default function Sidebar({
 
       {/* Sidebar Footer */}
       <View style={[styles.footer, { borderTopColor: colors.ghBorder }]}>
-        <TouchableOpacity 
-          style={[
-            styles.footerBtn, 
-            isSleeping && { backgroundColor: 'rgba(88, 166, 255, 0.1)', borderColor: colors.ghBlue }
-          ]} 
-          onPress={() => setIsSleeping(!isSleeping)}
-        >
-          <Text style={{ fontSize: 16 }}>{isSleeping ? '☀️' : '🌙'}</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity style={styles.footerBtn} onPress={onOpenSettings}>
-          <Text style={{ fontSize: 16, color: colors.ghMuted }}>⚙️</Text>
-        </TouchableOpacity>
-
         <View style={styles.userSection}>
           <View style={[styles.avatar, { backgroundColor: colors.ghBlue }]}>
             <Text style={styles.avatarText}>JD</Text>
           </View>
           <Text style={[styles.userName, { color: colors.ghText }]} numberOfLines={1}>John Doe</Text>
         </View>
+
+        <TouchableOpacity 
+          style={styles.footerBtn} 
+          onPress={() => setIsSettingsOpen(true)}
+        >
+          <Feather name="settings" size={16} color={colors.ghMuted} />
+        </TouchableOpacity>
       </View>
+
+      {/* Settings Modal */}
+      <Modal
+        visible={isSettingsOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsSettingsOpen(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.ghSurface, borderColor: colors.ghBorder }]}>
+            {/* Modal Header */}
+            <View style={[styles.modalHeader, { borderBottomColor: colors.ghBorder }]}>
+              <Text style={[styles.modalTitle, { color: colors.ghText }]}>Settings</Text>
+              <TouchableOpacity onPress={() => setIsSettingsOpen(false)} style={styles.closeBtn}>
+                <Feather name="x" size={20} color={colors.ghText} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody} contentContainerStyle={{ paddingBottom: 20 }}>
+              {/* Task Preferences Section */}
+              <View style={styles.settingsSection}>
+                <Text style={[styles.settingsSectionTitle, { color: colors.ghMuted }]}>PREFERENCES</Text>
+                <View style={styles.settingsRow}>
+                  <View style={{ flex: 1, paddingRight: 10 }}>
+                    <Text style={[styles.settingsLabel, { color: colors.ghText }]}>Show Completed Tasks</Text>
+                    <Text style={[styles.settingsHelp, { color: colors.ghMuted }]}>
+                      Toggle whether completed tasks are displayed in your lists.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={showCompleted}
+                    onValueChange={setShowCompleted}
+                    trackColor={{ false: colors.ghBorder, true: colors.ghBlue }}
+                    thumbColor="#fff"
+                  />
+                </View>
+              </View>
+
+              {/* Add Project Section */}
+              <View style={styles.settingsSection}>
+                <Text style={[styles.settingsSectionTitle, { color: colors.ghMuted }]}>ADD PROJECT</Text>
+                <View style={[styles.modalAddProjectBox, { backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder }]}>
+                  {/* Curated Colors */}
+                  <View style={styles.colorChipsRow}>
+                    {CURATED_COLORS.map((c) => (
+                      <TouchableOpacity
+                        key={c}
+                        style={[
+                          styles.colorChip,
+                          { backgroundColor: c },
+                          modalNewProjectColor === c && { borderColor: '#fff', borderWidth: 2 }
+                        ]}
+                        onPress={() => setModalNewProjectColor(c)}
+                      />
+                    ))}
+                  </View>
+
+                  <View style={[styles.addInputWrapper, { backgroundColor: colors.ghSurface, borderColor: colors.ghBorder }]}>
+                    <View style={[styles.projectDot, { backgroundColor: modalNewProjectColor }]} />
+                    <TextInput
+                      style={[styles.addInput, { color: colors.ghText }]}
+                      value={modalNewProjectName}
+                      onChangeText={setModalNewProjectName}
+                      placeholder="New project name..."
+                      placeholderTextColor={colors.ghMuted}
+                    />
+                  </View>
+
+                  <TouchableOpacity
+                    style={[styles.modalAddBtn, { backgroundColor: colors.ghBlue }]}
+                    onPress={handleModalSaveProject}
+                  >
+                    <Text style={styles.modalAddBtnText}>Add Project</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Manage Projects Section */}
+              <View style={styles.settingsSection}>
+                <Text style={[styles.settingsSectionTitle, { color: colors.ghMuted }]}>MANAGE PROJECTS</Text>
+                {projects.length === 0 ? (
+                  <Text style={{ color: colors.ghMuted, fontStyle: 'italic', fontSize: 13, paddingHorizontal: 4 }}>
+                    No projects created yet.
+                  </Text>
+                ) : (
+                  projects.map((proj) => (
+                    <View
+                      key={proj.name}
+                      style={[
+                        styles.projectManageItem,
+                        { borderBottomColor: colors.ghBorder }
+                      ]}
+                    >
+                      <View style={[styles.projectColorDot, { backgroundColor: proj.color }]} />
+                      <Text style={[styles.projectManageName, { color: colors.ghText }]} numberOfLines={1}>
+                        {proj.name}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => onDeleteProject(proj.name)}
+                        style={styles.deleteProjBtn}
+                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      >
+                        <Feather name="trash-2" size={14} color={colors.ghRed} />
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                )}
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -404,5 +526,98 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
     flex: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 450,
+    maxHeight: '80%',
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  closeBtn: {
+    padding: 4,
+  },
+  modalBody: {
+    padding: 20,
+  },
+  settingsSection: {
+    marginBottom: 24,
+  },
+  settingsSectionTitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginBottom: 12,
+  },
+  settingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  settingsLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  settingsHelp: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  modalAddProjectBox: {
+    padding: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+    gap: 10,
+  },
+  modalAddBtn: {
+    height: 32,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalAddBtnText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  projectManageItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  projectManageName: {
+    fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
+    marginLeft: 8,
+  },
+  deleteProjBtn: {
+    padding: 6,
   }
 });
