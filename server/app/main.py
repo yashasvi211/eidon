@@ -32,8 +32,8 @@ def read_root_head():
     from fastapi.responses import Response
     return Response(
         headers={
-            "X-App-Status": "Yes! Eidon backend is alive and kickin'! 🚀 Quit checking my headers, you're making me blush! 😳",
-            "X-Developer-Message": "HEAD request successfully handled. No body returned, just like my empty coffee mug. ☕️",
+            "X-App-Status": "Yes! Eidon backend is alive and kickin'! Quit checking my headers, you are making me blush! [insert blush emoji here]",
+            "X-Developer-Message": "HEAD request successfully handled. No body returned, just like my empty coffee mug.",
             "Allow": "GET, HEAD"
         }
     )
