@@ -9,6 +9,8 @@ lerna-debug.log*
 Prototype
 node_modules
 dist
+.env
+*.env
 dist-ssr
 *.local
 

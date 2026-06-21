@@ -28,12 +28,14 @@ def create_project(conn, project: ProjectSchema):
         (project.name, project.color)
     )
     conn.commit()
+    print(f"[DB WRITE] Project '{project.name}' successfully added/updated.")
 
 def delete_project(conn, name: str):
     cur = conn.cursor()
     cur.execute("UPDATE tasks SET project = 'Inbox' WHERE project = %s;", (name,))
     cur.execute("DELETE FROM projects WHERE name = %s;", (name,))
     conn.commit()
+    print(f"[DB WRITE] Project '{name}' successfully deleted. Associated tasks reassigned to 'Inbox'.")
 
 # ============================================================
 # TASKS CRUD
@@ -152,6 +154,7 @@ def create_task(conn, task: TaskCreate):
         )
     )
     conn.commit()
+    print(f"[DB WRITE] Task '{task.id}' (Title: '{task.title}') successfully created/updated in Project '{project_name}'.")
     return task.id
 
 def update_task(conn, task_id: str, updates: TaskUpdate):
@@ -176,12 +179,14 @@ def update_task(conn, task_id: str, updates: TaskUpdate):
     
     cur.execute(query, tuple(values))
     conn.commit()
+    print(f"[DB WRITE] Task '{task_id}' attributes successfully updated: {list(update_data.keys())}.")
     return True
 
 def delete_task(conn, task_id: str):
     cur = conn.cursor()
     cur.execute("DELETE FROM tasks WHERE id = %s", (task_id,))
     conn.commit()
+    print(f"[DB WRITE] Task '{task_id}' successfully deleted.")
 
 # ============================================================
 # SUBTASKS CRUD
@@ -198,6 +203,7 @@ def create_subtask(conn, task_id: str, subtask: SubtaskCreate):
         (subtask.id, task_id, subtask.title, subtask.done or False)
     )
     conn.commit()
+    print(f"[DB WRITE] Subtask '{subtask.id}' (Title: '{subtask.title}') successfully added/updated to Task '{task_id}'.")
     return subtask.id
 
 def update_subtask(conn, task_id: str, subtask_id: str, updates: SubtaskUpdate):
@@ -217,12 +223,14 @@ def update_subtask(conn, task_id: str, subtask_id: str, updates: SubtaskUpdate):
     
     cur.execute(query, tuple(values))
     conn.commit()
+    print(f"[DB WRITE] Subtask '{subtask_id}' for Task '{task_id}' successfully updated: {list(update_data.keys())}.")
     return True
 
 def delete_subtask(conn, task_id: str, subtask_id: str):
     cur = conn.cursor()
     cur.execute("DELETE FROM subtasks WHERE id = %s AND task_id = %s", (subtask_id, task_id))
     conn.commit()
+    print(f"[DB WRITE] Subtask '{subtask_id}' successfully deleted from Task '{task_id}'.")
 
 # ============================================================
 # TIMER SESSIONS CRUD
@@ -250,6 +258,7 @@ def create_session(conn, task_id: str, session: SessionCreate):
         )
     )
     conn.commit()
+    print(f"[DB WRITE] Timer Session '{session.id}' (Duration: {round((session.end - session.start)/1000)}s) successfully logged to Task '{task_id}'.")
     return session.id
 
 # ============================================================
@@ -273,6 +282,7 @@ def create_audit_log(conn, task_id: str, log: AuditLogCreate):
         )
     )
     conn.commit()
+    print(f"[DB WRITE] Audit Log entry '{log.id}' (Action: '{log.action}') successfully saved for Task '{task_id}'.")
     return log.id
 
 # ============================================================
@@ -323,3 +333,4 @@ def update_settings(conn, payload: SettingsUpdate):
             (db_key, json.dumps(value))
         )
     conn.commit()
+    print(f"[DB WRITE] Settings configuration updated successfully for fields: {list(payload_data.keys())}.")

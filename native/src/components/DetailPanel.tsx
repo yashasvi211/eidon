@@ -46,9 +46,11 @@ export interface Session {
   start: number;
   end: number;
   note?: string;
+  subtasksCompleted?: string[];
 }
 
 export interface AuditEntry {
+  id?: string;
   timestamp: number;
   action:
     | "created"

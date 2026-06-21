@@ -30,8 +30,7 @@ import Animated, {
   withTiming,
   runOnJS,
 } from "react-native-reanimated";
-import tasksData from "../constants/mockTasks.json";
-import { api } from "../services/api";
+import { api, API_BASE_URL } from "../services/api";
 
 
 export default function AppIndex() {
@@ -101,31 +100,24 @@ export default function AppIndex() {
     setErrorModalVisible(true);
   };
 
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    const BASE_DATE_MS = 1782000000000; // Approx June 21, 2026
-    const timeOffset = Date.now() - BASE_DATE_MS;
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
 
-    return (tasksData.tasks as Task[]).map((task) => {
-      const shiftedSessions = (task.sessions || []).map((sess) => ({
-        ...sess,
-        start: sess.start + timeOffset,
-        end: sess.end + timeOffset,
-      }));
+  const showToast = (message: string) => {
+    setToastMessage(message);
+    setToastVisible(true);
+  };
 
-      const shiftedAuditLog = (task.auditLog || []).map((entry) => ({
-        ...entry,
-        timestamp: entry.timestamp + timeOffset,
-      }));
+  useEffect(() => {
+    if (toastVisible) {
+      const timer = setTimeout(() => {
+        setToastVisible(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastVisible]);
 
-      return {
-        ...task,
-        createdAt: task.createdAt ? task.createdAt + timeOffset : task.createdAt,
-        completedAt: task.completedAt ? task.completedAt + timeOffset : null,
-        sessions: shiftedSessions,
-        auditLog: shiftedAuditLog,
-      };
-    });
-  });
+  const [tasks, setTasks] = useState<Task[]>([]);
 
   const [currentView, setCurrentView] = useState("today");
   const [currentProject, setCurrentProject] = useState<string | null>(null);
@@ -134,12 +126,7 @@ export default function AppIndex() {
     "details" | "checklist" | "timetracking" | "history"
   >("details");
 
-  const [projects, setProjects] = useState([
-    { name: "HubSpot Integration", color: "#58a6ff" },
-    { name: "Bill of Material", color: "#3fb950" },
-    { name: "GitHub Logs Backup", color: "#bc8cff" },
-    { name: "Inbox", color: "#8b949e" },
-  ]);
+  const [projects, setProjects] = useState<{ name: string; color: string }[]>([]);
 
   // Sleep mode state
   const [isSleeping, setIsSleeping] = useState(false);
@@ -178,18 +165,21 @@ export default function AppIndex() {
         const fetchedProjects = await api.getProjects();
         const fetchedSettings = await api.getSettings();
 
-        if (fetchedTasks.length > 0) {
-          setTasks(fetchedTasks);
-        }
-        if (fetchedProjects.length > 0) {
-          setProjects(fetchedProjects);
-        }
+        setTasks(fetchedTasks || []);
+        setProjects(fetchedProjects || []);
         if (fetchedSettings) {
           setIsSleeping(fetchedSettings.isSleeping);
           setSleepStartTime(fetchedSettings.sleepStartTime);
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Failed to load initial data from backend:", err);
+        showErrorAlert(
+          "Connection Failed",
+          `Could not connect to the backend server at:\n${API_BASE_URL}\n\n` +
+          `Please make sure the backend server is running and accessible from this device.\n\n` +
+          `Note: If you recently changed the API URL in your .env file, you must RESTART the Expo bundler/packager (stop it with Ctrl+C and run it again) to apply environment variable updates.\n\n` +
+          `Error Details: ${err?.message || err}`
+        );
       }
     }
     loadInitialData();
@@ -242,6 +232,7 @@ export default function AppIndex() {
       action: isDone ? "completed" : "uncompleted",
     };
 
+    const previousTasks = tasks;
     setTasks(
       tasks.map((t) => {
         if (t.id !== id) return t;
@@ -257,7 +248,14 @@ export default function AppIndex() {
     // Sync with API
     api.updateTask(id, { done: isDone, completedAt })
       .then(() => api.createAuditLog(id, auditEntry))
-      .catch((err) => console.error("Failed to sync task toggleDone:", err));
+      .catch((err: any) => {
+        console.error("Failed to sync task toggleDone:", err);
+        setTasks(previousTasks);
+        showErrorAlert(
+          "Task Update Failed",
+          `Could not synchronize task completion status with the server.\n\nError: ${err?.message || err}`
+        );
+      });
   };
 
   const handleUpdateTask = (updatedTask: Task) => {
@@ -269,6 +267,7 @@ export default function AppIndex() {
       return;
     }
 
+    const previousTasks = tasks;
     setTasks((prev) =>
       prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)),
     );
@@ -284,17 +283,21 @@ export default function AppIndex() {
       oldTask.done !== updatedTask.done ||
       oldTask.completedAt !== updatedTask.completedAt;
 
+    const syncPromises: Promise<any>[] = [];
+
     if (fieldsChanged) {
-      api.updateTask(updatedTask.id, {
-        title: updatedTask.title,
-        project: updatedTask.project,
-        due: updatedTask.due,
-        est: updatedTask.est,
-        notes: updatedTask.notes,
-        done: updatedTask.done,
-        completedAt: updatedTask.completedAt,
-        target: updatedTask.target,
-      }).catch((err) => console.error("Failed to sync task updates:", err));
+      syncPromises.push(
+        api.updateTask(updatedTask.id, {
+          title: updatedTask.title,
+          project: updatedTask.project,
+          due: updatedTask.due,
+          est: updatedTask.est,
+          notes: updatedTask.notes,
+          done: updatedTask.done,
+          completedAt: updatedTask.completedAt,
+          target: updatedTask.target,
+        })
+      );
     }
 
     // Sync subtask additions/updates/deletions
@@ -306,8 +309,7 @@ export default function AppIndex() {
       (n) => !oldSubtasks.some((o) => o.id === n.id)
     );
     for (const sub of addedSubtasks) {
-      api.createSubtask(updatedTask.id, sub)
-        .catch((err) => console.error("Failed to sync subtask creation:", err));
+      syncPromises.push(api.createSubtask(updatedTask.id, sub));
     }
 
     // Find modified subtasks
@@ -316,10 +318,12 @@ export default function AppIndex() {
       return oldSub && (oldSub.done !== n.done || oldSub.title !== n.title);
     });
     for (const sub of modifiedSubtasks) {
-      api.updateSubtask(updatedTask.id, sub.id, {
-        title: sub.title,
-        done: sub.done,
-      }).catch((err) => console.error("Failed to sync subtask update:", err));
+      syncPromises.push(
+        api.updateSubtask(updatedTask.id, sub.id, {
+          title: sub.title,
+          done: sub.done,
+        })
+      );
     }
 
     // Find deleted subtasks
@@ -327,8 +331,7 @@ export default function AppIndex() {
       (o) => !newSubtasks.some((n) => n.id === o.id)
     );
     for (const sub of deletedSubtasks) {
-      api.deleteSubtask(updatedTask.id, sub.id)
-        .catch((err) => console.error("Failed to sync subtask deletion:", err));
+      syncPromises.push(api.deleteSubtask(updatedTask.id, sub.id));
     }
 
     // Sync audit log additions
@@ -336,8 +339,18 @@ export default function AppIndex() {
     const newAudit = updatedTask.auditLog || [];
     const addedAudit = newAudit.slice(oldAudit.length);
     for (const entry of addedAudit) {
-      api.createAuditLog(updatedTask.id, entry)
-        .catch((err) => console.error("Failed to sync audit log entry:", err));
+      syncPromises.push(api.createAuditLog(updatedTask.id, entry));
+    }
+
+    if (syncPromises.length > 0) {
+      Promise.all(syncPromises).catch((err: any) => {
+        console.error("Failed to sync task updates:", err);
+        setTasks(previousTasks);
+        showErrorAlert(
+          "Task Sync Failed",
+          `Could not save task properties or subtasks to the server.\n\nError: ${err?.message || err}`
+        );
+      });
     }
   };
 
@@ -368,12 +381,22 @@ export default function AppIndex() {
         },
       ],
     };
-    setTasks((prev) => [...prev, newTask]);
 
-    // Sync with API
+    // Save to database first before adding to UI state
     api.createTask(newTask)
       .then(() => api.createAuditLog(newTask.id, newTask.auditLog![0]))
-      .catch((err) => console.error("Failed to create task in backend:", err));
+      .then(() => {
+        // Only if it saves to DB successfully, update local state
+        setTasks((prev) => [...prev, newTask]);
+        showToast("Task created and saved to DB! 🎉");
+      })
+      .catch((err: any) => {
+        console.error("Failed to create task in backend:", err);
+        showErrorAlert(
+          "Task Creation Failed",
+          `Unable to save the task to the backend server. The task was not created.\n\nError: ${err?.message || err}`
+        );
+      });
   };
 
   const handleStartTimer = (taskId: string) => {
@@ -388,6 +411,7 @@ export default function AppIndex() {
       action: "timer_started",
     };
 
+    const previousTasks = tasks;
     setTasks(
       tasks.map((t) => {
         if (t.id !== taskId) return t;
@@ -400,7 +424,14 @@ export default function AppIndex() {
 
     // Sync with API
     api.createAuditLog(taskId, audit)
-      .catch((err) => console.error("Failed to sync timer_started audit log:", err));
+      .catch((err: any) => {
+        console.error("Failed to sync timer_started audit log:", err);
+        setTasks(previousTasks);
+        showErrorAlert(
+          "Timer Start Failed",
+          `Could not start the timer on the server.\n\nError: ${err?.message || err}`
+        );
+      });
   };
 
   const handleStopTimer = (note: string) => {
@@ -423,6 +454,7 @@ export default function AppIndex() {
       },
     };
 
+    const previousTasks = tasks;
     setTasks(
       tasks.map((t) => {
         if (t.id !== activeTimerTaskId) return t;
@@ -435,6 +467,11 @@ export default function AppIndex() {
     );
 
     const taskId = activeTimerTaskId;
+    const prevIsTimerRunning = isTimerRunning;
+    const prevActiveTimerTaskId = activeTimerTaskId;
+    const prevTimerStartTimestamp = timerStartTimestamp;
+    const prevTimerSeconds = timerSeconds;
+
     setIsTimerRunning(false);
     setActiveTimerTaskId(null);
     setTimerStartTimestamp(null);
@@ -443,22 +480,52 @@ export default function AppIndex() {
     // Sync with API
     api.createSession(taskId, newSession)
       .then(() => api.createAuditLog(taskId, audit))
-      .catch((err) => console.error("Failed to sync timer session stop:", err));
+      .catch((err: any) => {
+        console.error("Failed to sync timer session stop:", err);
+        setTasks(previousTasks);
+        setIsTimerRunning(prevIsTimerRunning);
+        setActiveTimerTaskId(prevActiveTimerTaskId);
+        setTimerStartTimestamp(prevTimerStartTimestamp);
+        setTimerSeconds(prevTimerSeconds);
+        showErrorAlert(
+          "Timer Logging Failed",
+          `Could not save the logged work session to the server.\n\nError: ${err?.message || err}`
+        );
+      });
   };
 
   const handleAddProject = (name: string, color: string) => {
     if (projects.some((p) => p.name.toLowerCase() === name.toLowerCase()))
       return;
+    
+    const previousProjects = projects;
+    const previousCurrentProject = currentProject;
+    const previousCurrentView = currentView;
+
     setProjects([...projects, { name, color }]);
     setCurrentProject(name);
     setCurrentView("today");
 
     // Sync with API
     api.createProject({ name, color })
-      .catch((err) => console.error("Failed to create project in backend:", err));
+      .catch((err: any) => {
+        console.error("Failed to create project in backend:", err);
+        setProjects(previousProjects);
+        setCurrentProject(previousCurrentProject);
+        setCurrentView(previousCurrentView);
+        showErrorAlert(
+          "Project Creation Failed",
+          `Could not create project "${name}" on the server.\n\nError: ${err?.message || err}`
+        );
+      });
   };
 
   const handleDeleteProject = (name: string) => {
+    const previousProjects = projects;
+    const previousCurrentProject = currentProject;
+    const previousCurrentView = currentView;
+    const previousTasks = tasks;
+
     setProjects(projects.filter((p) => p.name !== name));
     if (currentProject === name) {
       setCurrentProject(null);
@@ -468,7 +535,17 @@ export default function AppIndex() {
 
     // Sync with API
     api.deleteProject(name)
-      .catch((err) => console.error("Failed to delete project in backend:", err));
+      .catch((err: any) => {
+        console.error("Failed to delete project in backend:", err);
+        setProjects(previousProjects);
+        setCurrentProject(previousCurrentProject);
+        setCurrentView(previousCurrentView);
+        setTasks(previousTasks);
+        showErrorAlert(
+          "Project Deletion Failed",
+          `Could not delete project "${name}" from the server.\n\nError: ${err?.message || err}`
+        );
+      });
   };
 
   const closeSidebarMobile = () => {
@@ -724,6 +801,13 @@ export default function AppIndex() {
           </View>
         </View>
       </Modal>
+
+      {toastVisible && (
+        <View style={[styles.toastContainer, { backgroundColor: colors.ghGreen }]}>
+          <Feather name="check" size={16} color="#ffffff" />
+          <Text style={styles.toastText}>{toastMessage}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -823,6 +907,28 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   errorCloseBtnText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  toastContainer: {
+    position: "absolute",
+    bottom: 55,
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 6,
+    zIndex: 9999,
+  },
+  toastText: {
     color: "#ffffff",
     fontSize: 13,
     fontWeight: "600",
