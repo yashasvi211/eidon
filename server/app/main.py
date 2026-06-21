@@ -22,7 +22,21 @@ app.include_router(settings.router)
 
 @app.get("/")
 def read_root():
-    return {"message": "Eidon FastAPI Backend is running!"}
+    return {
+        "status": "online",
+        "message": "Yes! The Eidon backend is working, fully caffeinated, and ready to track time! 🚀 Stop HEAD-ing me and start using GET! 😜"
+    }
+
+@app.head("/")
+def read_root_head():
+    from fastapi.responses import Response
+    return Response(
+        headers={
+            "X-App-Status": "Yes! Eidon backend is alive and kickin'! 🚀 Quit checking my headers, you're making me blush! 😳",
+            "X-Developer-Message": "HEAD request successfully handled. No body returned, just like my empty coffee mug. ☕️",
+            "Allow": "GET, HEAD"
+        }
+    )
 
 if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
