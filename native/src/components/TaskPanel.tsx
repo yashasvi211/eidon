@@ -203,107 +203,115 @@ export default function TaskPanel({
         entering={FadeIn.duration(200)}
         exiting={FadeOut.duration(150)}
       >
-        <TouchableOpacity
+        <View
           style={[
             styles.taskItem,
             { borderBottomColor: colors.ghBorder },
             isActive && { backgroundColor: "rgba(31,111,235,0.06)" },
           ]}
-          onPress={() => onOpenDetail(task)}
         >
-
           {/* Custom Checkbox */}
           <TouchableOpacity
-            style={[
-              styles.checkbox,
-              { borderColor: task.done ? colors.ghGreen : colors.ghBorder2 },
-              task.done && { backgroundColor: colors.ghGreen },
-            ]}
+            style={styles.checkboxTouchArea}
             onPress={() => toggleDone(task.id)}
           >
-            {task.done && <Text style={styles.checkmark}>✓</Text>}
+            <View
+              style={[
+                styles.checkbox,
+                { borderColor: task.done ? colors.ghGreen : colors.ghBorder2 },
+                task.done && { backgroundColor: colors.ghGreen },
+              ]}
+            >
+              {task.done && <Text style={styles.checkmark}>✓</Text>}
+            </View>
           </TouchableOpacity>
 
-          <View style={styles.taskBody}>
-            <Text
-              style={[
-                styles.taskTitle,
-                { color: task.done ? colors.ghMuted : colors.ghText },
-                task.done && styles.lineThrough,
-              ]}
-              numberOfLines={2}
-            >
-              {task.title}
-            </Text>
-
-            <View style={styles.taskMeta}>
-              {/* Project Tag */}
+          {/* Task Details Area */}
+          <TouchableOpacity
+            style={styles.taskBodyTouchArea}
+            onPress={() => onOpenDetail(task)}
+          >
+            <View style={styles.taskBody}>
               <Text
                 style={[
-                  styles.taskTag,
+                  styles.taskTitle,
+                  { color: task.done ? colors.ghMuted : colors.ghText },
+                  task.done && styles.lineThrough,
+                ]}
+                numberOfLines={2}
+              >
+                {task.title}
+              </Text>
+
+              <View style={styles.taskMeta}>
+                {/* Project Tag */}
+                <Text
+                  style={[
+                    styles.taskTag,
+                    {
+                      color: pColor,
+                      borderColor: projectBorderColor,
+                      backgroundColor: projectBgColor,
+                    },
+                  ]}
+                >
+                  {task.project}
+                </Text>
+
+                {/* Deadline Tag */}
+                {dlInfo && (
+                  <Text
+                    style={[
+                      styles.taskTag,
+                      {
+                        color: dlInfo.color,
+                        borderColor: dlInfo.border,
+                        backgroundColor: dlInfo.bg,
+                      },
+                    ]}
+                  >
+                    {dlInfo.label}
+                  </Text>
+                )}
+
+                {/* Subtask count */}
+                {subtaskStyles && (
+                  <Text
+                    style={[
+                      styles.taskTag,
+                      {
+                        color: subtaskStyles.color,
+                        borderColor: subtaskStyles.border,
+                        backgroundColor: subtaskStyles.bg,
+                      },
+                    ]}
+                  >
+                    ✓ {subtasksDone}/{totalSubtasks}
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            {/* Logged Timer Value */}
+            {totalSeconds > 0 && (
+              <View
+                style={[
+                  styles.timeLogBadge,
                   {
-                    color: pColor,
-                    borderColor: projectBorderColor,
-                    backgroundColor: projectBgColor,
+                    backgroundColor: colors.ghSurface2,
+                    borderColor: colors.ghBorder,
                   },
                 ]}
               >
-                {task.project}
-              </Text>
-
-              {/* Deadline Tag */}
-              {dlInfo && (
                 <Text
-                  style={[
-                    styles.taskTag,
-                    {
-                      color: dlInfo.color,
-                      borderColor: dlInfo.border,
-                      backgroundColor: dlInfo.bg,
-                    },
-                  ]}
+                  style={[styles.timeLogBadgeText, { color: colors.ghMuted }]}
                 >
-                  {dlInfo.label}
+                  {fmtSeconds(totalSeconds)}
                 </Text>
-              )}
-
-              {/* Subtask count */}
-              {subtaskStyles && (
-                <Text
-                  style={[
-                    styles.taskTag,
-                    {
-                      color: subtaskStyles.color,
-                      borderColor: subtaskStyles.border,
-                      backgroundColor: subtaskStyles.bg,
-                    },
-                  ]}
-                >
-                  ✓ {subtasksDone}/{totalSubtasks}
-                </Text>
-              )}
-            </View>
-          </View>
-
-          {/* Logged Timer Value */}
-          {totalSeconds > 0 && (
-            <View
-              style={[
-                styles.timeLogBadge,
-                {
-                  backgroundColor: colors.ghSurface2,
-                  borderColor: colors.ghBorder,
-                },
-              ]}
-            >
-              <Text
-                style={[styles.timeLogBadgeText, { color: colors.ghMuted }]}
-              >
-                {fmtSeconds(totalSeconds)}
-              </Text>
-            </View>
-          )}
-        </TouchableOpacity>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </Animated.View>
     );
   };
@@ -327,7 +335,7 @@ export default function TaskPanel({
       }
 
       return (
-        <ScrollView style={styles.taskList}>
+        <ScrollView style={styles.taskList} {...{ delaysContentTouches: false }}>
           {backlogTasks.length > 0 && (
             <View style={styles.projectSection}>
               <Text
@@ -363,7 +371,7 @@ export default function TaskPanel({
     }
 
     return (
-      <ScrollView style={styles.taskList}>
+      <ScrollView style={styles.taskList} {...{ delaysContentTouches: false }}>
         {baseFiltered.map(renderTaskItem)}
         {baseFiltered.length === 0 && (
           <View style={styles.emptyState}>
@@ -404,7 +412,6 @@ const styles = StyleSheet.create({
   },
   taskItem: {
     flexDirection: "row",
-    paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     alignItems: "center",
@@ -417,6 +424,18 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: 3,
   },
+  checkboxTouchArea: {
+    paddingVertical: 12,
+    marginRight: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  taskBodyTouchArea: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+  },
   checkbox: {
     width: 18,
     height: 18,
@@ -424,7 +443,6 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 12,
     flexShrink: 0,
   },
   checkmark: {

@@ -1563,7 +1563,7 @@ function TabPage({ isLargeScreen, activeTab, tabName, tabBarWidth, children }: T
   }
 
   return (
-    <ScrollView style={{ width: tabBarWidth }} showsVerticalScrollIndicator={false}>
+    <ScrollView style={{ width: tabBarWidth }} showsVerticalScrollIndicator={false} {...{ delaysContentTouches: false }}>
       <View style={styles.tabSection}>
         {children}
       </View>
@@ -1589,7 +1589,7 @@ function TabContentContainer({
   children,
 }: ParentProps) {
   if (isLargeScreen) {
-    return <ScrollView style={styles.scrollContent}>{children}</ScrollView>;
+    return <ScrollView style={styles.scrollContent} {...{ delaysContentTouches: false }}>{children}</ScrollView>;
   }
 
   return (
@@ -1603,6 +1603,7 @@ function TabContentContainer({
       onMomentumScrollEnd={handleScrollEnd}
       style={styles.scrollContent}
       contentContainerStyle={{ width: tabBarWidth * 4 }}
+      {...{ delaysContentTouches: false }}
     >
       {children}
     </Animated.ScrollView>

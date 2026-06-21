@@ -6,7 +6,9 @@ import {
   useWindowDimensions,
   useColorScheme,
   TouchableOpacity,
+  Modal,
 } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Sidebar from "../components/Sidebar";
 import TaskPanel from "../components/TaskPanel";
@@ -87,6 +89,15 @@ export default function AppIndex() {
 
   const [showCompleted, setShowCompleted] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorModalTitle, setErrorModalTitle] = useState("");
+  const [errorModalMessage, setErrorModalMessage] = useState("");
+
+  const showErrorAlert = (title: string, message: string) => {
+    setErrorModalTitle(title);
+    setErrorModalMessage(message);
+    setErrorModalVisible(true);
+  };
 
   const [tasks, setTasks] = useState<Task[]>(tasksData.tasks);
 
@@ -158,6 +169,22 @@ export default function AppIndex() {
   }, [selectedTaskId]);
 
   const toggleDone = (id: string) => {
+    const taskToToggle = tasks.find((t) => t.id === id);
+    if (!taskToToggle) return;
+
+    if (!taskToToggle.done) {
+      const hasUncompletedSubtasks = (taskToToggle.subtasks || []).some(
+        (sub) => !sub.done
+      );
+      if (hasUncompletedSubtasks) {
+        showErrorAlert(
+          "Cannot Complete Task",
+          "You must complete all subtasks before marking this task as completed."
+        );
+        return;
+      }
+    }
+
     setTasks(
       tasks.map((t) => {
         if (t.id !== id) return t;
@@ -493,6 +520,44 @@ export default function AppIndex() {
         onAdd={handleAddTask}
         projects={projects}
       />
+
+      <Modal
+        visible={errorModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setErrorModalVisible(false)}
+      >
+        <View style={styles.errorOverlay}>
+          <View
+            style={[
+              styles.errorModal,
+              {
+                backgroundColor: colors.ghSurface,
+                borderColor: colors.ghRed,
+              },
+            ]}
+          >
+            <View style={styles.errorHeader}>
+              <Feather name="alert-triangle" size={20} color={colors.ghRed} />
+              <Text style={[styles.errorTitle, { color: colors.ghText }]}>
+                {errorModalTitle}
+              </Text>
+            </View>
+            <Text style={[styles.errorMessage, { color: colors.ghMuted }]}>
+              {errorModalMessage}
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.errorCloseBtn,
+                { backgroundColor: colors.ghRed },
+              ]}
+              onPress={() => setErrorModalVisible(false)}
+            >
+              <Text style={styles.errorCloseBtnText}>Okay</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -550,5 +615,50 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 5,
+  },
+  errorOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+  },
+  errorModal: {
+    width: "100%",
+    maxWidth: 340,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    padding: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
+  },
+  errorHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 12,
+  },
+  errorTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  errorMessage: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 20,
+  },
+  errorCloseBtn: {
+    paddingVertical: 10,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  errorCloseBtnText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "600",
   },
 });

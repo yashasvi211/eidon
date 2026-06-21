@@ -160,7 +160,7 @@ export default function ScheduledView({ tasks, onSelectTask, showCompleted, onSw
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollArea}>
+      <ScrollView style={styles.scrollArea} {...{ delaysContentTouches: false }}>
         <View ref={calendarRef} style={styles.calendarContainer} onLayout={measureCalendar}>
           <View style={styles.weekdaysRow}>
             <View style={styles.weekNumberCol} />

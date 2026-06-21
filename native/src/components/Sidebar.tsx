@@ -76,7 +76,7 @@ export default function Sidebar({
         <Text style={[styles.headerText, { color: colors.ghText }]}>Eidon</Text>
       </View>
       
-      <ScrollView style={styles.menuList} contentContainerStyle={styles.menuListContent}>
+      <ScrollView style={styles.menuList} contentContainerStyle={styles.menuListContent} {...{ delaysContentTouches: false }}>
         <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>WORKSPACE</Text>
         {views.map((view) => {
           const isActive = currentView === view.id && !currentProject;

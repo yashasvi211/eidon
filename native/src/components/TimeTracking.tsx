@@ -78,7 +78,7 @@ export default function TimeTracking({ tasks, isSleeping, sleepStartTime }: Time
   }, [tasks, today]);
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: colors.ghBg }]}>
+    <ScrollView style={[styles.container, { backgroundColor: colors.ghBg }]} {...{ delaysContentTouches: false }}>
 
       {isSleeping && sleepStartTime && (
         <View style={[styles.sleepCard, { backgroundColor: 'rgba(88, 166, 255, 0.05)', borderColor: colors.ghBlue }]}>
