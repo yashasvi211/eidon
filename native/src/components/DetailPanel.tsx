@@ -9,7 +9,6 @@ import {
   TextInput,
   ActivityIndicator,
   useWindowDimensions,
-  PanResponder,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../constants/theme";
@@ -18,7 +17,23 @@ import Animated, {
   useAnimatedStyle,
   useAnimatedScrollHandler,
   withTiming,
+  withSpring,
+  Easing,
+  runOnJS,
+  interpolate,
+  Extrapolation,
 } from "react-native-reanimated";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { Feather, Octicons } from "@expo/vector-icons";
+import * as LocalAuthentication from "expo-local-authentication";
+
+// Pull-down dismiss threshold: if user drags past this many pixels, we close
+const DISMISS_THRESHOLD = 120;
+// Spring config for buttery-smooth native-thread animations
+const OPEN_SPRING = { damping: 28, stiffness: 220, mass: 0.9 };
+const SNAP_SPRING = { damping: 24, stiffness: 300, mass: 0.7 };
+const EXIT_DURATION = 250;
+const EXIT_EASING = Easing.bezierFn(0.4, 0, 1, 1);
 
 export interface Subtask {
   id: string;
@@ -132,27 +147,132 @@ const fmtRelativeTime = (timestamp: number) => {
   return new Date(timestamp).toLocaleDateString();
 };
 
+interface AuditIconConfig {
+  iconName: string;
+  library: "Feather" | "Octicons";
+  label: string;
+  color: string;
+}
+
 const AUDIT_ICONS: {
-  [key: string]: { icon: string; label: string; color: string };
+  [key: string]: AuditIconConfig;
 } = {
-  created: { icon: "🟢", label: "Task created", color: "#3fb950" },
-  completed: { icon: "✅", label: "Task completed", color: "#3fb950" },
-  uncompleted: { icon: "🔄", label: "Task reopened", color: "#f0883e" },
-  due_changed: { icon: "📅", label: "Due date changed", color: "#58a6ff" },
-  estimate_changed: { icon: "⏱", label: "Estimate updated", color: "#d29922" },
-  timer_started: { icon: "▶️", label: "Timer started", color: "#3fb950" },
-  timer_stopped: { icon: "⏹️", label: "Timer stopped", color: "#f85149" },
+  created: { iconName: "plus", library: "Feather", label: "Task created", color: "#3fb950" },
+  completed: { iconName: "check-circle", library: "Feather", label: "Task completed", color: "#3fb950" },
+  uncompleted: { iconName: "rotate-ccw", library: "Feather", label: "Task reopened", color: "#f0883e" },
+  due_changed: { iconName: "calendar", library: "Feather", label: "Due date changed", color: "#58a6ff" },
+  estimate_changed: { iconName: "clock", library: "Feather", label: "Estimate updated", color: "#d29922" },
+  timer_started: { iconName: "play", library: "Feather", label: "Timer started", color: "#3fb950" },
+  timer_stopped: { iconName: "square", library: "Feather", label: "Timer stopped", color: "#f85149" },
   subtask_completed: {
-    icon: "☑️",
+    iconName: "check-square",
+    library: "Feather",
     label: "Subtask completed",
     color: "#3fb950",
   },
   subtask_uncompleted: {
-    icon: "⬜",
+    iconName: "square",
+    library: "Feather",
     label: "Subtask reopened",
     color: "#f0883e",
   },
-  subtask_added: { icon: "➕", label: "Subtask added", color: "#58a6ff" },
+  subtask_added: { iconName: "plus-square", library: "Feather", label: "Subtask added", color: "#58a6ff" },
+};
+
+const SwipeStartButton = ({
+  onSwipeSuccess,
+  colors,
+  disabled,
+}: {
+  onSwipeSuccess: () => void;
+  colors: any;
+  disabled: boolean;
+}) => {
+  const [trackWidth, setTrackWidth] = useState(0);
+  const translateX = useSharedValue(0);
+  const thumbWidth = 46;
+
+  const onLayout = (e: any) => {
+    setTrackWidth(e.nativeEvent.layout.width);
+  };
+
+  const panGesture = Gesture.Pan()
+    .enabled(!disabled)
+    .activeOffsetX([5, -5])
+    .failOffsetY([-15, 15])
+    .onUpdate((event) => {
+      const maxTranslate = Math.max(0, trackWidth - thumbWidth - 4);
+      translateX.value = Math.max(
+        0,
+        Math.min(event.translationX, maxTranslate)
+      );
+    })
+    .onEnd(() => {
+      const maxTranslate = Math.max(0, trackWidth - thumbWidth - 4);
+      if (translateX.value > maxTranslate * 0.8) {
+        translateX.value = withSpring(maxTranslate, SNAP_SPRING, (finished) => {
+          if (finished) {
+            runOnJS(onSwipeSuccess)();
+            translateX.value = withTiming(0, { duration: 250 });
+          }
+        });
+      } else {
+        translateX.value = withSpring(0, SNAP_SPRING);
+      }
+    });
+
+  const animatedThumbStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: translateX.value }],
+    };
+  });
+
+  const animatedTrackStyle = useAnimatedStyle(() => {
+    const maxTranslate = Math.max(1, trackWidth - thumbWidth - 4);
+    const opacity = interpolate(
+      translateX.value,
+      [0, maxTranslate * 0.6],
+      [1, 0],
+      Extrapolation.CLAMP
+    );
+    return { opacity };
+  });
+
+  return (
+    <View
+      onLayout={onLayout}
+      style={[
+        styles.swipeTrack,
+        {
+          backgroundColor: colors.ghSurface2,
+          borderColor: colors.ghBorder,
+          opacity: disabled ? 0.5 : 1,
+        },
+      ]}
+    >
+      <Animated.Text
+        style={[
+          styles.swipeText,
+          { color: colors.ghMuted },
+          animatedTrackStyle,
+        ]}
+      >
+        Swipe to start timer
+      </Animated.Text>
+
+      <GestureDetector gesture={panGesture}>
+        <Animated.View
+          style={[
+            styles.swipeThumb,
+            { backgroundColor: colors.ghBlue },
+            animatedThumbStyle,
+          ]}
+        >
+          <Feather name="chevrons-right" size={20} color="#ffffff" />
+        </Animated.View>
+      </GestureDetector>
+    </View>
+  );
 };
 
 const getDeadlineInfo = (dueDate?: string, colors?: any) => {
@@ -217,7 +337,7 @@ export default function DetailPanel({
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
   const colors = Colors[scheme === "unspecified" ? "light" : scheme];
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const isLargeScreen = width >= 768;
 
   const [localActiveTab, setLocalActiveTab] = useState<
@@ -232,9 +352,7 @@ export default function DetailPanel({
   const [tabBarWidth, setTabBarWidth] = useState(isLargeScreen ? 0 : width);
 
   const handleTabBarLayout = (e: any) => {
-    if (isLargeScreen) {
-      setTabBarWidth(e.nativeEvent.layout.width);
-    }
+    setTabBarWidth(e.nativeEvent.layout.width);
   };
 
   const TABS = ["details", "checklist", "timetracking", "history"] as const;
@@ -243,94 +361,103 @@ export default function DetailPanel({
   // Scroll and touch references
   const scrollViewRef = useRef<any>(null);
 
-  const scrollX = useSharedValue(-999);
-  const hasReachedStart = useSharedValue(isLargeScreen ? 1 : 0);
+  // --- Bottom-to-top slide animation (mobile only) ---
+  // translateY drives the vertical offset; 0 = fully open, height = fully hidden below
+  const translateY = useSharedValue(isLargeScreen ? 0 : height);
+  const dragY = useSharedValue(0);
+
+  // Entrance animation: slide up from bottom using spring for butter-smooth 60fps
+  useEffect(() => {
+    if (!isLargeScreen) {
+      translateY.value = withSpring(0, OPEN_SPRING);
+    }
+  }, [isLargeScreen]);
+
+  // Pull-down-to-close pan gesture (mobile only)
+  // - activeOffsetY: only activate after 10px vertical movement
+  // - failOffsetX: cancel if horizontal movement exceeds 15px (let ScrollView handle it)
+  const panGesture = useMemo(() => {
+    return Gesture.Pan()
+      .activeOffsetY([10, -10])
+      .failOffsetX([-15, 15])
+      .onUpdate((e) => {
+        // Only allow dragging downward (positive translationY)
+        dragY.value = Math.max(0, e.translationY);
+      })
+      .onEnd((e) => {
+        if (e.translationY > DISMISS_THRESHOLD || e.velocityY > 800) {
+          // Dismiss: animate down off-screen
+          translateY.value = withTiming(height, {
+            duration: EXIT_DURATION,
+            easing: EXIT_EASING,
+          }, () => {
+            runOnJS(onClose)();
+          });
+          dragY.value = withTiming(0, { duration: EXIT_DURATION });
+        } else {
+          // Snap back
+          dragY.value = withSpring(0, SNAP_SPRING);
+        }
+      });
+  }, [height, onClose]);
+
+  // Horizontal scroll for tab swiping (mobile)
+  const scrollX = useSharedValue(0);
 
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
       scrollX.value = event.contentOffset.x;
-      // Only unlock translations and opacity once we've safely scrolled to the details tab
-      if (!isLargeScreen && tabBarWidth > 0 && event.contentOffset.x >= tabBarWidth - 1 && hasReachedStart.value === 0) {
-        hasReachedStart.value = 1;
-      }
     },
-  }, [tabBarWidth, isLargeScreen]);
+  }, []);
 
   const indicatorAnimatedStyle = useAnimatedStyle(() => {
     const tabWidth = tabBarWidth / 4;
-    if (scrollX.value === -999 || tabBarWidth === 0) {
+    if (tabBarWidth === 0) {
       return { left: 0, width: tabWidth };
     }
-    // Map floating indicator left pos to scroll position directly!
-    // Since we added an empty page at index 0 (width = tabBarWidth),
-    // we subtract tabBarWidth from scrollX to align with the visual tabs.
-    const rawLeftPos = (scrollX.value - tabBarWidth) / 4;
-    
-    // Clamp the indicator position so it doesn't move off-screen when swiping to close
-    const maxLeftPos = tabWidth * 3;
-    const leftPos = Math.max(0, Math.min(rawLeftPos, maxLeftPos));
-    
+    if (isLargeScreen) {
+      const leftPos = activeIndex * tabWidth;
+      return { left: leftPos, width: tabWidth };
+    }
+    const leftPos = Math.max(0, Math.min(scrollX.value / 4, tabWidth * 3));
     return {
       left: leftPos,
       width: tabWidth,
     };
-  }, [tabBarWidth]);
+  }, [tabBarWidth, isLargeScreen, activeIndex]);
 
+  // Root container style: slide up/down
   const rootAnimatedStyle = useAnimatedStyle(() => {
-    let tx = 0;
-    if (!isLargeScreen && tabBarWidth > 0 && scrollX.value !== -999 && hasReachedStart.value === 1) {
-      if (scrollX.value < tabBarWidth) {
-        tx = Math.max(0, tabBarWidth - scrollX.value);
-      } else if (scrollX.value > tabBarWidth * 4) {
-        tx = Math.min(0, (tabBarWidth * 4) - scrollX.value);
-      }
-    }
+    if (isLargeScreen) return {};
     return {
-      transform: [{ translateX: tx }],
+      transform: [{ translateY: translateY.value + dragY.value }],
+      opacity: interpolate(
+        translateY.value + dragY.value,
+        [0, height * 0.5],
+        [1, 0.85],
+        Extrapolation.CLAMP,
+      ),
     };
-  }, [tabBarWidth, isLargeScreen]);
+  }, [isLargeScreen, height]);
 
-  const scrollViewAnimatedStyle = useAnimatedStyle(() => {
-    let tx = 0;
-    if (!isLargeScreen && tabBarWidth > 0 && scrollX.value !== -999 && hasReachedStart.value === 1) {
-      if (scrollX.value < tabBarWidth) {
-        tx = Math.max(0, tabBarWidth - scrollX.value);
-      } else if (scrollX.value > tabBarWidth * 4) {
-        tx = Math.min(0, (tabBarWidth * 4) - scrollX.value);
-      }
-    }
-    return {
-      transform: [{ translateX: -tx }],
-      opacity: isLargeScreen ? 1 : hasReachedStart.value,
-    };
-  }, [tabBarWidth, isLargeScreen]);
-
-  // Synchronize ScrollView offset when activeTab changes (e.g. from tab buttons or parent gesture)
+  // Synchronize ScrollView offset when activeTab changes
   useEffect(() => {
     const index = TABS.indexOf(activeTab);
-    if (scrollViewRef.current && tabBarWidth > 0) {
+    if (scrollViewRef.current && tabBarWidth > 0 && !isLargeScreen) {
       scrollViewRef.current.scrollTo({
-        x: (index + 1) * tabBarWidth, // +1 to account for the empty close page at index 0
+        x: index * tabBarWidth,
         animated: true,
       });
     }
-  }, [activeTab, tabBarWidth]);
+  }, [activeTab, tabBarWidth, isLargeScreen]);
 
   // Handle horizontal swipe momentum settling on a page
   const handleScrollEnd = (e: any) => {
     const offsetX = e.nativeEvent.contentOffset.x;
-    const pageIndex = Math.round(offsetX / tabBarWidth); // 0 to 5
+    const pageIndex = Math.round(offsetX / tabBarWidth);
 
-    // If swiped to the empty pages at the ends, close the panel
-    if (pageIndex === 0 || pageIndex === 5) {
-      onClose();
-      return;
-    }
-
-    // Valid tab index is pageIndex - 1 (1 to 4 -> 0 to 3)
-    const tabIndex = pageIndex - 1;
-    if (tabIndex >= 0 && tabIndex < TABS.length) {
-      const targetTab = TABS[tabIndex];
+    if (pageIndex >= 0 && pageIndex < TABS.length) {
+      const targetTab = TABS[pageIndex];
       if (targetTab !== activeTab) {
         setActiveTab(targetTab);
       }
@@ -341,13 +468,24 @@ export default function DetailPanel({
   useEffect(() => {
     setActiveTab("details");
     setSessionNote("");
-    if (!isLargeScreen) {
-      hasReachedStart.value = 0;
-    }
     if (scrollViewRef.current && tabBarWidth > 0) {
-      scrollViewRef.current.scrollTo({ x: tabBarWidth, animated: false }); // start at index 1 (details tab)
+      scrollViewRef.current.scrollTo({ x: 0, animated: false });
     }
   }, [task?.id, tabBarWidth, isLargeScreen]);
+
+  const handleClose = () => {
+    if (isLargeScreen) {
+      onClose();
+      return;
+    }
+    translateY.value = withTiming(
+      height,
+      { duration: EXIT_DURATION, easing: EXIT_EASING },
+      () => {
+        runOnJS(onClose)();
+      }
+    );
+  };
 
   if (!task) {
     return (
@@ -407,6 +545,35 @@ export default function DetailPanel({
     });
   };
 
+  const handleStartTimerAuthentication = async () => {
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+      if (hasHardware && isEnrolled) {
+        const result = await LocalAuthentication.authenticateAsync({
+          promptMessage: "Authenticate to start task timer",
+          fallbackLabel: "Use Password/PIN",
+          disableDeviceFallback: false,
+        });
+        if (result.success) {
+          onStartTimer(task.id);
+        }
+      } else {
+        const result = await LocalAuthentication.authenticateAsync({
+          promptMessage: "Authenticate to start task timer",
+          disableDeviceFallback: false,
+        });
+        if (result.success) {
+          onStartTimer(task.id);
+        }
+      }
+    } catch (e) {
+      console.warn("LocalAuthentication error, starting timer directly:", e);
+      onStartTimer(task.id);
+    }
+  };
+
   const handleAddSubtaskSubmit = () => {
     if (!newSubtaskTitle.trim()) return;
     const newSub: Subtask = {
@@ -428,19 +595,15 @@ export default function DetailPanel({
     setNewSubtaskTitle("");
   };
 
-  return (
-    <Animated.View
-      style={[
-        styles.container,
-        {
-          backgroundColor: colors.ghBg,
-          borderLeftColor: colors.ghBorder,
-          borderLeftWidth: isLargeScreen ? 1 : 0,
-          paddingTop: isLargeScreen ? 0 : insets.top,
-        },
-        rootAnimatedStyle,
-      ]}
-    >
+  // The drag-handle + header area that responds to pull-down gesture
+  const dragArea = (
+    <>
+      {/* Drag handle indicator (mobile only) */}
+      {!isLargeScreen && (
+        <View style={styles.dragHandleContainer}>
+          <View style={[styles.dragHandle, { backgroundColor: colors.ghBorder2 }]} />
+        </View>
+      )}
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.ghBorder }]}>
         <Text
@@ -449,10 +612,35 @@ export default function DetailPanel({
         >
           {task.title}
         </Text>
-        <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+        <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
           <Text style={{ color: colors.ghMuted, fontSize: 20 }}>×</Text>
         </TouchableOpacity>
       </View>
+    </>
+  );
+
+  const panelContent = (
+    <Animated.View
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.ghBg,
+          borderLeftColor: colors.ghBorder,
+          borderLeftWidth: isLargeScreen ? 1 : 0,
+          borderTopLeftRadius: isLargeScreen ? 0 : 16,
+          borderTopRightRadius: isLargeScreen ? 0 : 16,
+        },
+        rootAnimatedStyle,
+      ]}
+    >
+      {/* On mobile, wrap drag area with GestureDetector for pull-down-to-close */}
+      {!isLargeScreen ? (
+        <GestureDetector gesture={panGesture}>
+          <Animated.View>{dragArea}</Animated.View>
+        </GestureDetector>
+      ) : (
+        dragArea
+      )}
 
       {/* Tabs */}
       <View
@@ -510,7 +698,6 @@ export default function DetailPanel({
         scrollHandler={scrollHandler}
         handleScrollEnd={handleScrollEnd}
         tabBarWidth={tabBarWidth}
-        scrollViewAnimatedStyle={scrollViewAnimatedStyle}
       >
         <TabPage
           isLargeScreen={isLargeScreen}
@@ -677,22 +864,15 @@ export default function DetailPanel({
                   </TouchableOpacity>
                 </View>
               ) : (
-                <View style={styles.timerIdleRow}>
+                <View style={{ gap: 12 }}>
                   <Text style={{ color: colors.ghMuted, fontSize: 13 }}>
                     No active session.
                   </Text>
-                  <TouchableOpacity
-                    style={[
-                      styles.timerBtn,
-                      { backgroundColor: colors.ghBlue },
-                      isTimerRunning &&
-                        activeTimerTaskId !== task.id && { opacity: 0.5 },
-                    ]}
+                  <SwipeStartButton
+                    colors={colors}
                     disabled={isTimerRunning && activeTimerTaskId !== task.id}
-                    onPress={() => onStartTimer(task.id)}
-                  >
-                    <Text style={styles.timerBtnText}>Start Timer</Text>
-                  </TouchableOpacity>
+                    onSwipeSuccess={handleStartTimerAuthentication}
+                  />
                 </View>
               )}
               {isTimerRunning && activeTimerTaskId !== task.id && (
@@ -762,7 +942,7 @@ export default function DetailPanel({
                     ]}
                   >
                     {sub.done && (
-                      <Text style={{ color: "#fff", fontSize: 9 }}>✓</Text>
+                      <Octicons name="check" size={10} color="#ffffff" />
                     )}
                   </View>
                   <Text
@@ -801,6 +981,26 @@ export default function DetailPanel({
                 onChangeText={setNewSubtaskTitle}
                 onSubmitEditing={handleAddSubtaskSubmit}
               />
+              <TouchableOpacity
+                style={[
+                  styles.addSubtaskBtn,
+                  {
+                    backgroundColor: newSubtaskTitle.trim()
+                      ? colors.ghBlue
+                      : colors.ghSurface2,
+                    borderColor: colors.ghBorder,
+                    borderWidth: 1,
+                  },
+                ]}
+                onPress={handleAddSubtaskSubmit}
+                disabled={!newSubtaskTitle.trim()}
+              >
+                <Octicons
+                  name="plus"
+                  size={14}
+                  color={newSubtaskTitle.trim() ? "#ffffff" : colors.ghMuted}
+                />
+              </TouchableOpacity>
             </View>
           </TabPage>
 
@@ -904,7 +1104,8 @@ export default function DetailPanel({
 
                 {task.auditLog.map((entry, idx) => {
                   const info = AUDIT_ICONS[entry.action] || {
-                    icon: "📝",
+                    iconName: "edit",
+                    library: "Feather",
                     label: "Task updated",
                     color: colors.ghMuted,
                   };
@@ -932,11 +1133,15 @@ export default function DetailPanel({
                           styles.nodeIconCircle,
                           {
                             backgroundColor: colors.ghBg,
-                            borderColor: colors.ghBorder,
+                            borderColor: info.color || colors.ghBorder,
                           },
                         ]}
                       >
-                        <Text style={{ fontSize: 10 }}>{info.icon}</Text>
+                        {info.library === "Octicons" ? (
+                          <Octicons name={info.iconName as any} size={11} color={info.color} />
+                        ) : (
+                          <Feather name={info.iconName as any} size={11} color={info.color} />
+                        )}
                       </View>
 
                       <View style={styles.nodeContent}>
@@ -965,6 +1170,8 @@ export default function DetailPanel({
       </TabContentContainer>
     </Animated.View>
   );
+
+  return panelContent;
 }
 
 const styles = StyleSheet.create({
@@ -978,6 +1185,18 @@ const styles = StyleSheet.create({
     flex: 1,
     borderLeftWidth: 1,
     flexDirection: "column",
+    overflow: "hidden",
+  },
+  dragHandleContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  dragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
   },
   header: {
     flexDirection: "row",
@@ -1000,7 +1219,6 @@ const styles = StyleSheet.create({
   tabsRow: {
     flexDirection: "row",
     borderBottomWidth: 1,
-    paddingHorizontal: 10,
   },
   tabButton: {
     flex: 1,
@@ -1015,6 +1233,7 @@ const styles = StyleSheet.create({
   tabButtonText: {
     fontSize: 12,
     fontWeight: "600",
+    textAlign: "center",
   },
   tabIndicator: {
     position: "absolute",
@@ -1195,14 +1414,55 @@ const styles = StyleSheet.create({
     paddingVertical: 30,
   },
   addSubtaskBox: {
-    marginTop: 10,
+    marginTop: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   subtaskInput: {
-    height: 34,
+    flex: 1,
+    height: 38,
     borderWidth: 1,
     borderRadius: 6,
     paddingHorizontal: 12,
-    fontSize: 12,
+    fontSize: 13,
+  },
+  addSubtaskBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  swipeTrack: {
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
+    justifyContent: "center",
+    position: "relative",
+    overflow: "hidden",
+    marginTop: 8,
+  },
+  swipeText: {
+    position: "absolute",
+    alignSelf: "center",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  swipeThumb: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "absolute",
+    left: 2,
+    top: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+    elevation: 2,
   },
   sessionsList: {
     gap: 10,
@@ -1241,12 +1501,12 @@ const styles = StyleSheet.create({
   },
   timelineContainer: {
     position: "relative",
-    paddingLeft: 20,
+    paddingLeft: 28,
     paddingTop: 10,
   },
   timelineLine: {
     position: "absolute",
-    left: 4,
+    left: 14,
     top: 15,
     bottom: 15,
     width: 2,
@@ -1259,12 +1519,12 @@ const styles = StyleSheet.create({
   },
   nodeIconCircle: {
     position: "absolute",
-    left: -21,
-    top: 2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 2,
+    left: -26,
+    top: 1,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -1317,7 +1577,6 @@ interface ParentProps {
   scrollHandler: any;
   handleScrollEnd: any;
   tabBarWidth: number;
-  scrollViewAnimatedStyle?: any;
   children: React.ReactNode;
 }
 
@@ -1327,7 +1586,6 @@ function TabContentContainer({
   scrollHandler,
   handleScrollEnd,
   tabBarWidth,
-  scrollViewAnimatedStyle,
   children,
 }: ParentProps) {
   if (isLargeScreen) {
@@ -1343,14 +1601,10 @@ function TabContentContainer({
       onScroll={scrollHandler}
       scrollEventThrottle={16}
       onMomentumScrollEnd={handleScrollEnd}
-      style={[styles.scrollContent, scrollViewAnimatedStyle]}
-      contentContainerStyle={{ width: tabBarWidth * 6 }} // 4 tabs + 2 empty close pages
+      style={styles.scrollContent}
+      contentContainerStyle={{ width: tabBarWidth * 4 }}
     >
-      {/* Empty page to capture right swipe (left-to-right) on details tab to close */}
-      <View style={{ width: tabBarWidth }} />
       {children}
-      {/* Empty page to capture left swipe (right-to-left) on history tab to close */}
-      <View style={{ width: tabBarWidth }} />
     </Animated.ScrollView>
   );
 }

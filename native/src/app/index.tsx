@@ -22,8 +22,6 @@ import { Colors } from "../constants/theme";
 import Header from "../components/Header";
 import AddTaskModal from "../components/AddTaskModal";
 import Animated, {
-  SlideInRight,
-  SlideOutRight,
   Easing,
   useSharedValue,
   useAnimatedStyle,
@@ -369,18 +367,8 @@ export default function AppIndex() {
     if (isLargeScreen) return;
     const dx = e.nativeEvent.pageX - touchStartX.current;
 
-    if (selectedTaskId) {
-      if (dx > 60) {
-        // Swipe Right: close detail panel
-        setSelectedTaskId(null);
-      } else if (dx < -60 && activeTab === "history") {
-        // Swipe Left on History: close detail panel
-        setSelectedTaskId(null);
-      }
-    } else {
-      if (dx > 60 && currentView !== "scheduled") {
-        openSidebar();
-      }
+    if (!selectedTaskId && dx > 60 && currentView !== "scheduled") {
+      openSidebar();
     }
   };
 
@@ -434,40 +422,26 @@ export default function AppIndex() {
             />
           </View>
         )}
-      </View>
 
-      {/* Detail Panel overlay on Mobile */}
-      {!isLargeScreen && !!selectedTaskId && (
-        <Animated.View
-          entering={SlideInRight.duration(350).easing(
-            Easing.out(Easing.cubic),
-          )}
-          exiting={SlideOutRight.duration(350).easing(
-            Easing.out(Easing.cubic),
-          )}
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              backgroundColor: "transparent",
-              zIndex: 90,
-            },
-          ]}
-        >
-          <DetailPanel
-            task={activeMobileTask}
-            onClose={() => setSelectedTaskId(null)}
-            onToggleDone={toggleDone}
-            onUpdateTask={handleUpdateTask}
-            isTimerRunning={isTimerRunning}
-            timerSeconds={timerSeconds}
-            onStartTimer={handleStartTimer}
-            onStopTimer={handleStopTimer}
-            activeTimerTaskId={activeTimerTaskId}
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-          />
-        </Animated.View>
-      )}
+        {/* Detail Panel overlay on Mobile — slides up from bottom, Header stays visible */}
+        {!isLargeScreen && !!selectedTaskId && (
+          <View style={styles.mobileDetailOverlay}>
+            <DetailPanel
+              task={activeMobileTask}
+              onClose={() => setSelectedTaskId(null)}
+              onToggleDone={toggleDone}
+              onUpdateTask={handleUpdateTask}
+              isTimerRunning={isTimerRunning}
+              timerSeconds={timerSeconds}
+              onStartTimer={handleStartTimer}
+              onStopTimer={handleStopTimer}
+              activeTimerTaskId={activeTimerTaskId}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+            />
+          </View>
+        )}
+      </View>
 
       {/* Sidebar Overlay Drawer with slide-in animation for Mobile */}
       {!isLargeScreen && (sidebarVisible || isSidebarOpen) && (
@@ -537,6 +511,14 @@ const styles = StyleSheet.create({
   rightPanel: {
     width: 320,
     flexShrink: 0,
+  },
+  mobileDetailOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 90,
   },
   sidebarOverlay: {
     position: "absolute",
