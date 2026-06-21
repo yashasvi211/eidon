@@ -1,0 +1,186 @@
+{
+  "tasks": [
+    {
+      "id": "mock1",
+      "title": "Refactor Navigation System",
+      "project": "Navigation Overhaul",
+      "due": "2026-06-25",
+      "est": "12h",
+      "notes": "Redesigning the stack and tab navigation flow for butter-smooth transitions.",
+      "done": false,
+      "target": "today",
+      "subtasks": [
+        { "id": "ms1", "title": "Setup basic drawer navigation", "done": true },
+        { "id": "ms2", "title": "Implement Reanimated bottom sheet transition", "done": true },
+        { "id": "ms3", "title": "Test gesture swipe to close", "done": false }
+      ],
+      "sessions": [
+        {
+          "id": "msess1",
+          "start": 1781517600000,
+          "end": 1781524800000,
+          "note": "Completed drawer stack structure"
+        },
+        {
+          "id": "msess2",
+          "start": 1781604000000,
+          "end": 1781614800000,
+          "note": "Polished the spring physics on the panel"
+        },
+        {
+          "id": "msess3",
+          "start": 1781949600000,
+          "end": 1781958600000,
+          "note": "Checked touch delay and swipe interaction"
+        }
+      ],
+      "createdAt": 1781481600000,
+      "completedAt": null,
+      "auditLog": [
+        { "timestamp": 1781482000000, "action": "created" },
+        { "timestamp": 1781517600000, "action": "timer_started" },
+        { "timestamp": 1781524800000, "action": "timer_stopped", "details": { "note": "Completed drawer stack structure" } }
+      ]
+    },
+    {
+      "id": "mock2",
+      "title": "Database Queries Optimization",
+      "project": "Database Speedup",
+      "due": "2026-06-28",
+      "est": "8h",
+      "notes": "Analyze slow queries on task audit logs table and add indexes.",
+      "done": false,
+      "target": "backlog",
+      "subtasks": [
+        { "id": "ms4", "title": "Add index to session table timestamp", "done": true },
+        { "id": "ms5", "title": "Optimize task lists fetch query", "done": true }
+      ],
+      "sessions": [
+        {
+          "id": "msess4",
+          "start": 1781686800000,
+          "end": 1781694000000,
+          "note": "Identified slow queries in pg_stat_activity"
+        },
+        {
+          "id": "msess5",
+          "start": 1781773200000,
+          "end": 1781782200000,
+          "note": "Wrote migration for compound indexes"
+        },
+        {
+          "id": "msess6",
+          "start": 1781859600000,
+          "end": 1781865000000,
+          "note": "Ran benchmark tests, queries are 4x faster"
+        }
+      ],
+      "createdAt": 1781568000000,
+      "completedAt": null,
+      "auditLog": [
+        { "timestamp": 1781568500000, "action": "created" }
+      ]
+    },
+    {
+      "id": "mock3",
+      "title": "OAuth 2.0 Integration",
+      "project": "Security Overhaul",
+      "due": "2026-06-14",
+      "est": "10h",
+      "notes": "Setup OAuth2 login with Google and Github.",
+      "done": true,
+      "target": "scheduled",
+      "subtasks": [
+        { "id": "ms6", "title": "Configure client IDs and credentials", "done": true },
+        { "id": "ms7", "title": "Implement backend redirect flow", "done": true }
+      ],
+      "sessions": [
+        {
+          "id": "msess7",
+          "start": 1780911600000,
+          "end": 1780922400000,
+          "note": "Configured developer portal credentials"
+        },
+        {
+          "id": "msess8",
+          "start": 1780998000000,
+          "end": 1781008800000,
+          "note": "Setup client auth endpoints"
+        },
+        {
+          "id": "msess9",
+          "start": 1781170800000,
+          "end": 1781181600000,
+          "note": "Verified Github redirect handler works"
+        }
+      ],
+      "createdAt": 1780876800000,
+      "completedAt": 1781181600000,
+      "auditLog": [
+        { "timestamp": 1780877000000, "action": "created" },
+        { "timestamp": 1781181600000, "action": "completed" }
+      ]
+    },
+    {
+      "id": "mock4",
+      "title": "Fix: Checkbox Click Touch Delay",
+      "project": "Inbox",
+      "due": "2026-06-21",
+      "est": "4h",
+      "notes": "Touchables nested inside other touchables take 150ms to register. Fix it.",
+      "done": true,
+      "target": "today",
+      "subtasks": [
+        { "id": "ms8", "title": "Remove nested touchables in TaskPanel", "done": true }
+      ],
+      "sessions": [
+        {
+          "id": "msess10",
+          "start": 1782014400000,
+          "end": 1782025200000,
+          "note": "Split check button and card text touchables"
+        }
+      ],
+      "createdAt": 1782000000000,
+      "completedAt": 1782025200000,
+      "auditLog": [
+        { "timestamp": 1782000100000, "action": "created" },
+        { "timestamp": 1782025200000, "action": "completed" }
+      ]
+    },
+    {
+      "id": "mock5",
+      "title": "UI Theme Styling & Polish",
+      "project": "UI Polish",
+      "due": "2026-06-12",
+      "est": "6h",
+      "notes": "Redesign timeline elements, progress indicators, and custom alerts.",
+      "done": true,
+      "target": "scheduled",
+      "subtasks": [
+        { "id": "ms9", "title": "Replace audit log emojis with Feather icons", "done": true },
+        { "id": "ms10", "title": "Build custom alert modal", "done": true }
+      ],
+      "sessions": [
+        {
+          "id": "msess11",
+          "start": 1781257200000,
+          "end": 1781268000000,
+          "note": "Refactored audit icons configuration"
+        },
+        {
+          "id": "msess12",
+          "start": 1781343600000,
+          "end": 1781354400000,
+          "note": "Polished the alert design and colors"
+        }
+      ],
+      "createdAt": 1781136000000,
+      "completedAt": 1781354400000,
+      "auditLog": [
+        { "timestamp": 1781136100000, "action": "created" },
+        { "timestamp": 1781354400000, "action": "completed" }
+      ]
+    }
+  ]
+}

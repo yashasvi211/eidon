@@ -30,7 +30,7 @@ import Animated, {
   withTiming,
   runOnJS,
 } from "react-native-reanimated";
-import tasksData from "../constants/tasks.json";
+import tasksData from "../constants/mockTasks.json";
 
 export default function AppIndex() {
   const { width } = useWindowDimensions();
@@ -99,7 +99,31 @@ export default function AppIndex() {
     setErrorModalVisible(true);
   };
 
-  const [tasks, setTasks] = useState<Task[]>(tasksData.tasks);
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    const BASE_DATE_MS = 1782000000000; // Approx June 21, 2026
+    const timeOffset = Date.now() - BASE_DATE_MS;
+
+    return (tasksData.tasks as Task[]).map((task) => {
+      const shiftedSessions = (task.sessions || []).map((sess) => ({
+        ...sess,
+        start: sess.start + timeOffset,
+        end: sess.end + timeOffset,
+      }));
+
+      const shiftedAuditLog = (task.auditLog || []).map((entry) => ({
+        ...entry,
+        timestamp: entry.timestamp + timeOffset,
+      }));
+
+      return {
+        ...task,
+        createdAt: task.createdAt ? task.createdAt + timeOffset : task.createdAt,
+        completedAt: task.completedAt ? task.completedAt + timeOffset : null,
+        sessions: shiftedSessions,
+        auditLog: shiftedAuditLog,
+      };
+    });
+  });
 
   const [currentView, setCurrentView] = useState("today");
   const [currentProject, setCurrentProject] = useState<string | null>(null);
@@ -325,6 +349,9 @@ export default function AppIndex() {
           tasks={tasks}
           isSleeping={isSleeping}
           sleepStartTime={sleepStartTime}
+          isTimerRunning={isTimerRunning}
+          activeTimerTaskId={activeTimerTaskId}
+          timerSeconds={timerSeconds}
         />
       );
     }

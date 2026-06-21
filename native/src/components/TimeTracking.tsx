@@ -7,6 +7,9 @@ interface TimeTrackingProps {
   tasks: Task[];
   isSleeping: boolean;
   sleepStartTime: number | null;
+  isTimerRunning?: boolean;
+  activeTimerTaskId?: string | null;
+  timerSeconds?: number;
 }
 
 const fmtSeconds = (s: number) => {
@@ -27,9 +30,22 @@ const fmtDuration = (ms: number) => {
   return `${hStr}${mStr}${s}s`;
 };
 
-const todayISO = () => new Date().toISOString().split('T')[0];
+const getLocalDateString = (timestamp: number) => {
+  const d = new Date(timestamp);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dateVal = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dateVal}`;
+};
 
-export default function TimeTracking({ tasks, isSleeping, sleepStartTime }: TimeTrackingProps) {
+export default function TimeTracking({
+  tasks,
+  isSleeping,
+  sleepStartTime,
+  isTimerRunning,
+  activeTimerTaskId,
+  timerSeconds = 0,
+}: TimeTrackingProps) {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
 
@@ -48,7 +64,7 @@ export default function TimeTracking({ tasks, isSleeping, sleepStartTime }: Time
     return () => clearInterval(interval);
   }, [isSleeping, sleepStartTime]);
 
-  const today = todayISO();
+  const today = useMemo(() => getLocalDateString(Date.now()), []);
 
   const todayEntries = useMemo(() => {
     const entries: {
@@ -62,7 +78,7 @@ export default function TimeTracking({ tasks, isSleeping, sleepStartTime }: Time
 
     tasks.forEach(task => {
       (task.sessions || []).forEach(sess => {
-        const date = new Date(sess.start).toISOString().split('T')[0];
+        const date = getLocalDateString(sess.start);
         if (date !== today) return;
         entries.push({
           taskId: task.id,
@@ -77,8 +93,29 @@ export default function TimeTracking({ tasks, isSleeping, sleepStartTime }: Time
     return entries.sort((a, b) => b.start - a.start);
   }, [tasks, today]);
 
+  const activeTask = useMemo(() => {
+    if (!isTimerRunning || !activeTimerTaskId) return null;
+    return tasks.find(t => t.id === activeTimerTaskId);
+  }, [tasks, isTimerRunning, activeTimerTaskId]);
+
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.ghBg }]} {...{ delaysContentTouches: false }}>
+
+      {isTimerRunning && activeTimerTaskId && activeTask && (
+        <View style={[styles.activeCard, { backgroundColor: 'rgba(45, 164, 78, 0.05)', borderColor: colors.ghGreen }]}>
+          <View style={styles.activeHeader}>
+            <View style={[styles.pulseDot, { backgroundColor: colors.ghGreen }]} />
+            <Text style={[styles.activeCardTitle, { color: colors.ghGreen }]}>Active Session</Text>
+          </View>
+          <Text style={[styles.activeTaskTitle, { color: colors.ghText }]}>{activeTask.title}</Text>
+          <Text style={[styles.activeDurationText, { color: colors.ghText }]}>
+            {fmtDuration(timerSeconds * 1000)}
+          </Text>
+          <Text style={[styles.activeCardSub, { color: colors.ghMuted }]}>
+            Project: {activeTask.project}
+          </Text>
+        </View>
+      )}
 
       {isSleeping && sleepStartTime && (
         <View style={[styles.sleepCard, { backgroundColor: 'rgba(88, 166, 255, 0.05)', borderColor: colors.ghBlue }]}>
@@ -127,6 +164,42 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
+  },
+  activeCard: {
+    marginBottom: 24,
+    padding: 16,
+    borderWidth: 1,
+    borderRadius: 8,
+  },
+  activeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 4,
+  },
+  pulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  activeCardTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  activeTaskTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  activeDurationText: {
+    fontSize: 24,
+    fontWeight: '700',
+    fontFamily: 'monospace',
+  },
+  activeCardSub: {
+    fontSize: 11,
+    marginTop: 4,
   },
   sleepCard: {
     marginBottom: 24,
