@@ -671,24 +671,27 @@ export default function AppIndex() {
           />
         )}
 
-        {/* Task List / Stats / Time Tracking / Calendar Panel or Mobile Detail */}
+        {/* Task List / Stats / Time Tracking / Calendar Panel */}
         <View style={styles.middlePanel}>
-          {!isLargeScreen && !!selectedTaskId ? (
-            <DetailPanel
-              task={activeMobileTask}
-              onClose={() => setSelectedTaskId(null)}
-              onToggleDone={toggleDone}
-              onUpdateTask={handleUpdateTask}
-              isTimerRunning={isTimerRunning}
-              timerSeconds={timerSeconds}
-              onStartTimer={handleStartTimer}
-              onStopTimer={handleStopTimer}
-              activeTimerTaskId={activeTimerTaskId}
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-            />
-          ) : (
-            renderMiddlePanel()
+          {renderMiddlePanel()}
+
+          {/* Mobile Detail Panel — overlaid so task list stays rendered behind it */}
+          {!isLargeScreen && !!selectedTaskId && (
+            <View style={styles.mobileDetailOverlay}>
+              <DetailPanel
+                task={activeMobileTask}
+                onClose={() => setSelectedTaskId(null)}
+                onToggleDone={toggleDone}
+                onUpdateTask={handleUpdateTask}
+                isTimerRunning={isTimerRunning}
+                timerSeconds={timerSeconds}
+                onStartTimer={handleStartTimer}
+                onStopTimer={handleStopTimer}
+                activeTimerTaskId={activeTimerTaskId}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+              />
+            </View>
           )}
         </View>
 
@@ -821,6 +824,15 @@ const styles = StyleSheet.create({
   },
   middlePanel: {
     flex: 1,
+    overflow: "hidden",
+  },
+  mobileDetailOverlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 10,
   },
   rightPanel: {
     width: 320,

@@ -9,14 +9,7 @@ const API_BASE_URL_DEV =
 const API_BASE_URL_PROD =
   process.env.EXPO_PUBLIC_API_URL_PROD || "https://eidon.onrender.com";
 
-const rawApiUrl = IS_PROD ? API_BASE_URL_PROD : API_BASE_URL_DEV;
-
-// If running in a web browser and URL points to Android loopback (10.0.2.2), auto-rewrite it to localhost (127.0.0.1)
-if (typeof window !== "undefined" && window.location && rawApiUrl.includes("10.0.2.2")) {
-  rawApiUrl = rawApiUrl.replace("10.0.2.2", "127.0.0.1");
-}
-
-export const API_BASE_URL = rawApiUrl;
+const API_BASE_URL = IS_PROD ? API_BASE_URL_PROD : API_BASE_URL_DEV;
 
 async function request(path: string, options: RequestInit = {}) {
   const url = `${API_BASE_URL}${path}`;
