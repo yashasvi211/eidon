@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, useColorScheme, Modal, Switch } from 'react-native';
 import { Colors } from '../constants/theme';
 import { Task } from './DetailPanel';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
+import { api } from '../services/api';
+import * as WebBrowser from 'expo-web-browser';
+import { DROPBOX_APP_KEY, DROPBOX_APP_SECRET } from '../constants/env';
 
 interface Project {
   name: string;
@@ -24,6 +27,7 @@ interface SidebarProps {
   showCompleted: boolean;
   setShowCompleted: (val: boolean) => void;
   onDeleteProject: (name: string) => void;
+  onDataChanged?: () => void;
 }
 
 const CURATED_COLORS = [
@@ -36,6 +40,12 @@ const CURATED_COLORS = [
   '#f2cc60',
   '#8b949e',
 ];
+
+const fmtDate = (ts: number | null) => {
+  if (!ts) return 'Never';
+  const d = new Date(ts);
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
 
 export default function Sidebar({
   currentView,
@@ -62,6 +72,136 @@ export default function Sidebar({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [modalNewProjectName, setModalNewProjectName] = useState('');
   const [modalNewProjectColor, setModalNewProjectColor] = useState('#58a6ff');
+
+  // Dropbox / sync state
+  const [dropboxToken, setDropboxToken] = useState('');
+  const [dropboxPath, setDropboxPath] = useState('/eidon_db.json');
+  const [syncInterval, setSyncInterval] = useState('30');
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
+  const [syncStatus, setSyncStatus] = useState<string | null>(null);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
+  const [connectionLoading, setConnectionLoading] = useState(false);
+
+  // Load settings on mount / when settings opens
+  useEffect(() => {
+    if (isSettingsOpen) {
+      api.getSettings().then((s) => {
+        let token = s.dropboxToken || '';
+        if (token && !s.dropboxRefreshToken) {
+          // Auto-clear legacy token
+          token = '';
+          api.updateSettings({ dropboxToken: '', dropboxRefreshToken: '', tokenExpiresAt: 0 });
+        }
+        setDropboxToken(token);
+        setDropboxPath(s.dropboxPath || '/eidon_db.json');
+        setSyncInterval(String(s.syncIntervalMinutes || 30));
+        setAutoSyncEnabled(s.autoSyncEnabled || false);
+        setLastSyncTime(s.lastSyncTime || null);
+      });
+    } else {
+      setSyncStatus(null);
+      setConnectionStatus(null);
+    }
+  }, [isSettingsOpen]);
+
+  const [authCode, setAuthCode] = useState('');
+
+  const handleGetAuthCode = async () => {
+    const scopes = 'account_info.read files.content.write files.content.read files.metadata.read files.metadata.write';
+    const url = `https://www.dropbox.com/oauth2/authorize?client_id=${DROPBOX_APP_KEY}&response_type=code&token_access_type=offline&scope=${encodeURIComponent(scopes)}`;
+    await WebBrowser.openBrowserAsync(url);
+  };
+
+  const exchangeCode = async () => {
+    if (!authCode.trim()) {
+      setConnectionStatus('Please enter an auth code.');
+      return;
+    }
+    setConnectionLoading(true);
+    setConnectionStatus('Connecting to Dropbox...');
+    try {
+      const res = await fetch('https://api.dropboxapi.com/oauth2/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `grant_type=authorization_code&code=${authCode.trim()}&client_id=${DROPBOX_APP_KEY}&client_secret=${DROPBOX_APP_SECRET}`,
+      });
+      const data = await res.json();
+      if (res.ok) {
+        await api.updateSettings({
+          dropboxToken: data.access_token,
+          dropboxRefreshToken: data.refresh_token,
+          tokenExpiresAt: Date.now() + (data.expires_in * 1000),
+        });
+        setDropboxToken(data.access_token);
+        setConnectionStatus('Connected to Dropbox!');
+        setAuthCode('');
+      } else {
+        setConnectionStatus(`Failed: ${data.error_description || data.error}`);
+      }
+    } catch (e: any) {
+      setConnectionStatus(`Error: ${e.message}`);
+    }
+    setConnectionLoading(false);
+  };
+
+  const handleExport = async () => {
+    try {
+      await api.exportData();
+    } catch (e: any) {
+      alert('Export failed: ' + e.message);
+    }
+  };
+
+  const handleImport = async () => {
+    try {
+      const reloaded = await api.importData();
+      if (reloaded) {
+        alert('Import successful!');
+        if (onDataChanged) onDataChanged();
+      }
+    } catch (e: any) {
+      alert('Import failed: ' + e.message);
+    }
+  };
+
+  const handleSaveSyncSettings = async () => {
+    await api.updateSettings({
+      dropboxToken: dropboxToken.trim(),
+      dropboxPath: dropboxPath.trim() || '/eidon_db.json',
+      syncIntervalMinutes: parseInt(syncInterval) || 30,
+      autoSyncEnabled,
+    });
+
+    if (autoSyncEnabled && dropboxToken.trim()) {
+      api.startAutoSync((result) => {
+        setSyncStatus(result.message);
+      });
+    } else {
+      api.stopAutoSync();
+    }
+
+    setSyncStatus('Settings saved');
+    setTimeout(() => setSyncStatus(null), 3000);
+  };
+
+  const handleTestConnection = async () => {
+    setConnectionLoading(true);
+    setConnectionStatus(null);
+    const result = await api.testDropboxConnection();
+    setConnectionStatus(result.message);
+    setConnectionLoading(false);
+  };
+
+  const handleUpload = async () => {
+    setSyncLoading(true);
+    setSyncStatus(null);
+    const result = await api.uploadToDropbox();
+    setSyncStatus(result.message);
+    setLastSyncTime(result.success ? Date.now() : lastSyncTime);
+    setSyncLoading(false);
+  };
 
   const handleModalSaveProject = () => {
     if (!modalNewProjectName.trim()) return;
@@ -138,7 +278,6 @@ export default function Sidebar({
 
         {isAdding && (
           <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={[styles.addProjectBox, { backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder }]}>
-            {/* Color selector */}
             <View style={styles.colorChipsRow}>
               {CURATED_COLORS.map((c) => (
                 <TouchableOpacity
@@ -153,7 +292,6 @@ export default function Sidebar({
               ))}
             </View>
             
-            {/* Input name */}
             <View style={[styles.addInputWrapper, { backgroundColor: colors.ghSurface, borderColor: colors.ghBorder }]}>
               <View style={[styles.projectDot, { backgroundColor: newProjectColor }]} />
               <TextInput
@@ -166,7 +304,6 @@ export default function Sidebar({
               />
             </View>
 
-            {/* Buttons */}
             <View style={styles.addActionsRow}>
               <TouchableOpacity style={[styles.btnSmall, { borderColor: colors.ghBorder }]} onPress={() => setIsAdding(false)}>
                 <Text style={{ color: colors.ghText, fontSize: 11 }}>Cancel</Text>
@@ -205,7 +342,6 @@ export default function Sidebar({
         })}
       </ScrollView>
 
-      {/* Sidebar Footer */}
       <View style={[styles.footer, { borderTopColor: colors.ghBorder }]}>
         <View style={styles.userSection}>
           <View style={[styles.avatar, { backgroundColor: colors.ghBlue }]}>
@@ -222,7 +358,6 @@ export default function Sidebar({
         </TouchableOpacity>
       </View>
 
-      {/* Settings Modal */}
       <Modal
         visible={isSettingsOpen}
         transparent
@@ -231,7 +366,6 @@ export default function Sidebar({
       >
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.ghSurface, borderColor: colors.ghBorder }]}>
-            {/* Modal Header */}
             <View style={[styles.modalHeader, { borderBottomColor: colors.ghBorder }]}>
               <Text style={[styles.modalTitle, { color: colors.ghText }]}>Settings</Text>
               <TouchableOpacity onPress={() => setIsSettingsOpen(false)} style={styles.closeBtn}>
@@ -240,7 +374,7 @@ export default function Sidebar({
             </View>
 
             <ScrollView style={styles.modalBody} contentContainerStyle={{ paddingBottom: 20 }}>
-              {/* Task Preferences Section */}
+              {/* PREFERENCES */}
               <View style={styles.settingsSection}>
                 <Text style={[styles.settingsSectionTitle, { color: colors.ghMuted }]}>PREFERENCES</Text>
                 <View style={styles.settingsRow}>
@@ -259,11 +393,194 @@ export default function Sidebar({
                 </View>
               </View>
 
-              {/* Add Project Section */}
+              {/* EXPORT / IMPORT */}
+              <View style={styles.settingsSection}>
+                <Text style={[styles.settingsSectionTitle, { color: colors.ghMuted }]}>EXPORT / IMPORT</Text>
+                <Text style={[styles.settingsHelp, { color: colors.ghMuted, marginBottom: 10 }]}>
+                  Export your data as a JSON file or import from a previously exported file.
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <TouchableOpacity
+                    style={[styles.modalActionBtn, { flex: 1, backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder, borderWidth: 1 }]}
+                    onPress={handleExport}
+                  >
+                    <Feather name="upload" size={14} color={colors.ghText} style={{ marginRight: 6 }} />
+                    <Text style={[styles.modalActionBtnText, { color: colors.ghText }]}>Export</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalActionBtn, { flex: 1, backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder, borderWidth: 1 }]}
+                    onPress={handleImport}
+                  >
+                    <Feather name="download" size={14} color={colors.ghText} style={{ marginRight: 6 }} />
+                    <Text style={[styles.modalActionBtnText, { color: colors.ghText }]}>Import</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* DROPBOX SYNC */}
+              <View style={styles.settingsSection}>
+                <Text style={[styles.settingsSectionTitle, { color: colors.ghMuted }]}>DROPBOX SYNC</Text>
+                <Text style={[styles.settingsHelp, { color: colors.ghMuted, marginBottom: 10 }]}>
+                  Backup and restore your data via Dropbox. All data stays on your device — Dropbox is only used for cloud storage.
+                </Text>
+
+                {/* API Upload (requires token) */}
+                <View style={[styles.optionCard, { backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder }]}>
+                  <Text style={[styles.optionTitle, { color: colors.ghText }]}>Dropbox Connection</Text>
+                  <Text style={[styles.optionDesc, { color: colors.ghMuted, marginBottom: 10 }]}>
+                    Connect your Dropbox account to backup data and enable auto-sync.
+                  </Text>
+
+                  {dropboxToken ? (
+                    <View style={{ marginBottom: 15 }}>
+                      <Text style={[styles.statusText, { color: colors.ghGreen, marginBottom: 8 }]}>
+                        ✓ Connected
+                      </Text>
+                      <TouchableOpacity
+                        style={[styles.modalActionBtn, { backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder, borderWidth: 1 }]}
+                        onPress={async () => {
+                          setDropboxToken('');
+                          await api.updateSettings({ dropboxToken: '', dropboxRefreshToken: '', tokenExpiresAt: 0 });
+                          setConnectionStatus(null);
+                        }}
+                      >
+                        <Feather name="log-out" size={14} color={colors.ghRed} style={{ marginRight: 6 }} />
+                        <Text style={[styles.modalActionBtnText, { color: colors.ghRed }]}>Disconnect</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={{ marginBottom: 15, gap: 10 }}>
+                      <TouchableOpacity
+                        style={[styles.modalActionBtn, { backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder, borderWidth: 1 }]}
+                        onPress={handleGetAuthCode}
+                      >
+                        <Feather name="external-link" size={14} color={colors.ghText} style={{ marginRight: 6 }} />
+                        <Text style={[styles.modalActionBtnText, { color: colors.ghText }]}>Step 1: Get Auth Code</Text>
+                      </TouchableOpacity>
+                      
+                      <View style={styles.inputGroup}>
+                        <TextInput
+                          style={[styles.settingsInput, { color: colors.ghText, backgroundColor: colors.ghBg, borderColor: colors.ghBorder, marginTop: 4 }]}
+                          value={authCode}
+                          onChangeText={setAuthCode}
+                          placeholder="Step 2: Paste Auth Code Here"
+                          placeholderTextColor={colors.ghMuted}
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                        />
+                      </View>
+
+                      <TouchableOpacity
+                        style={[styles.modalActionBtn, { backgroundColor: '#0061FE' }]}
+                        onPress={exchangeCode}
+                        disabled={connectionLoading || !authCode.trim()}
+                      >
+                        <Feather name="link" size={14} color="#fff" style={{ marginRight: 6 }} />
+                        <Text style={[styles.modalActionBtnText, { color: '#fff' }]}>
+                          {connectionLoading ? 'Connecting...' : 'Step 3: Connect'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  <View style={styles.inputGroup}>
+                    <Text style={[styles.inputLabel, { color: colors.ghMuted }]}>Dropbox File Path</Text>
+                    <TextInput
+                      style={[styles.settingsInput, { color: colors.ghText, backgroundColor: colors.ghBg, borderColor: colors.ghBorder }]}
+                      value={dropboxPath}
+                      onChangeText={setDropboxPath}
+                      placeholder="/eidon_db.json"
+                      placeholderTextColor={colors.ghMuted}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                    />
+                  </View>
+
+                  {connectionStatus && (
+                    <Text style={[styles.statusText, { color: connectionStatus.includes('Connected') ? colors.ghGreen : colors.ghRed, marginBottom: 8 }]}>
+                      {connectionStatus}
+                    </Text>
+                  )}
+                  <TouchableOpacity
+                    style={[styles.modalActionBtn, { backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder, borderWidth: 1, marginBottom: 10 }]}
+                    onPress={handleTestConnection}
+                    disabled={connectionLoading || !dropboxToken.trim()}
+                  >
+                    <Feather name={connectionLoading ? 'loader' : 'check-circle'} size={14} color={colors.ghText} style={{ marginRight: 6 }} />
+                    <Text style={[styles.modalActionBtnText, { color: colors.ghText }]}>
+                      {connectionLoading ? 'Testing...' : 'Test Connection'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <View style={{ flexDirection: 'row', gap: 10, marginBottom: 10 }}>
+                    <TouchableOpacity
+                      style={[styles.modalActionBtn, { flex: 1, backgroundColor: colors.ghBlue }]}
+                      onPress={handleUpload}
+                      disabled={syncLoading || !dropboxToken.trim()}
+                    >
+                      <Feather name="upload-cloud" size={14} color="#fff" style={{ marginRight: 6 }} />
+                      <Text style={[styles.modalActionBtnText, { color: '#fff' }]}>
+                        {syncLoading ? '...' : 'Upload'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <View style={styles.settingsRow}>
+                    <View style={{ flex: 1, paddingRight: 10 }}>
+                      <Text style={[styles.settingsLabel, { color: colors.ghText }]}>Auto-sync</Text>
+                      <Text style={[styles.settingsHelp, { color: colors.ghMuted }]}>
+                        Automatically upload to Dropbox at regular intervals.
+                      </Text>
+                    </View>
+                    <Switch
+                      value={autoSyncEnabled}
+                      onValueChange={setAutoSyncEnabled}
+                      trackColor={{ false: colors.ghBorder, true: colors.ghBlue }}
+                      thumbColor="#fff"
+                    />
+                  </View>
+
+                  {autoSyncEnabled && (
+                    <View style={styles.inputGroup}>
+                      <Text style={[styles.inputLabel, { color: colors.ghMuted }]}>Sync Interval (minutes)</Text>
+                      <TextInput
+                        style={[styles.settingsInput, { color: colors.ghText, backgroundColor: colors.ghBg, borderColor: colors.ghBorder }]}
+                        value={syncInterval}
+                        onChangeText={setSyncInterval}
+                        placeholder="30"
+                        placeholderTextColor={colors.ghMuted}
+                        keyboardType="number-pad"
+                      />
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    style={[styles.saveBtn, { backgroundColor: colors.ghBlue, marginTop: 8 }]}
+                    onPress={handleSaveSyncSettings}
+                  >
+                    <Text style={styles.saveBtnText}>Save Sync Settings</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {syncStatus && (
+                  <Text style={[styles.statusText, { color: syncStatus.includes('fail') || syncStatus.includes('error') || syncStatus.includes('Invalid') || syncStatus.includes('Invalid') ? colors.ghRed : colors.ghGreen, marginTop: 8 }]}>
+                    {syncStatus}
+                  </Text>
+                )}
+
+                <Text style={[styles.syncInfo, { color: colors.ghMuted }]}>
+                  Last sync: {fmtDate(lastSyncTime)}
+                </Text>
+
+                <Text style={[styles.syncHelpText, { color: colors.ghMuted }]}>
+                  Your connection is saved securely and refreshes automatically.
+                </Text>
+              </View>
+
+              {/* ADD PROJECT */}
               <View style={styles.settingsSection}>
                 <Text style={[styles.settingsSectionTitle, { color: colors.ghMuted }]}>ADD PROJECT</Text>
                 <View style={[styles.modalAddProjectBox, { backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder }]}>
-                  {/* Curated Colors */}
                   <View style={styles.colorChipsRow}>
                     {CURATED_COLORS.map((c) => (
                       <TouchableOpacity
@@ -298,7 +615,7 @@ export default function Sidebar({
                 </View>
               </View>
 
-              {/* Manage Projects Section */}
+              {/* MANAGE PROJECTS */}
               <View style={styles.settingsSection}>
                 <Text style={[styles.settingsSectionTitle, { color: colors.ghMuted }]}>MANAGE PROJECTS</Text>
                 {projects.length === 0 ? (
@@ -536,8 +853,8 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: '100%',
-    maxWidth: 450,
-    maxHeight: '80%',
+    maxWidth: 480,
+    maxHeight: '90%',
     borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
@@ -588,6 +905,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
   },
+  inputGroup: {
+    marginBottom: 12,
+  },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 4,
+    letterSpacing: 0.3,
+  },
+  settingsInput: {
+    height: 38,
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    fontSize: 13,
+  },
   modalAddProjectBox: {
     padding: 12,
     borderWidth: 1,
@@ -604,6 +937,58 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 13,
     fontWeight: '600',
+  },
+  modalActionBtn: {
+    height: 34,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+  },
+  modalActionBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  saveBtn: {
+    height: 36,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+  },
+  saveBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  syncInfo: {
+    fontSize: 11,
+    marginTop: 8,
+  },
+  syncHelpText: {
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 8,
+    fontStyle: 'italic',
+  },
+  optionCard: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  optionTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  optionDesc: {
+    fontSize: 11,
+    lineHeight: 15,
   },
   projectManageItem: {
     flexDirection: 'row',

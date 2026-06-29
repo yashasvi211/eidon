@@ -30,7 +30,7 @@ import Animated, {
   withTiming,
   runOnJS,
 } from "react-native-reanimated";
-import { api, API_BASE_URL } from "../services/api";
+import { api } from "../services/api";
 
 
 export default function AppIndex() {
@@ -161,6 +161,7 @@ export default function AppIndex() {
   useEffect(() => {
     async function loadInitialData() {
       try {
+        await api.init();
         const fetchedTasks = await api.getTasks();
         const fetchedProjects = await api.getProjects();
         const fetchedSettings = await api.getSettings();
@@ -172,17 +173,20 @@ export default function AppIndex() {
           setSleepStartTime(fetchedSettings.sleepStartTime);
         }
       } catch (err: any) {
-        console.error("Failed to load initial data from backend:", err);
+        console.error("Failed to load data:", err);
         showErrorAlert(
-          "Connection Failed",
-          `Could not connect to the backend server at:\n${API_BASE_URL}\n\n` +
-          `Please make sure the backend server is running and accessible from this device.\n\n` +
-          `Note: If you recently changed the API URL in your .env file, you must RESTART the Expo bundler/packager (stop it with Ctrl+C and run it again) to apply environment variable updates.\n\n` +
-          `Error Details: ${err?.message || err}`
+          "Load Failed",
+          `Could not load data.\n\n${err?.message || err}`
         );
       }
     }
     loadInitialData();
+  }, []);
+
+  // Start auto-sync if enabled
+  useEffect(() => {
+    api.startAutoSync();
+    return () => api.stopAutoSync();
   }, []);
 
   // Handle sleep mode transitions
@@ -190,7 +194,7 @@ export default function AppIndex() {
     const nextStart = isSleeping ? Date.now() : null;
     setSleepStartTime(nextStart);
     api.updateSettings({ isSleeping, sleepStartTime: nextStart })
-      .catch((err) => console.error("Failed to sync sleep settings:", err));
+      .catch((err) => console.error("Failed to save sleep settings:", err));
   }, [isSleeping]);
 
   // Derived selected task
@@ -245,16 +249,12 @@ export default function AppIndex() {
       }),
     );
 
-    // Sync with API
     api.updateTask(id, { done: isDone, completedAt })
       .then(() => api.createAuditLog(id, auditEntry))
       .catch((err: any) => {
-        console.error("Failed to sync task toggleDone:", err);
+        console.error("Failed to update task:", err);
         setTasks(previousTasks);
-        showErrorAlert(
-          "Task Update Failed",
-          `Could not synchronize task completion status with the server.\n\nError: ${err?.message || err}`
-        );
+        showErrorAlert("Save Failed", `Could not save.\n\n${err?.message || err}`);
       });
   };
 
@@ -344,12 +344,9 @@ export default function AppIndex() {
 
     if (syncPromises.length > 0) {
       Promise.all(syncPromises).catch((err: any) => {
-        console.error("Failed to sync task updates:", err);
+        console.error("Failed to save task updates:", err);
         setTasks(previousTasks);
-        showErrorAlert(
-          "Task Sync Failed",
-          `Could not save task properties or subtasks to the server.\n\nError: ${err?.message || err}`
-        );
+        showErrorAlert("Save Failed", `Could not save.\n\n${err?.message || err}`);
       });
     }
   };
@@ -382,20 +379,17 @@ export default function AppIndex() {
       ],
     };
 
-    // Save to database first before adding to UI state
     api.createTask(newTask)
-      .then(() => api.createAuditLog(newTask.id, newTask.auditLog![0]))
       .then(() => {
-        // Only if it saves to DB successfully, update local state
-        setTasks((prev) => [...prev, newTask]);
-        showToast("Task created and saved to DB! 🎉");
+        setTasks((prev) => {
+          if (prev.some(t => t.id === newTask.id)) return prev;
+          return [...prev, newTask];
+        });
+        showToast("Task created!");
       })
       .catch((err: any) => {
-        console.error("Failed to create task in backend:", err);
-        showErrorAlert(
-          "Task Creation Failed",
-          `Unable to save the task to the backend server. The task was not created.\n\nError: ${err?.message || err}`
-        );
+        console.error("Failed to create task:", err);
+        showErrorAlert("Save Failed", `Could not save.\n\n${err?.message || err}`);
       });
   };
 
@@ -422,15 +416,11 @@ export default function AppIndex() {
       }),
     );
 
-    // Sync with API
     api.createAuditLog(taskId, audit)
       .catch((err: any) => {
-        console.error("Failed to sync timer_started audit log:", err);
+        console.error("Failed to save timer audit log:", err);
         setTasks(previousTasks);
-        showErrorAlert(
-          "Timer Start Failed",
-          `Could not start the timer on the server.\n\nError: ${err?.message || err}`
-        );
+        showErrorAlert("Save Failed", `Could not save.\n\n${err?.message || err}`);
       });
   };
 
@@ -477,20 +467,16 @@ export default function AppIndex() {
     setTimerStartTimestamp(null);
     setTimerSeconds(0);
 
-    // Sync with API
     api.createSession(taskId, newSession)
       .then(() => api.createAuditLog(taskId, audit))
       .catch((err: any) => {
-        console.error("Failed to sync timer session stop:", err);
+        console.error("Failed to save timer session:", err);
         setTasks(previousTasks);
         setIsTimerRunning(prevIsTimerRunning);
         setActiveTimerTaskId(prevActiveTimerTaskId);
         setTimerStartTimestamp(prevTimerStartTimestamp);
         setTimerSeconds(prevTimerSeconds);
-        showErrorAlert(
-          "Timer Logging Failed",
-          `Could not save the logged work session to the server.\n\nError: ${err?.message || err}`
-        );
+        showErrorAlert("Save Failed", `Could not save.\n\n${err?.message || err}`);
       });
   };
 
@@ -506,17 +492,13 @@ export default function AppIndex() {
     setCurrentProject(name);
     setCurrentView("today");
 
-    // Sync with API
     api.createProject({ name, color })
       .catch((err: any) => {
-        console.error("Failed to create project in backend:", err);
+        console.error("Failed to create project:", err);
         setProjects(previousProjects);
         setCurrentProject(previousCurrentProject);
         setCurrentView(previousCurrentView);
-        showErrorAlert(
-          "Project Creation Failed",
-          `Could not create project "${name}" on the server.\n\nError: ${err?.message || err}`
-        );
+        showErrorAlert("Save Failed", `Could not save.\n\n${err?.message || err}`);
       });
   };
 
@@ -533,19 +515,26 @@ export default function AppIndex() {
     }
     setTasks(tasks.filter((t) => t.project !== name));
 
-    // Sync with API
     api.deleteProject(name)
       .catch((err: any) => {
-        console.error("Failed to delete project in backend:", err);
+        console.error("Failed to delete project:", err);
         setProjects(previousProjects);
         setCurrentProject(previousCurrentProject);
         setCurrentView(previousCurrentView);
         setTasks(previousTasks);
-        showErrorAlert(
-          "Project Deletion Failed",
-          `Could not delete project "${name}" from the server.\n\nError: ${err?.message || err}`
-        );
+        showErrorAlert("Save Failed", `Could not save.\n\n${err?.message || err}`);
       });
+  };
+
+  const reloadData = async () => {
+    try {
+      const fetchedTasks = await api.getTasks();
+      const fetchedProjects = await api.getProjects();
+      setTasks(fetchedTasks || []);
+      setProjects(fetchedProjects || []);
+    } catch (err: any) {
+      console.error("Failed to reload data:", err);
+    }
   };
 
   const closeSidebarMobile = () => {
@@ -668,6 +657,7 @@ export default function AppIndex() {
             showCompleted={showCompleted}
             setShowCompleted={setShowCompleted}
             onDeleteProject={handleDeleteProject}
+            onDataChanged={reloadData}
           />
         )}
 
