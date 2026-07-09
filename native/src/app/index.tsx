@@ -668,7 +668,7 @@ export default function AppIndex() {
               {renderMiddlePanel()}
 
               {/* Mobile Detail Panel — overlaid so task list stays rendered behind it */}
-              {!isLargeScreen && !!selectedTaskId && (
+              {!isLargeScreen && !!selectedTaskId && !!activeMobileTask && (
                 <View style={styles.mobileDetailOverlay}>
                   <DetailPanel
                     task={activeMobileTask}
