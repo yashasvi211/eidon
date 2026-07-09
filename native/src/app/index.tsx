@@ -636,78 +636,83 @@ export default function AppIndex() {
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
-      <Header
-        title={headerTitle}
-        showMenuBtn={!isLargeScreen}
-        onMenuPress={() => openSidebar()}
-        right={headerRight}
-      />
-      <View style={styles.appRow}>
-        {isLargeScreen && (
-          <Sidebar
-            currentView={currentView}
-            setCurrentView={setCurrentView}
-            currentProject={currentProject}
-            setCurrentProject={setCurrentProject}
-            projects={projects}
-            onAddProject={handleAddProject}
-            tasks={tasks}
-            isSleeping={isSleeping}
-            setIsSleeping={setIsSleeping}
-            showCompleted={showCompleted}
-            setShowCompleted={setShowCompleted}
-            onDeleteProject={handleDeleteProject}
-            onDataChanged={reloadData}
-          />
-        )}
-
-        {/* Task List / Stats / Time Tracking / Calendar Panel */}
-        <View style={styles.middlePanel}>
-          {renderMiddlePanel()}
-
-          {/* Mobile Detail Panel — overlaid so task list stays rendered behind it */}
-          {!isLargeScreen && !!selectedTaskId && (
-            <View style={styles.mobileDetailOverlay}>
-              <DetailPanel
-                task={activeMobileTask}
-                onClose={() => setSelectedTaskId(null)}
-                onToggleDone={toggleDone}
-                onUpdateTask={handleUpdateTask}
-                isTimerRunning={isTimerRunning}
-                timerSeconds={timerSeconds}
-                onStartTimer={handleStartTimer}
-                onStopTimer={handleStopTimer}
-                activeTimerTaskId={activeTimerTaskId}
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
+      <View style={{ flex: 1, paddingTop: insets.top }}>
+        <Header
+          title={headerTitle}
+          showMenuBtn={!isLargeScreen}
+          onMenuPress={() => openSidebar()}
+          right={headerRight}
+        />
+        <View style={{ flex: 1 }}>
+          <View style={styles.appRow}>
+            {isLargeScreen && (
+              <Sidebar
+                currentView={currentView}
+                setCurrentView={setCurrentView}
+                currentProject={currentProject}
+                setCurrentProject={setCurrentProject}
+                projects={projects}
+                onAddProject={handleAddProject}
+                tasks={tasks}
+                isSleeping={isSleeping}
+                setIsSleeping={setIsSleeping}
+                showCompleted={showCompleted}
+                setShowCompleted={setShowCompleted}
+                onDeleteProject={handleDeleteProject}
+                onDataChanged={reloadData}
               />
-            </View>
-          )}
-        </View>
+            )}
 
-        {/* Detail Panel for Large Screens */}
-        {isLargeScreen && (
-          <View style={styles.rightPanel}>
-            <DetailPanel
-              task={selectedTask}
-              onClose={() => setSelectedTaskId(null)}
-              onToggleDone={toggleDone}
-              onUpdateTask={handleUpdateTask}
-              isTimerRunning={isTimerRunning}
-              timerSeconds={timerSeconds}
-              onStartTimer={handleStartTimer}
-              onStopTimer={handleStopTimer}
-              activeTimerTaskId={activeTimerTaskId}
-              activeTab={activeTab}
-              setActiveTab={setActiveTab}
-            />
+            {/* Task List / Stats / Time Tracking / Calendar Panel */}
+            <View style={styles.middlePanel}>
+              {renderMiddlePanel()}
+
+              {/* Mobile Detail Panel — overlaid so task list stays rendered behind it */}
+              {!isLargeScreen && !!selectedTaskId && (
+                <View style={styles.mobileDetailOverlay}>
+                  <DetailPanel
+                    task={activeMobileTask}
+                    onClose={() => setSelectedTaskId(null)}
+                    onToggleDone={toggleDone}
+                    onUpdateTask={handleUpdateTask}
+                    isTimerRunning={isTimerRunning}
+                    timerSeconds={timerSeconds}
+                    onStartTimer={handleStartTimer}
+                    onStopTimer={handleStopTimer}
+                    activeTimerTaskId={activeTimerTaskId}
+                    activeTab={activeTab}
+                    setActiveTab={setActiveTab}
+                  />
+                </View>
+              )}
+            </View>
+
+            {/* Detail Panel for Large Screens */}
+            {isLargeScreen && (
+              <View style={styles.rightPanel}>
+                <DetailPanel
+                  task={selectedTask}
+                  onClose={() => setSelectedTaskId(null)}
+                  onToggleDone={toggleDone}
+                  onUpdateTask={handleUpdateTask}
+                  isTimerRunning={isTimerRunning}
+                  timerSeconds={timerSeconds}
+                  onStartTimer={handleStartTimer}
+                  onStopTimer={handleStopTimer}
+                  activeTimerTaskId={activeTimerTaskId}
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                />
+              </View>
+            )}
           </View>
-        )}
+
+        </View>
       </View>
 
       {/* Sidebar Overlay Drawer with slide-in animation for Mobile */}
       {!isLargeScreen && (sidebarVisible || isSidebarOpen) && (
-        <View style={styles.sidebarOverlay}>
+        <View style={[styles.sidebarOverlay, { top: insets.top }]}>
           <Animated.View
             style={[styles.backdropContainer, backdropAnimatedStyle]}
           >

@@ -28,6 +28,7 @@ interface SidebarProps {
   setShowCompleted: (val: boolean) => void;
   onDeleteProject: (name: string) => void;
   onDataChanged?: () => void;
+  hideHeader?: boolean;
 }
 
 const CURATED_COLORS = [
@@ -62,6 +63,7 @@ export default function Sidebar({
   setShowCompleted,
   onDeleteProject,
   onDataChanged,
+  hideHeader,
 }: SidebarProps) {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
@@ -230,9 +232,11 @@ export default function Sidebar({
 
   return (
     <View style={[styles.sidebar, { backgroundColor: colors.ghSurface, borderRightColor: colors.ghBorder }]}>
-      <View style={styles.header}>
-        <Text style={[styles.headerText, { color: colors.ghText }]}>Eidon</Text>
-      </View>
+      {!hideHeader && (
+        <View style={styles.header}>
+          <Text style={[styles.headerText, { color: colors.ghText }]}>Eidon</Text>
+        </View>
+      )}
       
       <ScrollView style={styles.menuList} contentContainerStyle={styles.menuListContent} {...{ delaysContentTouches: false }}>
         <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>WORKSPACE</Text>
