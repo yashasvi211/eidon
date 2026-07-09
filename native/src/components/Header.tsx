@@ -1,5 +1,4 @@
 import { View, Text, StyleSheet, TouchableOpacity, useColorScheme } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "@/constants/theme";
 
 interface HeaderProps {
@@ -17,7 +16,6 @@ export default function Header({
 }: HeaderProps) {
   const scheme = useColorScheme();
   const colors = Colors[scheme === "unspecified" ? "light" : scheme];
-  const insets = useSafeAreaInsets();
 
   return (
     <View
@@ -26,7 +24,6 @@ export default function Header({
         {
           backgroundColor: colors.ghBg,
           borderBottomColor: colors.ghBorder,
-          paddingTop: insets.top + 10,
         },
       ]}
     >
@@ -49,9 +46,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingBottom: 17,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    minHeight: 70,
+    minHeight: 56,
   },
   left: {
     flexDirection: "row",

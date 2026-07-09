@@ -19,7 +19,7 @@ export default function TabLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />
-        <RNStatusBar backgroundColor={colors.background} />
+        <RNStatusBar backgroundColor={colors.ghBg} translucent={false} />
         <Slot />
       </SafeAreaProvider>
     </GestureHandlerRootView>

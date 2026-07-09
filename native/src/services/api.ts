@@ -53,7 +53,29 @@ async function loadDb() {
       const parsed = JSON.parse(content);
       memoryDb = { ...memoryDb, ...parsed };
       if (!memoryDb.settings) {
-        memoryDb.settings = { ...memoryDb.settings };
+        memoryDb.settings = {
+          isSleeping: false,
+          sleepStartTime: null,
+          dropboxToken: '',
+          dropboxRefreshToken: '',
+          tokenExpiresAt: 0,
+          dropboxPath: '/eidon_db.json',
+          syncIntervalMinutes: 30,
+          lastSyncTime: null,
+          autoSyncEnabled: false,
+        };
+      } else {
+        memoryDb.settings = {
+          isSleeping: memoryDb.settings.isSleeping ?? false,
+          sleepStartTime: memoryDb.settings.sleepStartTime ?? null,
+          dropboxToken: memoryDb.settings.dropboxToken ?? '',
+          dropboxRefreshToken: memoryDb.settings.dropboxRefreshToken ?? '',
+          tokenExpiresAt: memoryDb.settings.tokenExpiresAt ?? 0,
+          dropboxPath: memoryDb.settings.dropboxPath ?? '/eidon_db.json',
+          syncIntervalMinutes: memoryDb.settings.syncIntervalMinutes ?? 30,
+          lastSyncTime: memoryDb.settings.lastSyncTime ?? null,
+          autoSyncEnabled: memoryDb.settings.autoSyncEnabled ?? false,
+        };
       }
     }
   } catch (err) {

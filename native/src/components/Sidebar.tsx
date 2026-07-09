@@ -61,6 +61,7 @@ export default function Sidebar({
   showCompleted,
   setShowCompleted,
   onDeleteProject,
+  onDataChanged,
 }: SidebarProps) {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
