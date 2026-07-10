@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <rect id="bg" width="1024" height="1024" fill="none" pointer-events="all"/>
+    <!-- Bar color gradients (updated coordinates) -->
+    <linearGradient id="bar1c" x1="353.4" y1="179.2" x2="729.1" y2="179.2" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2dd4bf"/><stop offset="100%" stop-color="#818cf8"/>
+    </linearGradient>
+    <linearGradient id="bar2c" x1="353.4" y1="179.2" x2="631.6" y2="179.2" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2dd4bf" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#818cf8" stop-opacity="0.4"/>
+    </linearGradient>
+    <linearGradient id="bar3c" x1="353.4" y1="179.2" x2="534.1" y2="179.2" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2dd4bf" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#818cf8" stop-opacity="0.15"/>
+    </linearGradient>
+
+    <!-- 3D top highlight overlay -->
+    <linearGradient id="hi" x1="0" y1="179.2" x2="179.2" y2="1">
+      <stop offset="0%" stop-color="#fff" stop-opacity="0.28"/>
+      <stop offset="40%" stop-color="#fff" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0.18"/>
+    </linearGradient>
+
+    <!-- Circle specular highlight -->
+    <radialGradient id="cspec" cx="0.32" cy="0.32" r="0.68">
+      <stop offset="0%" stop-color="#fff" stop-opacity="0.14"/>
+      <stop offset="100%" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Drop shadow for bars -->
+    <filter id="bdrop" x="-8%" y="-10%" width="116%" height="135%">
+      <feDropShadow dx="0" dy="9.1" stdDeviation="13" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+
+    <!-- Glow behind first bar -->
+    <filter id="bglow" x="-12%" y="-22%" width="124%" height="160%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="16.9" result="b"/>
+      <feColorMatrix in="b" type="matrix"
+        values="0 0 0 0 0.18  0 0 0 0 0.48  0 0 0 0 0.82  0 0 0 0.28 0" result="cb"/>
+      <feMerge><feMergeNode in="cb"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <!-- Circle shadow -->
+    <filter id="cdrop" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="2.6" stdDeviation="3.9" flood-color="#000" flood-opacity="0.55"/>
+    </filter>
+
+    <!-- Clip paths for 3D overlays -->
+    <clipPath id="c1"><rect x="353.4" y="324.8" width="375.7" height="80.6" rx="40.3"/></clipPath>
+    <clipPath id="c2"><rect x="353.4" y="471.7" width="278.2" height="80.6" rx="40.3"/></clipPath>
+    <clipPath id="c3"><rect x="353.4" y="619.9" width="180.7" height="80.6" rx="40.3"/></clipPath>
+  </defs>
+
+  <use href="#bg"/>
+
+  <!-- ===== BAR 1 — full length, glowing ===== -->
+  <g filter="url(#bglow)">
+    <rect x="353.4" y="324.8" width="375.7" height="80.6" rx="40.3" fill="url(#bar1c)"/>
+    <rect x="353.4" y="324.8" width="375.7" height="80.6" rx="40.3" fill="url(#hi)" clip-path="url(#c1)"/>
+    <rect x="374.2" y="326.75" width="334.1" height="3.25" rx="1.62" fill="#fff" opacity="0.18" clip-path="url(#c1)"/>
+    <rect x="374.2" y="401.5" width="334.1" height="2.86" rx="1.43" fill="#000" opacity="0.12" clip-path="url(#c1)"/>
+  </g>
+
+  <!-- ===== BAR 2 — medium ===== -->
+  <g filter="url(#bdrop)">
+    <rect x="353.4" y="471.7" width="278.2" height="80.6" rx="40.3" fill="url(#bar2c)"/>
+    <rect x="353.4" y="471.7" width="278.2" height="80.6" rx="40.3" fill="url(#hi)" clip-path="url(#c2)"/>
+    <rect x="374.2" y="473.65" width="236.6" height="2.6" rx="1.3" fill="#fff" opacity="0.1" clip-path="url(#c2)"/>
+    <rect x="374.2" y="548.4" width="236.6" height="2.34" rx="1.17" fill="#000" opacity="0.08" clip-path="url(#c2)"/>
+  </g>
+
+  <!-- ===== BAR 3 — short ===== -->
+  <g filter="url(#bdrop)">
+    <rect x="353.4" y="619.9" width="180.7" height="80.6" rx="40.3" fill="url(#bar3c)"/>
+    <rect x="353.4" y="619.9" width="180.7" height="80.6" rx="40.3" fill="url(#hi)" clip-path="url(#c3)"/>
+    <rect x="374.2" y="621.85" width="139.1" height="2.34" rx="1.17" fill="#fff" opacity="0.05" clip-path="url(#c3)"/>
+    <rect x="374.2" y="696.6" width="139.1" height="1.82" rx="0.91" fill="#000" opacity="0.05" clip-path="url(#c3)"/>
+  </g>
+
+  <!-- ===== CIRCLE 1 — active (teal stroke) ===== -->
+  <g filter="url(#cdrop)">
+    <circle cx="317" cy="365.1" r="20.8" fill="#0d1120"/>
+    <circle cx="317" cy="365.1" r="20.8" fill="none" stroke="#4de8d0" stroke-opacity="0.7" stroke-width="3.64"/>
+    <circle cx="317" cy="365.1" r="16.9" fill="none" stroke="#4de8d0" stroke-opacity="0.08" stroke-width="1.3"/>
+    <circle cx="317" cy="365.1" r="20.8" fill="url(#cspec)"/>
+    <circle cx="311.8" cy="359.9" r="4.16" fill="#fff" opacity="0.1"/>
+  </g>
+
+  <!-- ===== CIRCLE 2 — dim ===== -->
+  <g filter="url(#cdrop)">
+    <circle cx="317" cy="512" r="20.8" fill="#0d1120"/>
+    <circle cx="317" cy="512" r="20.8" fill="none" stroke="#fff" stroke-opacity="0.14" stroke-width="2.86"/>
+    <circle cx="317" cy="512" r="16.9" fill="none" stroke="#fff" stroke-opacity="0.04" stroke-width="1.04"/>
+    <circle cx="317" cy="512" r="20.8" fill="url(#cspec)"/>
+    <circle cx="311.8" cy="506.8" r="4.16" fill="#fff" opacity="0.06"/>
+  </g>
+
+  <!-- ===== CIRCLE 3 — faintest ===== -->
+  <g filter="url(#cdrop)">
+    <circle cx="317" cy="658.9" r="20.8" fill="#0d1120"/>
+    <circle cx="317" cy="658.9" r="20.8" fill="none" stroke="#fff" stroke-opacity="0.07" stroke-width="2.6"/>
+    <circle cx="317" cy="658.9" r="41.6" fill="url(#cspec)"/>
+    <circle cx="311.8" cy="653.7" r="4.16" fill="#fff" opacity="0.03"/>
+  </g>
+</svg>
