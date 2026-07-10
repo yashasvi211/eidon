@@ -25,32 +25,14 @@ export default function CalendarModal({ visible, onClose, onSelectDate, initialD
   const opacityAnim = useRef(new RNAnimated.Value(0)).current;
 
   useEffect(() => {
-    if (visible) {
-      scaleAnim.setValue(0.9);
-      opacityAnim.setValue(0);
-      RNAnimated.parallel([
-        RNAnimated.spring(scaleAnim, {
-          toValue: 1,
-          tension: 20,
-          friction: 10,
-          useNativeDriver: true,
-        }),
-        RNAnimated.timing(opacityAnim, {
-          toValue: 1,
-          duration: 350,
-          useNativeDriver: true,
-        }),
-      ]).start();
-
-      if (initialDateStr) {
-        const parts = initialDateStr.split("/");
-        if (parts.length === 3) {
-          const d = Number(parts[0]);
-          const m = Number(parts[1]) - 1;
-          const y = Number(parts[2]);
-          if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
-            setViewDate(new Date(y, m, d));
-          }
+    if (visible && initialDateStr) {
+      const parts = initialDateStr.split("/");
+      if (parts.length === 3) {
+        const d = Number(parts[0]);
+        const m = Number(parts[1]) - 1;
+        const y = Number(parts[2]);
+        if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
+          setViewDate(new Date(y, m, d));
         }
       }
     }
@@ -130,16 +112,33 @@ export default function CalendarModal({ visible, onClose, onSelectDate, initialD
 
   const monthLabel = viewDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
+  const animateOpen = () => {
+    scaleAnim.setValue(0.9);
+    opacityAnim.setValue(0);
+    RNAnimated.parallel([
+      RNAnimated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 20,
+        friction: 10,
+        useNativeDriver: true,
+      }),
+      RNAnimated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={() => animateClose(onClose)}>
-      <View style={styles.modalOverlayTime}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={() => animateClose(onClose)} onShow={animateOpen}>
+      <RNAnimated.View style={[styles.modalOverlayTime, { opacity: opacityAnim }]}>
         <RNAnimated.View
           style={[
             styles.calendarModalContent,
             {
               backgroundColor: colors.ghSurface,
               borderColor: colors.ghBorder,
-              opacity: opacityAnim,
               transform: [{ scale: scaleAnim }],
             },
           ]}
@@ -194,7 +193,7 @@ export default function CalendarModal({ visible, onClose, onSelectDate, initialD
             <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: "600" }}>Cancel</Text>
           </TouchableOpacity>
         </RNAnimated.View>
-      </View>
+      </RNAnimated.View>
     </Modal>
   );
 }

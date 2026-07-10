@@ -44,23 +44,7 @@ export default function LogTimeModal({
   const opacityAnim = useRef(new RNAnimated.Value(0)).current;
 
   useEffect(() => {
-    if (visible) {
-      scaleAnim.setValue(0.9);
-      opacityAnim.setValue(0);
-      RNAnimated.parallel([
-        RNAnimated.spring(scaleAnim, {
-          toValue: 1,
-          tension: 20,
-          friction: 10,
-          useNativeDriver: true,
-        }),
-        RNAnimated.timing(opacityAnim, {
-          toValue: 1,
-          duration: 350,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
+    // Keep for any non-animation side-effects if needed in the future
   }, [visible]);
 
   const animateClose = (callback: () => void) => {
@@ -89,16 +73,33 @@ export default function LogTimeModal({
     }
   };
 
+  const animateOpen = () => {
+    scaleAnim.setValue(0.9);
+    opacityAnim.setValue(0);
+    RNAnimated.parallel([
+      RNAnimated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 20,
+        friction: 10,
+        useNativeDriver: true,
+      }),
+      RNAnimated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={handleCancel}>
-      <View style={styles.modalOverlayTime}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={handleCancel} onShow={animateOpen}>
+      <RNAnimated.View style={[styles.modalOverlayTime, { opacity: opacityAnim }]}>
         <RNAnimated.View
           style={[
             styles.modalContentTime,
             {
               backgroundColor: colors.ghSurface,
               borderColor: colors.ghBorder,
-              opacity: opacityAnim,
               transform: [{ scale: scaleAnim }],
             },
           ]}
@@ -207,7 +208,7 @@ export default function LogTimeModal({
             </TouchableOpacity>
           </View>
         </RNAnimated.View>
-      </View>
+      </RNAnimated.View>
     </Modal>
   );
 }

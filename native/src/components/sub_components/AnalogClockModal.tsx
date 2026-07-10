@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   Modal,
+  ScrollView,
   Animated as RNAnimated,
 } from "react-native";
 
@@ -17,44 +18,145 @@ interface AnalogClockModalProps {
   title: string;
 }
 
+interface ScrollWheelProps {
+  items: string[];
+  selectedValue: string;
+  onValueChange: (val: string) => void;
+  colors: any;
+  visible: boolean;
+}
+
+function ScrollWheel({ items, selectedValue, onValueChange, colors, visible }: ScrollWheelProps) {
+  const scrollViewRef = useRef<ScrollView>(null);
+  const itemHeight = 44; // slightly taller for better centering room
+  const listHeight = itemHeight * 3; // shows 3 items
+  const scrollY = useRef(new RNAnimated.Value(0)).current;
+  const activeIndex = items.indexOf(selectedValue);
+
+  // Scroll to active index only when modal opens
+  useEffect(() => {
+    if (visible && activeIndex !== -1) {
+      const timer = setTimeout(() => {
+        scrollViewRef.current?.scrollTo({ y: activeIndex * itemHeight, animated: false });
+        scrollY.setValue(activeIndex * itemHeight);
+      }, 120);
+      return () => clearTimeout(timer);
+    }
+  }, [visible]);
+
+  // After momentum/snap settles, just update state
+  const handleMomentumEnd = (event: any) => {
+    const y = event.nativeEvent.contentOffset.y;
+    const index = Math.round(y / itemHeight);
+    const clampedIndex = Math.max(0, Math.min(index, items.length - 1));
+    const val = items[clampedIndex];
+    if (val !== selectedValue) {
+      onValueChange(val);
+    }
+  };
+
+  return (
+    <View style={[styles.wheelContainer, { height: listHeight }]}>
+      {/* Highlight bar behind the center item */}
+      <View
+        style={[
+          styles.wheelHighlight,
+          {
+            top: itemHeight,
+            height: itemHeight,
+            borderColor: colors.ghBorder,
+            backgroundColor: colors.ghSurface2,
+          },
+        ]}
+        pointerEvents="none"
+      />
+
+      <RNAnimated.ScrollView
+        ref={scrollViewRef as any}
+        showsVerticalScrollIndicator={false}
+        snapToInterval={itemHeight}      // continuous snap woven into deceleration
+        decelerationRate={0.985}         // slow enough to glide many items, no abrupt stop
+        scrollEventThrottle={16}
+        onScroll={RNAnimated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
+        )}
+        onMomentumScrollEnd={handleMomentumEnd}
+        contentContainerStyle={{
+          paddingVertical: itemHeight,
+        }}
+      >
+        {items.map((item, idx) => {
+          const inputRange = [
+            (idx - 1) * itemHeight,
+            idx * itemHeight,
+            (idx + 1) * itemHeight,
+          ];
+
+          const scale = scrollY.interpolate({
+            inputRange,
+            outputRange: [0.78, 1.08, 0.78],
+            extrapolate: "clamp",
+          });
+
+          const opacity = scrollY.interpolate({
+            inputRange,
+            outputRange: [0.3, 1.0, 0.3],
+            extrapolate: "clamp",
+          });
+
+          const isSelected = idx === activeIndex;
+
+          return (
+            <RNAnimated.View
+              key={idx}
+              style={[
+                styles.wheelItem,
+                {
+                  height: itemHeight,
+                  transform: [{ scale }],
+                  opacity,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.wheelItemText,
+                  {
+                    color: isSelected ? colors.ghBlue : colors.ghText,
+                    fontWeight: isSelected ? "700" : "400",
+                  },
+                ]}
+              >
+                {item}
+              </Text>
+            </RNAnimated.View>
+          );
+        })}
+      </RNAnimated.ScrollView>
+    </View>
+  );
+}
+
 export default function AnalogClockModal({ visible, onClose, onSelectTime, initialTimeStr, colors, title }: AnalogClockModalProps) {
   const [hour, setHour] = useState(9);
   const [minute, setMinute] = useState(0);
   const [ampm, setAmPm] = useState<"AM" | "PM">("AM");
-  const [mode, setMode] = useState<"hour" | "minute">("hour");
-
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragAngle, setDragAngle] = useState(0);
 
   // Animation values
   const scaleAnim = useRef(new RNAnimated.Value(0.9)).current;
   const opacityAnim = useRef(new RNAnimated.Value(0)).current;
 
-  useEffect(() => {
-    if (visible) {
-      scaleAnim.setValue(0.9);
-      opacityAnim.setValue(0);
-      RNAnimated.parallel([
-        RNAnimated.spring(scaleAnim, {
-          toValue: 1,
-          tension: 20,
-          friction: 10,
-          useNativeDriver: true,
-        }),
-        RNAnimated.timing(opacityAnim, {
-          toValue: 1,
-          duration: 350,
-          useNativeDriver: true,
-        }),
-      ]).start();
+  // Generate lists
+  const hoursArray = useMemo(() => Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0")), []);
+  const minutesArray = useMemo(() => Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0")), []);
 
-      if (initialTimeStr) {
-        const parsed = parseInitTime(initialTimeStr);
-        setHour(parsed.hour);
-        setMinute(parsed.minute);
-        setAmPm(parsed.ampm);
-        setMode("hour");
-      }
+  useEffect(() => {
+    if (visible && initialTimeStr) {
+      const parsed = parseInitTime(initialTimeStr);
+      setHour(parsed.hour);
+      setMinute(parsed.minute);
+      setAmPm(parsed.ampm);
     }
   }, [visible, initialTimeStr]);
 
@@ -69,45 +171,6 @@ export default function AnalogClockModal({ visible, onClose, onSelectTime, initi
       };
     }
     return { hour: 9, minute: 0, ampm: "AM" as const };
-  };
-
-  const handleClockInteraction = (x: number, y: number) => {
-    const dx = x - 100;
-    const dy = y - 100;
-    const angleRad = Math.atan2(dy, dx);
-    let angleDeg = (angleRad * 180) / Math.PI;
-    let clockAngle = (angleDeg + 90) % 360;
-    if (clockAngle < 0) clockAngle += 360;
-
-    // Set smooth rotation angle
-    setDragAngle(clockAngle);
-
-    if (mode === "hour") {
-      let h = Math.round(clockAngle / 30);
-      if (h === 0) h = 12;
-      setHour(h);
-    } else {
-      let m = Math.round(clockAngle / 6) % 60;
-      setMinute(m);
-    }
-  };
-
-  const handleClockTouch = (event: any) => {
-    setIsDragging(true);
-    const { locationX, locationY } = event.nativeEvent;
-    handleClockInteraction(locationX, locationY);
-  };
-
-  const handleClockTouchMove = (event: any) => {
-    const { locationX, locationY } = event.nativeEvent;
-    handleClockInteraction(locationX, locationY);
-  };
-
-  const handleClockTouchEnd = () => {
-    setIsDragging(false);
-    if (mode === "hour") {
-      setMode("minute");
-    }
   };
 
   const animateClose = (callback: () => void) => {
@@ -134,26 +197,33 @@ export default function AnalogClockModal({ visible, onClose, onSelectTime, initi
     });
   };
 
-  const handAngle = isDragging
-    ? dragAngle
-    : mode === "hour"
-    ? hour * 30
-    : minute * 6;
-
-  const handAngleRad = ((handAngle - 90) * Math.PI) / 180;
-  const handX = 100 + 72 * Math.cos(handAngleRad);
-  const handY = 100 + 72 * Math.sin(handAngleRad);
+  const animateOpen = () => {
+    scaleAnim.setValue(0.9);
+    opacityAnim.setValue(0);
+    RNAnimated.parallel([
+      RNAnimated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 20,
+        friction: 10,
+        useNativeDriver: true,
+      }),
+      RNAnimated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
 
   return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={() => animateClose(onClose)}>
-      <View style={styles.modalOverlayTime}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={() => animateClose(onClose)} onShow={animateOpen}>
+      <RNAnimated.View style={[styles.modalOverlayTime, { opacity: opacityAnim }]}>
         <RNAnimated.View
           style={[
             styles.clockModalContent,
             {
               backgroundColor: colors.ghSurface,
               borderColor: colors.ghBorder,
-              opacity: opacityAnim,
               transform: [{ scale: scaleAnim }],
               alignItems: "center",
             },
@@ -167,80 +237,43 @@ export default function AnalogClockModal({ visible, onClose, onSelectTime, initi
           {/* Large Time Display Header */}
           <View style={styles.clockHeader}>
             <View style={styles.clockHeaderTimeRow}>
-              <TouchableOpacity onPress={() => setMode("hour")}>
-                <Text style={[styles.clockHeaderText, mode === "hour" ? { color: colors.ghBlue } : { color: colors.ghMuted }]}>
-                  {String(hour).padStart(2, "0")}
-                </Text>
-              </TouchableOpacity>
-              <Text style={[styles.clockHeaderText, { color: colors.ghMuted }]}>:</Text>
-              <TouchableOpacity onPress={() => setMode("minute")}>
-                <Text style={[styles.clockHeaderText, mode === "minute" ? { color: colors.ghBlue } : { color: colors.ghMuted }]}>
-                  {String(minute).padStart(2, "0")}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.clockAmPmCol}>
-              <TouchableOpacity onPress={() => setAmPm("AM")} style={[styles.ampmBtn, ampm === "AM" && { backgroundColor: colors.ghSurface2, borderRadius: 4 }]}>
-                <Text style={[styles.ampmBtnText, { color: ampm === "AM" ? colors.ghText : colors.ghMuted }]}>AM</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setAmPm("PM")} style={[styles.ampmBtn, ampm === "PM" && { backgroundColor: colors.ghSurface2, borderRadius: 4 }]}>
-                <Text style={[styles.ampmBtnText, { color: ampm === "PM" ? colors.ghText : colors.ghMuted }]}>PM</Text>
-              </TouchableOpacity>
+              <Text style={[styles.clockHeaderText, { color: colors.ghBlue }]}>
+                {String(hour).padStart(2, "0")}
+              </Text>
+              <Text style={[styles.clockHeaderText, { color: colors.ghMuted, marginHorizontal: 4 }]}>:</Text>
+              <Text style={[styles.clockHeaderText, { color: colors.ghBlue }]}>
+                {String(minute).padStart(2, "0")}
+              </Text>
+              <Text style={[styles.ampmText, { color: colors.ghText, marginLeft: 10 }]}>
+                {ampm}
+              </Text>
             </View>
           </View>
 
-          {/* Clock Face Selector */}
-          <View
-            style={[styles.clockFace, { backgroundColor: colors.ghBg, borderColor: colors.ghBorder }]}
-            onTouchStart={handleClockTouch}
-            onTouchMove={handleClockTouchMove}
-            onTouchEnd={handleClockTouchEnd}
-          >
-            {/* Center point */}
-            <View pointerEvents="none" style={[styles.clockCenter, { backgroundColor: colors.ghBlue }]} />
-
-            {/* Selection line */}
-            <View
-              pointerEvents="none"
-              style={[
-                styles.clockHand,
-                {
-                  backgroundColor: colors.ghBlue,
-                  transform: [
-                    { translateY: 36 },
-                    { rotate: `${handAngle}deg` },
-                    { translateY: -36 },
-                  ],
-                },
-              ]}
+          {/* iOS Style Drum Wheel Picker Row */}
+          <View style={styles.pickerRow}>
+            <ScrollWheel
+              items={hoursArray}
+              selectedValue={String(hour).padStart(2, "0")}
+              onValueChange={(val) => setHour(Number(val))}
+              colors={colors}
+              visible={visible}
             />
-
-            {/* Selected point circle */}
-            <View pointerEvents="none" style={[styles.clockHandCircle, { left: handX - 14, top: handY - 14, backgroundColor: colors.ghBlue }]} />
-
-            {/* Numbers */}
-            {Array.from({ length: 12 }).map((_, i) => {
-              const num = i + 1;
-              const displayVal = mode === "hour" ? num : String((num * 5) % 60).padStart(2, "0");
-              const angleRad = ((num * 30 - 90) * Math.PI) / 180;
-              const x = 100 + 72 * Math.cos(angleRad) - 10;
-              const y = 100 + 72 * Math.sin(angleRad) - 10;
-              const isSelected = mode === "hour" ? hour === num : minute === (num * 5) % 60;
-
-              return (
-                <View key={i} pointerEvents="none" style={[styles.clockNumberBox, { left: x, top: y }]}>
-                  <Text
-                    style={[
-                      styles.clockNumberText,
-                      { color: isSelected ? "#ffffff" : colors.ghText },
-                      isSelected && { fontWeight: "700" },
-                    ]}
-                  >
-                    {displayVal}
-                  </Text>
-                </View>
-              );
-            })}
+            <Text style={[styles.separator, { color: colors.ghMuted }]}>:</Text>
+            <ScrollWheel
+              items={minutesArray}
+              selectedValue={String(minute).padStart(2, "0")}
+              onValueChange={(val) => setMinute(Number(val))}
+              colors={colors}
+              visible={visible}
+            />
+            <ScrollWheel
+              items={["AM", "PM"]}
+              selectedValue={ampm}
+              onValueChange={(val) => setAmPm(val as "AM" | "PM")}
+              colors={colors}
+              visible={visible}
+            />
           </View>
 
           {/* Footer Actions */}
@@ -253,7 +286,7 @@ export default function AnalogClockModal({ visible, onClose, onSelectTime, initi
             </TouchableOpacity>
           </View>
         </RNAnimated.View>
-      </View>
+      </RNAnimated.View>
     </Modal>
   );
 }
@@ -268,7 +301,7 @@ const styles = StyleSheet.create({
   },
   clockModalContent: {
     width: "100%",
-    maxWidth: 280,
+    maxWidth: 290,
     borderRadius: 12,
     borderWidth: 1,
     padding: 20,
@@ -278,77 +311,58 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 16,
     marginBottom: 20,
   },
   clockHeaderTimeRow: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "baseline",
   },
   clockHeaderText: {
-    fontSize: 32,
+    fontSize: 34,
     fontWeight: "700",
   },
-  clockAmPmCol: {
-    flexDirection: "column",
-    gap: 4,
+  ampmText: {
+    fontSize: 18,
+    fontWeight: "600",
   },
-  ampmBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+  pickerRow: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+    marginVertical: 10,
+    gap: 8,
+    width: "100%",
   },
-  ampmBtnText: {
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  clockFace: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    borderWidth: 1,
+  wheelContainer: {
+    width: 68,
     position: "relative",
-    marginBottom: 20,
+    overflow: "hidden",
   },
-  clockCenter: {
+  wheelHighlight: {
     position: "absolute",
-    left: 97,
-    top: 97,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    left: 0,
+    right: 0,
+    borderRadius: 8,
+    borderWidth: 1,
   },
-  clockHand: {
-    position: "absolute",
-    left: 99,
-    top: 28,
-    width: 2,
-    height: 72,
-  },
-  clockHandCircle: {
-    position: "absolute",
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    opacity: 0.4,
-  },
-  clockNumberBox: {
-    position: "absolute",
-    width: 20,
-    height: 20,
-    alignItems: "center",
+  wheelItem: {
     justifyContent: "center",
+    alignItems: "center",
+    width: "100%",
   },
-  clockNumberText: {
-    fontSize: 12,
-    fontFamily: "monospace",
+  wheelItemText: {
+    fontSize: 17,
+  },
+  separator: {
+    fontSize: 18,
+    fontWeight: "700",
   },
   clockFooter: {
     flexDirection: "row",
     justifyContent: "flex-end",
     gap: 10,
     width: "100%",
+    marginTop: 20,
   },
   btnTime: {
     paddingHorizontal: 16,
