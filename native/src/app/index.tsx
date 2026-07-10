@@ -338,7 +338,7 @@ export default function AppIndex() {
     api.updateTask(id, { done: isDone, completedAt })
       .then(() => {
         if (isDone) cancelTaskNotifications(id);
-        else syncTaskNotifications(tasks.find(t => t.id === id)!);
+        else syncTaskNotifications({ ...tasks.find(t => t.id === id)!, done: isDone, completedAt });
         return api.createAuditLog(id, auditEntry);
       })
       .catch((err: any) => {

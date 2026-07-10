@@ -158,6 +158,99 @@ const fmtRelativeTime = (timestamp: number) => {
   return new Date(timestamp).toLocaleDateString();
 };
 
+const formatDuration = (ms: number): string => {
+  if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
+  if (ms < 3_600_000) return `${Math.round(ms / 60_000)} min`;
+  if (ms < 86_400_000) {
+    const hours = Math.round(ms / 3_600_000);
+    return `${hours} hour${hours !== 1 ? 's' : ''}`;
+  }
+  const days = Math.round(ms / 86_400_000);
+  return `${days} day${days !== 1 ? 's' : ''}`;
+};
+
+const formatCountdown = (ms: number): string => {
+  if (ms < 0) return "0s";
+  const totalSecs = Math.floor(ms / 1000);
+  const d = Math.floor(totalSecs / 86400);
+  const h = Math.floor((totalSecs % 86400) / 3600);
+  const m = Math.floor((totalSecs % 3600) / 60);
+  const s = totalSecs % 60;
+  let res = [];
+  if (d > 0) res.push(`${d}d`);
+  if (h > 0) res.push(`${h}h`);
+  if (m > 0) res.push(`${m}m`);
+  res.push(`${s}s`);
+  return res.join(' ');
+};
+
+function getNextReminderTime(task: Task): number | null {
+  if (task.done || !task.due || !task.reminder || task.reminder.dismissed) return null;
+  const now = Date.now();
+  let targetDueTime: number;
+  if (task.dueTime) {
+    const [y, m, d] = task.due.split('-').map(Number);
+    const [h, min] = task.dueTime.split(':').map(Number);
+    targetDueTime = new Date(y, m - 1, d, h, min, 0, 0).getTime();
+  } else {
+    const [y, m, d] = task.due.split('-').map(Number);
+    targetDueTime = new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
+  }
+  const dueEndOfDay = new Date(targetDueTime);
+  dueEndOfDay.setHours(23, 59, 59, 999);
+  if (now >= dueEndOfDay.getTime()) return null;
+  if (task.dueTime && now >= targetDueTime) return null;
+
+  let scheduleTime = targetDueTime - task.reminder.remindBefore;
+  
+  if (scheduleTime <= now) {
+    if (!task.reminder.repeatEvery) {
+      return null;
+    } else {
+      while (scheduleTime <= now && scheduleTime < targetDueTime) {
+        scheduleTime += task.reminder.repeatEvery;
+      }
+      if (scheduleTime <= now || scheduleTime >= targetDueTime) return null;
+    }
+  }
+  return scheduleTime;
+}
+
+const ReminderCountdown = ({ task, colors }: { task: Task, colors: any }) => {
+  const [nextTime, setNextTime] = useState<number | null>(getNextReminderTime(task));
+  const [timeLeft, setTimeLeft] = useState<number>(0);
+
+  useEffect(() => {
+    setNextTime(getNextReminderTime(task));
+  }, [task]);
+
+  useEffect(() => {
+    if (!nextTime) return;
+    const update = () => {
+      const remaining = nextTime - Date.now();
+      if (remaining <= 0) {
+        setNextTime(getNextReminderTime(task));
+      } else {
+        setTimeLeft(remaining);
+      }
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, [nextTime, task]);
+
+  if (!nextTime) return null;
+
+  return (
+    <View style={styles.detailSection}>
+      <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>NEXT REMINDER (TESTING)</Text>
+      <Text style={{ color: colors.ghBlue, fontWeight: "600", fontSize: 13, fontFamily: "monospace" }}>
+        In {formatCountdown(timeLeft)}
+      </Text>
+    </View>
+  );
+};
+
 interface AuditIconConfig {
   iconName: string;
   library: "Feather" | "Octicons";
@@ -792,7 +885,7 @@ export default function DetailPanel({
             {task.due ? (
               <View style={styles.detailSection}>
                 <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
-                  DUE DATE
+                  DUE DATE & TIME
                 </Text>
                 <View style={styles.dueRow}>
                   <View
@@ -808,12 +901,32 @@ export default function DetailPanel({
                       fontWeight: "500",
                     }}
                   >
-                    {fmtDateDisplay(task.due)}{" "}
+                    {fmtDateDisplay(task.due)}
+                    {task.dueTime ? ` at ${task.dueTime}` : ""}
+                    {" "}
                     {dlInfo.label && `(${dlInfo.label})`}
                   </Text>
                 </View>
               </View>
             ) : null}
+
+            {task.reminder ? (
+              <View style={styles.detailSection}>
+                <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
+                  REMINDER SETTINGS
+                </Text>
+                <Text style={{ color: colors.ghText, fontSize: 13, marginBottom: 4 }}>
+                  Remind Me: {formatDuration(task.reminder.remindBefore)} before
+                </Text>
+                {task.reminder.repeatEvery ? (
+                  <Text style={{ color: colors.ghText, fontSize: 13 }}>
+                    Repeat Every: {formatDuration(task.reminder.repeatEvery)}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+
+            <ReminderCountdown task={task} colors={colors} />
 
             {task.notes ? (
               <View style={styles.detailSection}>
