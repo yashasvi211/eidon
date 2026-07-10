@@ -243,7 +243,7 @@ const ReminderCountdown = ({ task, colors }: { task: Task, colors: any }) => {
 
   return (
     <View style={styles.detailSection}>
-      <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>NEXT REMINDER (TESTING)</Text>
+      <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>NEXT REMINDER</Text>
       <Text style={{ color: colors.ghBlue, fontWeight: "600", fontSize: 13, fontFamily: "monospace" }}>
         In {formatCountdown(timeLeft)}
       </Text>
@@ -619,6 +619,9 @@ export default function DetailPanel({
   const isThisTaskTimerRunning =
     isTimerRunning && activeTimerTaskId === task.id;
 
+  const totalTimeSpentMs = (task.sessions || []).reduce((acc, sess) => acc + (sess.end - sess.start), 0) + (isThisTaskTimerRunning ? timerSeconds * 1000 : 0);
+  const timeSpentStr = totalTimeSpentMs > 0 ? fmtSeconds(Math.floor(totalTimeSpentMs / 1000)) : "0m";
+
   const handleToggleSubtask = (subId: string) => {
     const updatedSubtasks = subtasks.map((s) => {
       if (s.id !== subId) return s;
@@ -882,6 +885,31 @@ export default function DetailPanel({
               </View>
             ) : null}
 
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 24, paddingRight: 16 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
+                  SUBTASKS
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Octicons name="tasklist" size={14} color={colors.ghMuted} style={{ marginRight: 6 }} />
+                  <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: "500" }}>
+                    {subtasksDone} / {totalSubtasks}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
+                  TIME SPENT
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Feather name="clock" size={14} color={colors.ghMuted} style={{ marginRight: 6 }} />
+                  <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: "500" }}>
+                    {timeSpentStr}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
             {task.due ? (
               <View style={styles.detailSection}>
                 <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
@@ -915,13 +943,21 @@ export default function DetailPanel({
                 <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
                   REMINDER SETTINGS
                 </Text>
-                <Text style={{ color: colors.ghText, fontSize: 13, marginBottom: 4 }}>
-                  Remind Me: {formatDuration(task.reminder.remindBefore)} before
-                </Text>
-                {task.reminder.repeatEvery ? (
-                  <Text style={{ color: colors.ghText, fontSize: 13 }}>
-                    Repeat Every: {formatDuration(task.reminder.repeatEvery)}
+                
+                <View style={[styles.dueRow, { marginBottom: 8 }]}>
+                  <Feather name="bell" size={14} color={colors.ghBlue} style={{ marginRight: 6 }} />
+                  <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: "500" }}>
+                    Remind me {formatDuration(task.reminder.remindBefore)} before
                   </Text>
+                </View>
+
+                {task.reminder.repeatEvery ? (
+                  <View style={styles.dueRow}>
+                    <Feather name="repeat" size={14} color={colors.ghPurple} style={{ marginRight: 6 }} />
+                    <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: "500" }}>
+                      Repeat every {formatDuration(task.reminder.repeatEvery)}
+                    </Text>
+                  </View>
                 ) : null}
               </View>
             ) : null}
