@@ -73,6 +73,13 @@ export interface AuditEntry {
   };
 }
 
+export interface TaskReminder {
+  remindBefore: number;       // ms before due date to start reminding
+  repeatEvery?: number;       // ms between repeat notifications (optional)
+  lastNotifiedAt?: number;    // timestamp of last notification fired
+  dismissed?: boolean;        // user dismissed all reminders for this task
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -81,12 +88,14 @@ export interface Task {
   target: string;
   est?: string;
   due?: string;
+  dueTime?: string;
   notes?: string;
   subtasks?: Subtask[];
   sessions?: Session[];
   createdAt?: number;
   completedAt?: number | null;
   auditLog?: AuditEntry[];
+  reminder?: TaskReminder;
 }
 
 interface DetailPanelProps {

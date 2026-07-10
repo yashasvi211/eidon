@@ -7,6 +7,7 @@ import {
   useColorScheme,
   TouchableOpacity,
   Modal,
+  Platform,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,17 +24,59 @@ import ScheduledView from "../components/ScheduledView";
 import { Colors } from "../constants/theme";
 import Header from "../components/Header";
 import AddTaskModal from "../components/AddTaskModal";
+import type { ReminderConfig } from "../components/AddTaskModal";
+import NotificationBanner, { NotificationData } from "../components/NotificationBanner";
+import { checkReminders } from "../services/notifications";
+import * as Notifications from 'expo-notifications';
 import Animated, {
   Easing,
   useSharedValue,
   useAnimatedStyle,
   withTiming,
   runOnJS,
+  withRepeat,
 } from "react-native-reanimated";
 import { api } from "../services/api";
 
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+});
+
+const LoadingLine = ({ colors }: { colors: any }) => {
+  const translateX = useSharedValue(-200);
+
+  useEffect(() => {
+    translateX.value = withRepeat(
+      withTiming(200, { duration: 1000, easing: Easing.inOut(Easing.quad) }),
+      -1,
+      false
+    );
+  }, []);
+
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateX: translateX.value }],
+    };
+  });
+
+  return (
+    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.ghBg }}>
+      <View style={{ width: 200, height: 3, backgroundColor: colors.ghBorder, borderRadius: 2, overflow: "hidden" }}>
+        <Animated.View style={[{ width: '50%', height: "100%", backgroundColor: colors.ghBlue, borderRadius: 2 }, animatedStyle]} />
+      </View>
+      <Text style={{ marginTop: 16, color: colors.ghMuted, fontSize: 12, fontWeight: "600", letterSpacing: 1 }}>LOADING</Text>
+    </View>
+  );
+};
 
 export default function AppIndex() {
+  const [isAppLoading, setIsAppLoading] = useState(true);
   const { width } = useWindowDimensions();
   const isLargeScreen = width >= 768;
   const scheme = useColorScheme();
@@ -128,6 +171,57 @@ export default function AppIndex() {
 
   const [projects, setProjects] = useState<{ name: string; color: string }[]>([]);
 
+  // Notification/reminder state
+  const [activeNotification, setActiveNotification] = useState<NotificationData | null>(null);
+  const [notificationQueue, setNotificationQueue] = useState<NotificationData[]>([]);
+  const tasksRef = useRef<Task[]>(tasks);
+
+  // Keep ref in sync with tasks state
+  useEffect(() => { tasksRef.current = tasks; }, [tasks]);
+
+  // Background reminder checker — runs every 5s to support the 5s test interval
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const currentTasks = tasksRef.current;
+      const notifications = checkReminders(currentTasks);
+      if (notifications.length > 0) {
+        const now = Date.now();
+        // Update lastNotifiedAt for each notified task
+        const updatedTasks = currentTasks.map(t => {
+          const notif = notifications.find(n => n.taskId === t.id);
+          if (notif && t.reminder) {
+            const updatedReminder = { ...t.reminder, lastNotifiedAt: now };
+            api.updateTask(t.id, { reminder: updatedReminder }).catch(console.error);
+            // Trigger native local system notification
+            Notifications.scheduleNotificationAsync({
+              content: {
+                title: t.title,
+                body: notif.message,
+                sound: true,
+              },
+              trigger: null,
+            }).catch(console.error);
+            return { ...t, reminder: updatedReminder };
+          }
+          return t;
+        });
+        setTasks(updatedTasks);
+
+        // Queue the notifications
+        setNotificationQueue(prev => [...prev, ...notifications]);
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Pop next notification from queue when current one is dismissed
+  useEffect(() => {
+    if (!activeNotification && notificationQueue.length > 0) {
+      setActiveNotification(notificationQueue[0]);
+      setNotificationQueue(prev => prev.slice(1));
+    }
+  }, [activeNotification, notificationQueue]);
+
   // Sleep mode state
   const [isSleeping, setIsSleeping] = useState(false);
   const [sleepStartTime, setSleepStartTime] = useState<number | null>(null);
@@ -157,7 +251,7 @@ export default function AppIndex() {
     };
   }, [isTimerRunning, activeTimerTaskId]);
 
-  // Load tasks, projects, and settings on mount
+  // Load tasks, projects, and settings on mount, plus register notifications
   useEffect(() => {
     async function loadInitialData() {
       try {
@@ -178,9 +272,34 @@ export default function AppIndex() {
           "Load Failed",
           `Could not load data.\n\n${err?.message || err}`
         );
+      } finally {
+        setIsAppLoading(false);
       }
     }
+
+    async function registerForPushNotificationsAsync() {
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'default',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FF231F7C',
+        });
+      }
+
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') {
+        console.warn('Failed to get permissions for local notifications!');
+      }
+    }
+
     loadInitialData();
+    registerForPushNotificationsAsync();
   }, []);
 
   // Start auto-sync if enabled
@@ -276,6 +395,7 @@ export default function AppIndex() {
     const fieldsChanged =
       oldTask.title !== updatedTask.title ||
       oldTask.due !== updatedTask.due ||
+      oldTask.dueTime !== updatedTask.dueTime ||
       oldTask.est !== updatedTask.est ||
       oldTask.notes !== updatedTask.notes ||
       oldTask.project !== updatedTask.project ||
@@ -291,11 +411,13 @@ export default function AppIndex() {
           title: updatedTask.title,
           project: updatedTask.project,
           due: updatedTask.due,
+          dueTime: updatedTask.dueTime,
           est: updatedTask.est,
           notes: updatedTask.notes,
           done: updatedTask.done,
           completedAt: updatedTask.completedAt,
           target: updatedTask.target,
+          reminder: updatedTask.reminder,
         })
       );
     }
@@ -355,12 +477,15 @@ export default function AppIndex() {
     title: string,
     project: string = "Inbox",
     due?: string,
+    reminderConfig?: ReminderConfig,
+    dueTime?: string,
   ) => {
     const newTask: Task = {
       id: "t" + Date.now(),
       title,
       project,
       due,
+      dueTime,
       done: false,
       target:
         currentView === "backlog"
@@ -377,6 +502,9 @@ export default function AppIndex() {
           action: "created",
         },
       ],
+      reminder: reminderConfig
+        ? { ...reminderConfig, lastNotifiedAt: 0, dismissed: false }
+        : undefined,
     };
 
     api.createTask(newTask)
@@ -385,7 +513,7 @@ export default function AppIndex() {
           if (prev.some(t => t.id === newTask.id)) return prev;
           return [...prev, newTask];
         });
-        showToast("Task created!");
+        showToast(reminderConfig ? "Task created with reminder!" : "Task created!");
       })
       .catch((err: any) => {
         console.error("Failed to create task:", err);
@@ -630,6 +758,10 @@ export default function AppIndex() {
     }
   };
 
+  if (isAppLoading) {
+    return <LoadingLine colors={colors} />;
+  }
+
   return (
     <View
       style={{ flex: 1, backgroundColor: colors.ghBg }}
@@ -805,6 +937,16 @@ export default function AppIndex() {
           <Text style={styles.toastText}>{toastMessage}</Text>
         </View>
       )}
+
+      {/* Reminder Notification Banner */}
+      <NotificationBanner
+        notification={activeNotification}
+        onDismiss={() => setActiveNotification(null)}
+        onPress={(taskId) => {
+          setSelectedTaskId(taskId);
+          setActiveNotification(null);
+        }}
+      />
     </View>
   );
 }
