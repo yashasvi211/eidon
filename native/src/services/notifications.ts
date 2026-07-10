@@ -1,4 +1,5 @@
 import { Task } from '../components/DetailPanel';
+import * as Notifications from 'expo-notifications';
 
 export interface ReminderNotification {
   taskId: string;
@@ -126,3 +127,94 @@ export function validateReminder(
 
   return null;
 }
+
+/**
+ * Cancel all natively scheduled notifications for a given task.
+ */
+export async function cancelTaskNotifications(taskId: string) {
+  try {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const notif of scheduled) {
+      if (notif.identifier.startsWith(taskId + '_')) {
+        await Notifications.cancelScheduledNotificationAsync(notif.identifier);
+      }
+    }
+  } catch (err) {
+    console.error('Failed to cancel notifications for task:', taskId, err);
+  }
+}
+
+/**
+ * Sync natively scheduled notifications for a given task.
+ * Cancels old ones and schedules new ones if the task has an active reminder.
+ */
+export async function syncTaskNotifications(task: Task) {
+  await cancelTaskNotifications(task.id);
+
+  if (task.done || !task.due || !task.reminder || task.reminder.dismissed) {
+    return;
+  }
+
+  const now = Date.now();
+  const dueEndOfDay = getDueEndOfDay(task.due);
+
+  if (now >= dueEndOfDay) return;
+
+  let targetDueTime: number;
+  if (task.dueTime) {
+    const [y, m, d] = task.due.split('-').map(Number);
+    const [h, min] = task.dueTime.split(':').map(Number);
+    targetDueTime = new Date(y, m - 1, d, h, min, 0, 0).getTime();
+  } else {
+    const [y, m, d] = task.due.split('-').map(Number);
+    targetDueTime = new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
+  }
+
+  const reminderStartTime = targetDueTime - task.reminder.remindBefore;
+  
+  // If exact due time has passed, stop reminding
+  if (task.dueTime && now >= targetDueTime) return;
+
+  let scheduleTime = reminderStartTime;
+  
+  // If the reminder start time is in the past, maybe skip to the next repeat or schedule right now
+  if (scheduleTime <= now) {
+    if (!task.reminder.repeatEvery) {
+      scheduleTime = now + 2000;
+    } else {
+      while (scheduleTime <= now && scheduleTime < targetDueTime) {
+        scheduleTime += task.reminder.repeatEvery;
+      }
+    }
+  }
+
+  // Schedule up to 10 repeating notifications
+  let count = 0;
+  while (scheduleTime < targetDueTime && count < 10) {
+    const timeLeft = Math.max(0, targetDueTime - scheduleTime);
+    const message = task.dueTime
+      ? `Due at ${task.dueTime} (${formatDuration(timeLeft)} left)` + (count > 0 ? ' — reminder' : '')
+      : `Due in ${formatDuration(dueEndOfDay - scheduleTime)}` + (count > 0 ? ' — reminder' : '');
+
+    try {
+      await Notifications.scheduleNotificationAsync({
+        identifier: `${task.id}_${count}`,
+        content: {
+          title: task.title,
+          body: message,
+          sound: true,
+        },
+        trigger: { date: new Date(scheduleTime) },
+      });
+    } catch (err) {
+      console.error('Failed to schedule notification', err);
+    }
+
+    count++;
+    if (!task.reminder.repeatEvery || task.reminder.repeatEvery <= 0) {
+      break;
+    }
+    scheduleTime += task.reminder.repeatEvery;
+  }
+}
+

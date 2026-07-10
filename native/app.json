@@ -11,6 +11,10 @@
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.eidon.app"
     },
+    "notification": {
+      "icon": "./assets/images/notification-icon.png",
+      "color": "#5cb8d7"
+    },
     "android": {
       "package": "com.eidon.app",
       "adaptiveIcon": {

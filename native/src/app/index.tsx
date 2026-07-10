@@ -26,7 +26,7 @@ import Header from "../components/Header";
 import AddTaskModal from "../components/AddTaskModal";
 import type { ReminderConfig } from "../components/AddTaskModal";
 import NotificationBanner, { NotificationData } from "../components/NotificationBanner";
-import { checkReminders } from "../services/notifications";
+import { syncTaskNotifications, cancelTaskNotifications } from "../services/notifications";
 import * as Notifications from 'expo-notifications';
 import Animated, {
   Easing,
@@ -179,40 +179,7 @@ export default function AppIndex() {
   // Keep ref in sync with tasks state
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
 
-  // Background reminder checker — runs every 5s to support the 5s test interval
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const currentTasks = tasksRef.current;
-      const notifications = checkReminders(currentTasks);
-      if (notifications.length > 0) {
-        const now = Date.now();
-        // Update lastNotifiedAt for each notified task
-        const updatedTasks = currentTasks.map(t => {
-          const notif = notifications.find(n => n.taskId === t.id);
-          if (notif && t.reminder) {
-            const updatedReminder = { ...t.reminder, lastNotifiedAt: now };
-            api.updateTask(t.id, { reminder: updatedReminder }).catch(console.error);
-            // Trigger native local system notification
-            Notifications.scheduleNotificationAsync({
-              content: {
-                title: t.title,
-                body: notif.message,
-                sound: true,
-              },
-              trigger: null,
-            }).catch(console.error);
-            return { ...t, reminder: updatedReminder };
-          }
-          return t;
-        });
-        setTasks(updatedTasks);
-
-        // Queue the notifications
-        setNotificationQueue(prev => [...prev, ...notifications]);
-      }
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
+  // Remove polling loop in favor of native OS-scheduled notifications
 
   // Pop next notification from queue when current one is dismissed
   useEffect(() => {
@@ -369,7 +336,11 @@ export default function AppIndex() {
     );
 
     api.updateTask(id, { done: isDone, completedAt })
-      .then(() => api.createAuditLog(id, auditEntry))
+      .then(() => {
+        if (isDone) cancelTaskNotifications(id);
+        else syncTaskNotifications(tasks.find(t => t.id === id)!);
+        return api.createAuditLog(id, auditEntry);
+      })
       .catch((err: any) => {
         console.error("Failed to update task:", err);
         setTasks(previousTasks);
@@ -471,6 +442,8 @@ export default function AppIndex() {
         showErrorAlert("Save Failed", `Could not save.\n\n${err?.message || err}`);
       });
     }
+    
+    syncTaskNotifications(updatedTask);
   };
 
   const handleAddTask = (
@@ -513,6 +486,7 @@ export default function AppIndex() {
           if (prev.some(t => t.id === newTask.id)) return prev;
           return [...prev, newTask];
         });
+        syncTaskNotifications(newTask);
         showToast(reminderConfig ? "Task created with reminder!" : "Task created!");
       })
       .catch((err: any) => {
