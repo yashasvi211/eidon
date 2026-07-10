@@ -15,8 +15,7 @@
       "package": "com.eidon.app",
       "adaptiveIcon": {
         "backgroundColor": "#0d1117",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png"
+        "foregroundImage": "./assets/images/android-icon-foreground.png"
       },
       "predictiveBackGestureEnabled": false,
       "softwareKeyboardLayoutMode": "pan"
