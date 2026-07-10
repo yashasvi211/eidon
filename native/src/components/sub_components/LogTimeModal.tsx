@@ -23,6 +23,7 @@ interface LogTimeModalProps {
   onChangeNote: (text: string) => void;
   addSessionError: string;
   onSave: () => boolean;
+  saveSuccess?: boolean;
 }
 
 export default function LogTimeModal({
@@ -38,10 +39,18 @@ export default function LogTimeModal({
   onChangeNote,
   addSessionError,
   onSave,
+  saveSuccess = false,
 }: LogTimeModalProps) {
   // Animation values
   const scaleAnim = useRef(new RNAnimated.Value(0.9)).current;
   const opacityAnim = useRef(new RNAnimated.Value(0)).current;
+
+  // Watch saveSuccess to trigger smooth close
+  useEffect(() => {
+    if (saveSuccess) {
+      animateClose(onClose);
+    }
+  }, [saveSuccess]);
 
   useEffect(() => {
     // Keep for any non-animation side-effects if needed in the future

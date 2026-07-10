@@ -6,6 +6,7 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
+  withTiming,
   interpolate,
   Extrapolation,
 } from "react-native-reanimated";
@@ -170,6 +171,12 @@ export default function ConfirmationModal({ visible, onClose, onConfirm, title, 
     };
   });
 
+  const contentStyle = useAnimatedStyle(() => {
+    return {
+      opacity: isSuccess ? withTiming(0, { duration: 100 }) : 1,
+    };
+  });
+
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={() => animateClose(onClose)} onShow={animateOpen}>
       <GestureHandlerRootView style={{ flex: 1 }}>
@@ -184,33 +191,35 @@ export default function ConfirmationModal({ visible, onClose, onConfirm, title, 
               },
             ]}
           >
-            <Text style={[styles.title, { color: colors.ghText }]}>{title}</Text>
-            <Text style={[styles.description, { color: colors.ghMuted }]}>{description}</Text>
+            <Animated.View style={contentStyle}>
+              <Text style={[styles.title, { color: colors.ghText }]}>{title}</Text>
+              <Text style={[styles.description, { color: colors.ghMuted }]}>{description}</Text>
 
-            <View style={styles.actionContainer}>
-              <SwipeButton
-                text="Swipe to Confirm"
-                onSwipeSuccess={handleSwipeSuccess}
-                colors={colors}
-                isLoading={isLoading}
-                isSuccess={isSuccess}
-              />
-            </View>
-            
-            <TouchableOpacity 
-              disabled={isLoading || isSuccess}
-              style={[
-                styles.cancelBtn, 
-                { 
-                  borderColor: colors.ghBorder, 
-                  backgroundColor: colors.ghSurface2,
-                  opacity: (isLoading || isSuccess) ? 0.5 : 1
-                }
-              ]} 
-              onPress={() => animateClose(onClose)}
-            >
-              <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: "600" }}>Cancel</Text>
-            </TouchableOpacity>
+              <View style={styles.actionContainer}>
+                <SwipeButton
+                  text="Swipe to Confirm"
+                  onSwipeSuccess={handleSwipeSuccess}
+                  colors={colors}
+                  isLoading={isLoading}
+                  isSuccess={isSuccess}
+                />
+              </View>
+              
+              <TouchableOpacity 
+                disabled={isLoading || isSuccess}
+                style={[
+                  styles.cancelBtn, 
+                  { 
+                    borderColor: colors.ghBorder, 
+                    backgroundColor: colors.ghSurface2,
+                    opacity: (isLoading || isSuccess) ? 0.5 : 1
+                  }
+                ]} 
+                onPress={() => animateClose(onClose)}
+              >
+                <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: "600" }}>Cancel</Text>
+              </TouchableOpacity>
+            </Animated.View>
 
             {/* Premium Full-Modal Success Overlay */}
             {isSuccess && (

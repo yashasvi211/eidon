@@ -405,6 +405,7 @@ export default function DetailPanel({
   const [isClockModalOpen, setIsClockModalOpen] = useState(false);
   const [clockField, setClockField] = useState<"start" | "end">("start");
   const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   const getTodayLocalDateString = () => {
     const d = new Date();
@@ -431,6 +432,7 @@ export default function DetailPanel({
     setManualEndTime(getLocalTimeString(0));
     setManualNote("");
     setAddSessionError("");
+    setSaveSuccess(false);
     setIsAddSessionOpen(true);
   };
 
@@ -503,7 +505,7 @@ export default function DetailPanel({
       auditLog: [...(task.auditLog || []), audit],
     });
 
-    setIsAddSessionOpen(false); // Close the time logging modal
+    setSaveSuccess(true); // Trigger smooth slide-out animation on LogTimeModal
   };
 
   const activeTab = propActiveTab !== undefined ? propActiveTab : localActiveTab;
@@ -1424,6 +1426,7 @@ export default function DetailPanel({
         onChangeNote={setManualNote}
         addSessionError={addSessionError}
         onSave={handleManualAddSession}
+        saveSuccess={saveSuccess}
       />
 
       <CalendarModal
