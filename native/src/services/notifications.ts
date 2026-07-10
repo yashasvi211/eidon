@@ -178,11 +178,12 @@ export async function syncTaskNotifications(task: Task) {
   let scheduleTime = reminderStartTime;
   
   // If the reminder start time is in the past, maybe skip to the next repeat or schedule right now
-  if (scheduleTime <= now) {
+  const SAFETY_BUFFER = 2000;
+  if (scheduleTime <= now + SAFETY_BUFFER) {
     if (!task.reminder.repeatEvery) {
-      scheduleTime = now + 2000;
+      scheduleTime = now + SAFETY_BUFFER;
     } else {
-      while (scheduleTime <= now && scheduleTime < targetDueTime) {
+      while (scheduleTime <= now + SAFETY_BUFFER && scheduleTime < targetDueTime) {
         scheduleTime += task.reminder.repeatEvery;
       }
     }
@@ -204,7 +205,11 @@ export async function syncTaskNotifications(task: Task) {
           body: message,
           sound: true,
         },
-        trigger: { date: new Date(scheduleTime) },
+        trigger: { 
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: new Date(scheduleTime),
+          channelId: 'default',
+        },
       });
     } catch (err) {
       console.error('Failed to schedule notification', err);
