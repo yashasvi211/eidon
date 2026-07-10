@@ -14,6 +14,7 @@ import Animated, {
   FadeOut,
   LinearTransition,
 } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface Project {
   name: string;
@@ -142,6 +143,7 @@ export default function TaskPanel({
 }: TaskPanelProps) {
   const scheme = useColorScheme();
   const colors = Colors[scheme === "unspecified" ? "light" : scheme];
+  const insets = useSafeAreaInsets();
 
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -158,6 +160,7 @@ export default function TaskPanel({
   const baseFiltered = tasks
     .filter((t) => {
       if (currentProject) return t.project === currentProject;
+      if (currentView === "inbox") return t.project === "Inbox";
       const backlog = isTaskBacklog(t);
       if (currentView === "backlog") return backlog;
       if (currentView === "today") return !backlog && isTaskCurrent(t);
@@ -317,6 +320,36 @@ export default function TaskPanel({
   };
 
   const renderContent = () => {
+    if (!currentProject && currentView === "backlog") {
+      const byProject = baseFiltered.reduce((acc, t) => {
+        if (!acc[t.project]) acc[t.project] = [];
+        acc[t.project].push(t);
+        return acc;
+      }, {} as Record<string, Task[]>);
+
+      const projectNames = Object.keys(byProject).sort();
+
+      return (
+        <ScrollView style={styles.taskList} contentContainerStyle={{ paddingBottom: insets.bottom + 20 }} {...{ delaysContentTouches: false }}>
+          {projectNames.map((pName) => (
+            <View key={pName} style={styles.projectSection}>
+              <Text style={[styles.projectSectionTitle, { color: colors.ghMuted }]}>
+                {pName}
+              </Text>
+              {byProject[pName].map(renderTaskItem)}
+            </View>
+          ))}
+          {baseFiltered.length === 0 && (
+            <View style={styles.emptyState}>
+              <Text style={{ color: colors.ghMuted, fontSize: 13 }}>
+                No backlog tasks found.
+              </Text>
+            </View>
+          )}
+        </ScrollView>
+      );
+    }
+
     if (currentProject) {
       const backlogTasks = baseFiltered.filter(isTaskBacklog);
       const currentTasks = baseFiltered.filter(isTaskCurrent);
@@ -335,7 +368,7 @@ export default function TaskPanel({
       }
 
       return (
-        <ScrollView style={styles.taskList} {...{ delaysContentTouches: false }}>
+        <ScrollView style={styles.taskList} contentContainerStyle={{ paddingBottom: insets.bottom + 20 }} {...{ delaysContentTouches: false }}>
           {backlogTasks.length > 0 && (
             <View style={styles.projectSection}>
               <Text
@@ -371,7 +404,7 @@ export default function TaskPanel({
     }
 
     return (
-      <ScrollView style={styles.taskList} {...{ delaysContentTouches: false }}>
+      <ScrollView style={styles.taskList} contentContainerStyle={{ paddingBottom: insets.bottom + 20 }} {...{ delaysContentTouches: false }}>
         {baseFiltered.map(renderTaskItem)}
         {baseFiltered.length === 0 && (
           <View style={styles.emptyState}>

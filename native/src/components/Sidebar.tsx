@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, useColorScheme, Modal, Switch } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../constants/theme';
 import { Task } from './DetailPanel';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
@@ -67,6 +68,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+  const insets = useSafeAreaInsets();
 
   const [isAdding, setIsAdding] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
@@ -213,6 +215,7 @@ export default function Sidebar({
   };
 
   const todayBadgeCount = tasks.filter((t) => t.target === 'today' && !t.done).length;
+  const inboxBadgeCount = tasks.filter((t) => t.project === 'Inbox' && !t.done).length;
   const backlogBadgeCount = tasks.filter((t) => t.target === 'backlog' && !t.done).length;
 
   const handleSaveProject = () => {
@@ -224,10 +227,11 @@ export default function Sidebar({
 
   const views = [
     { id: 'today', label: "Today's Tasks", icon: '☀️', badge: todayBadgeCount },
+    { id: 'inbox', label: 'Inbox', icon: '📥', badge: inboxBadgeCount },
     { id: 'scheduled', label: 'Scheduled', icon: '📅' },
     { id: 'timetracking', label: 'Time Tracking', icon: '⏱️' },
     { id: 'stats', label: 'Deep Stats', icon: '📈' },
-    { id: 'backlog', label: 'Backlog', icon: '📥', badge: backlogBadgeCount },
+    { id: 'backlog', label: 'Backlog', icon: '📦', badge: backlogBadgeCount },
   ];
 
   return (
@@ -347,7 +351,7 @@ export default function Sidebar({
         })}
       </ScrollView>
 
-      <View style={[styles.footer, { borderTopColor: colors.ghBorder }]}>
+      <View style={[styles.footer, { borderTopColor: colors.ghBorder, borderBottomWidth: 1, borderBottomColor: colors.ghBorder }]}>
         <View style={styles.userSection}>
           <View style={[styles.avatar, { backgroundColor: colors.ghBlue }]}>
             <Text style={styles.avatarText}>JD</Text>
@@ -362,6 +366,7 @@ export default function Sidebar({
           <Feather name="settings" size={16} color={colors.ghMuted} />
         </TouchableOpacity>
       </View>
+      {insets.bottom > 0 && <View style={{ height: insets.bottom }} />}
 
       <Modal
         visible={isSettingsOpen}

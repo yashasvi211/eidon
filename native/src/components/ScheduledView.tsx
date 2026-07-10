@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, useColorScheme, PanResponder } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../constants/theme';
 import { Task } from './DetailPanel';
 
@@ -25,6 +26,7 @@ function getWeekNumber(d: Date): number {
 export default function ScheduledView({ tasks, onSelectTask, showCompleted, onSwipeRight }: ScheduledViewProps) {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+  const insets = useSafeAreaInsets();
   
   const [viewDate, setViewDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -160,7 +162,7 @@ export default function ScheduledView({ tasks, onSelectTask, showCompleted, onSw
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollArea} {...{ delaysContentTouches: false }}>
+      <ScrollView style={styles.scrollArea} contentContainerStyle={{ paddingBottom: insets.bottom + 20 }} {...{ delaysContentTouches: false }}>
         <View ref={calendarRef} style={styles.calendarContainer} onLayout={measureCalendar}>
           <View style={styles.weekdaysRow}>
             <View style={styles.weekNumberCol} />

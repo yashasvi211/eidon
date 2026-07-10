@@ -9,6 +9,8 @@ import {
   TextInput,
   ActivityIndicator,
   useWindowDimensions,
+  Modal,
+  Animated as RNAnimated,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../constants/theme";
@@ -26,6 +28,9 @@ import Animated, {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { Feather, Octicons } from "@expo/vector-icons";
 import * as LocalAuthentication from "expo-local-authentication";
+import CalendarModal from "./sub_components/CalendarModal";
+import AnalogClockModal from "./sub_components/AnalogClockModal";
+import LogTimeModal from "./sub_components/LogTimeModal";
 
 // Pull-down dismiss threshold: if user drags past this many pixels, we close
 const DISMISS_THRESHOLD = 120;
@@ -137,6 +142,12 @@ const fmtSeconds = (s: number) => {
   const m = Math.floor((s % 3600) / 60);
   if (h > 0) return `${h}h ${m}m`;
   return `${m}m`;
+};
+
+const parseDateTime = (dateStr: string, timeStr: string) => {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const [h, min] = timeStr.split(":").map(Number);
+  return new Date(y, m - 1, d, h, min).getTime();
 };
 
 const fmtTimer = (s: number) => {
@@ -449,6 +460,102 @@ export default function DetailPanel({
   >("details");
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [sessionNote, setSessionNote] = useState("");
+
+  const [isAddSessionOpen, setIsAddSessionOpen] = useState(false);
+  const [manualDate, setManualDate] = useState("");
+  const [manualStartTime, setManualStartTime] = useState("");
+  const [manualEndTime, setManualEndTime] = useState("");
+  const [manualNote, setManualNote] = useState("");
+  const [addSessionError, setAddSessionError] = useState("");
+
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
+  const [isClockModalOpen, setIsClockModalOpen] = useState(false);
+  const [clockField, setClockField] = useState<"start" | "end">("start");
+
+  const getTodayLocalDateString = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
+  const getLocalTimeString = (offsetMinutes = 0) => {
+    const d = new Date(Date.now() + offsetMinutes * 60000);
+    let hours = d.getHours();
+    const minutes = String(d.getMinutes()).padStart(2, "0");
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const hoursStr = String(hours).padStart(2, "0");
+    return `${hoursStr}:${minutes} ${ampm}`;
+  };
+
+  const openAddSessionModal = () => {
+    setManualDate(getTodayLocalDateString());
+    setManualStartTime(getLocalTimeString(-60));
+    setManualEndTime(getLocalTimeString(0));
+    setManualNote("");
+    setAddSessionError("");
+    setIsAddSessionOpen(true);
+  };
+
+  const handleManualAddSession = (): boolean => {
+    if (!task) return false;
+
+    const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
+    const timeRegex = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i;
+
+    if (!dateRegex.test(manualDate)) {
+      setAddSessionError("Date must be in DD/MM/YYYY format.");
+      return false;
+    }
+    if (!timeRegex.test(manualStartTime)) {
+      setAddSessionError("Start Time must be HH:MM AM/PM format (e.g. 09:00 AM).");
+      return false;
+    }
+    if (!timeRegex.test(manualEndTime)) {
+      setAddSessionError("End Time must be HH:MM AM/PM format (e.g. 10:00 AM).");
+      return false;
+    }
+
+    const startMs = parseDateTime(manualDate, manualStartTime);
+    const endMs = parseDateTime(manualDate, manualEndTime);
+
+    if (isNaN(startMs) || isNaN(endMs)) {
+      setAddSessionError("Invalid Date or Time entered.");
+      return false;
+    }
+
+    if (endMs <= startMs) {
+      setAddSessionError("End time must be after start time.");
+      return false;
+    }
+
+    const newSess: Session = {
+      id: "sess_" + Date.now(),
+      start: startMs,
+      end: endMs,
+      note: manualNote.trim() || undefined,
+    };
+
+    const duration = Math.floor((endMs - startMs) / 1000);
+    const audit: AuditEntry = {
+      timestamp: Date.now(),
+      action: "time_logged",
+      details: { duration },
+    };
+
+    const updatedSessions = [...(task.sessions || []), newSess].sort((a, b) => b.start - a.start);
+
+    onUpdateTask({
+      ...task,
+      sessions: updatedSessions,
+      auditLog: [...(task.auditLog || []), audit],
+    });
+
+    return true;
+  };
 
   const activeTab = propActiveTab !== undefined ? propActiveTab : localActiveTab;
   const setActiveTab = propSetActiveTab !== undefined ? propSetActiveTab : setLocalActiveTab;
@@ -1170,9 +1277,29 @@ export default function DetailPanel({
           tabName="timetracking"
           tabBarWidth={tabBarWidth}
         >
-            <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
-              LOGGED SESSIONS
-            </Text>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 0 }]}>
+                LOGGED SESSIONS
+              </Text>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: colors.ghSurface2,
+                  borderColor: colors.ghBorder,
+                  borderWidth: 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  borderRadius: 6,
+                }}
+                onPress={openAddSessionModal}
+              >
+                <Feather name="plus" size={12} color={colors.ghText} style={{ marginRight: 4 }} />
+                <Text style={{ color: colors.ghText, fontSize: 11, fontWeight: "600" }}>
+                  Add Time
+                </Text>
+              </TouchableOpacity>
+            </View>
             {!task.sessions || task.sessions.length === 0 ? (
               <Text style={[styles.emptyText, { color: colors.ghMuted }]}>
                 No time has been logged on this task.
@@ -1189,10 +1316,8 @@ export default function DetailPanel({
                     hour: "2-digit",
                     minute: "2-digit",
                   });
-                  const dateStr = new Date(sess.start).toLocaleDateString([], {
-                    month: "short",
-                    day: "numeric",
-                  });
+                  const dObj = new Date(sess.start);
+                  const dateStr = `${String(dObj.getDate()).padStart(2, "0")}/${String(dObj.getMonth() + 1).padStart(2, "0")}/${dObj.getFullYear()}`;
 
                   return (
                     <View
@@ -1328,6 +1453,48 @@ export default function DetailPanel({
             )}
           </TabPage>
       </TabContentContainer>
+
+      <LogTimeModal
+        visible={isAddSessionOpen}
+        onClose={() => setIsAddSessionOpen(false)}
+        colors={colors}
+        manualDate={manualDate}
+        onOpenCalendar={() => setIsCalendarModalOpen(true)}
+        manualStartTime={manualStartTime}
+        manualEndTime={manualEndTime}
+        onOpenClock={(field) => {
+          setClockField(field);
+          setIsClockModalOpen(true);
+        }}
+        manualNote={manualNote}
+        onChangeNote={setManualNote}
+        addSessionError={addSessionError}
+        onSave={handleManualAddSession}
+      />
+
+      <CalendarModal
+        visible={isCalendarModalOpen}
+        onClose={() => setIsCalendarModalOpen(false)}
+        onSelectDate={setManualDate}
+        initialDateStr={manualDate}
+        colors={colors}
+      />
+
+      <AnalogClockModal
+        visible={isClockModalOpen}
+        onClose={() => setIsClockModalOpen(false)}
+        onSelectTime={(time) => {
+          if (clockField === "start") {
+            setManualStartTime(time);
+          } else {
+            setManualEndTime(time);
+          }
+        }}
+        initialTimeStr={clockField === "start" ? manualStartTime : manualEndTime}
+        colors={colors}
+        title={clockField === "start" ? "Start Time" : "End Time"}
+      />
+
     </Animated.View>
   );
 
@@ -1704,6 +1871,9 @@ const styles = StyleSheet.create({
     textDecorationLine: "line-through",
   },
 });
+
+
+
 
 interface TabWrapperProps {
   isLargeScreen: boolean;
