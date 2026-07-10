@@ -8,6 +8,7 @@ import {
   ScrollView,
   Animated as RNAnimated,
 } from "react-native";
+import * as Haptics from "expo-haptics";
 
 interface AnalogClockModalProps {
   visible: boolean;
@@ -27,22 +28,30 @@ interface ScrollWheelProps {
 }
 
 function ScrollWheel({ items, selectedValue, onValueChange, colors, visible }: ScrollWheelProps) {
-  const scrollViewRef = useRef<ScrollView>(null);
   const itemHeight = 44; // slightly taller for better centering room
   const listHeight = itemHeight * 3; // shows 3 items
-  const scrollY = useRef(new RNAnimated.Value(0)).current;
   const activeIndex = items.indexOf(selectedValue);
+  const scrollY = useRef(new RNAnimated.Value(activeIndex !== -1 ? activeIndex * itemHeight : 0)).current;
+  const flatListRef = useRef<any>(null);
+  const lastHapticIndex = useRef(activeIndex);
 
-  // Scroll to active index only when modal opens
+  // Trigger haptics when crossing item boundaries during scroll
   useEffect(() => {
-    if (visible && activeIndex !== -1) {
-      const timer = setTimeout(() => {
-        scrollViewRef.current?.scrollTo({ y: activeIndex * itemHeight, animated: false });
-        scrollY.setValue(activeIndex * itemHeight);
-      }, 120);
-      return () => clearTimeout(timer);
-    }
-  }, [visible]);
+    const listenerId = scrollY.addListener(({ value }) => {
+      const idx = Math.round(value / itemHeight);
+      if (idx !== lastHapticIndex.current && idx >= 0 && idx < items.length) {
+        if (lastHapticIndex.current !== -1) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+        }
+        lastHapticIndex.current = idx;
+      }
+    });
+    return () => {
+      scrollY.removeListener(listenerId);
+    };
+  }, [items.length, itemHeight]);
+
+
 
   // After momentum/snap settles, just update state
   const handleMomentumEnd = (event: any) => {
@@ -71,11 +80,13 @@ function ScrollWheel({ items, selectedValue, onValueChange, colors, visible }: S
         pointerEvents="none"
       />
 
-      <RNAnimated.ScrollView
-        ref={scrollViewRef as any}
+      <RNAnimated.FlatList
+        ref={flatListRef}
+        data={items}
+        keyExtractor={(_, i) => String(i)}
         showsVerticalScrollIndicator={false}
-        snapToInterval={itemHeight}      // continuous snap woven into deceleration
-        decelerationRate={0.985}         // slow enough to glide many items, no abrupt stop
+        snapToOffsets={items.map((_, i) => i * itemHeight)}
+        decelerationRate="fast"
         scrollEventThrottle={16}
         onScroll={RNAnimated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -85,8 +96,12 @@ function ScrollWheel({ items, selectedValue, onValueChange, colors, visible }: S
         contentContainerStyle={{
           paddingVertical: itemHeight,
         }}
-      >
-        {items.map((item, idx) => {
+        getItemLayout={(_, index) => ({ length: itemHeight, offset: itemHeight * index, index })}
+        initialScrollIndex={activeIndex !== -1 ? activeIndex : undefined}
+        initialNumToRender={5}
+        windowSize={5}
+        maxToRenderPerBatch={10}
+        renderItem={({ item, index: idx }) => {
           const inputRange = [
             (idx - 1) * itemHeight,
             idx * itemHeight,
@@ -109,7 +124,6 @@ function ScrollWheel({ items, selectedValue, onValueChange, colors, visible }: S
 
           return (
             <RNAnimated.View
-              key={idx}
               style={[
                 styles.wheelItem,
                 {
@@ -128,12 +142,12 @@ function ScrollWheel({ items, selectedValue, onValueChange, colors, visible }: S
                   },
                 ]}
               >
-                {item}
+                {item as string}
               </Text>
             </RNAnimated.View>
           );
-        })}
-      </RNAnimated.ScrollView>
+        }}
+      />
     </View>
   );
 }

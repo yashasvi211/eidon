@@ -19,6 +19,7 @@ interface CalendarModalProps {
 
 export default function CalendarModal({ visible, onClose, onSelectDate, initialDateStr, colors }: CalendarModalProps) {
   const [viewDate, setViewDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   // Animation values
   const scaleAnim = useRef(new RNAnimated.Value(0.9)).current;
@@ -32,7 +33,9 @@ export default function CalendarModal({ visible, onClose, onSelectDate, initialD
         const m = Number(parts[1]) - 1;
         const y = Number(parts[2]);
         if (!isNaN(d) && !isNaN(m) && !isNaN(y)) {
-          setViewDate(new Date(y, m, d));
+          const parsedDate = new Date(y, m, d);
+          setViewDate(parsedDate);
+          setSelectedDate(parsedDate);
         }
       }
     }
@@ -101,13 +104,21 @@ export default function CalendarModal({ visible, onClose, onSelectDate, initialD
   };
 
   const handleSelectDay = (date: Date) => {
-    const day = String(date.getDate()).padStart(2, "0");
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const year = date.getFullYear();
-    animateClose(() => {
-      onSelectDate(`${day}/${month}/${year}`);
-      onClose();
-    });
+    setSelectedDate(date);
+  };
+
+  const handleSave = () => {
+    if (selectedDate) {
+      const day = String(selectedDate.getDate()).padStart(2, "0");
+      const month = String(selectedDate.getMonth() + 1).padStart(2, "0");
+      const year = selectedDate.getFullYear();
+      animateClose(() => {
+        onSelectDate(`${day}/${month}/${year}`);
+        onClose();
+      });
+    } else {
+      animateClose(onClose);
+    }
   };
 
   const monthLabel = viewDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
@@ -165,7 +176,11 @@ export default function CalendarModal({ visible, onClose, onSelectDate, initialD
           {weeks.map((week, wIdx) => (
             <View key={wIdx} style={{ flexDirection: "row", marginBottom: 4 }}>
               {week.map((day, dIdx) => {
-                const isSelected = initialDateStr === `${String(day.date.getDate()).padStart(2, "0")}/${String(day.date.getMonth() + 1).padStart(2, "0")}/${day.date.getFullYear()}`;
+                const isSelected = selectedDate ? (
+                  day.date.getDate() === selectedDate.getDate() &&
+                  day.date.getMonth() === selectedDate.getMonth() &&
+                  day.date.getFullYear() === selectedDate.getFullYear()
+                ) : false;
                 return (
                   <TouchableOpacity
                     key={dIdx}
@@ -189,9 +204,15 @@ export default function CalendarModal({ visible, onClose, onSelectDate, initialD
             </View>
           ))}
 
-          <TouchableOpacity style={[styles.calendarCloseBtn, { borderColor: colors.ghBorder, backgroundColor: colors.ghSurface2 }]} onPress={() => animateClose(onClose)}>
-            <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: "600" }}>Cancel</Text>
-          </TouchableOpacity>
+          {/* Footer Actions */}
+          <View style={[styles.calendarFooter, { borderColor: colors.ghBorder }]}>
+            <TouchableOpacity style={[styles.btnTime, { borderColor: colors.ghBorder, backgroundColor: colors.ghSurface2 }]} onPress={() => animateClose(onClose)}>
+              <Text style={[styles.btnTextTime, { color: colors.ghText }]}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.btnTime, { backgroundColor: colors.ghBlue, borderColor: colors.ghBlue }]} onPress={handleSave}>
+              <Text style={[styles.btnTextTime, { color: "#ffffff" }]}>OK</Text>
+            </TouchableOpacity>
+          </View>
         </RNAnimated.View>
       </RNAnimated.View>
     </Modal>
@@ -249,11 +270,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "500",
   },
-  calendarCloseBtn: {
-    borderWidth: 1,
-    borderRadius: 6,
-    paddingVertical: 8,
-    alignItems: "center",
+  calendarFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginTop: 16,
+    borderTopWidth: 1,
+    paddingTop: 16,
+    borderColor: 'transparent',
+  },
+  btnTime: {
+    flex: 1,
+    height: 40,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    marginHorizontal: 4,
+  },
+  btnTextTime: {
+    fontSize: 14,
+    fontWeight: "600",
   },
 });

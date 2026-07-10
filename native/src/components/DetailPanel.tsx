@@ -31,6 +31,8 @@ import * as LocalAuthentication from "expo-local-authentication";
 import CalendarModal from "./sub_components/CalendarModal";
 import AnalogClockModal from "./sub_components/AnalogClockModal";
 import LogTimeModal from "./sub_components/LogTimeModal";
+import SwipeButton from "./sub_components/SwipeButton";
+import ConfirmationModal from "./sub_components/ConfirmationModal";
 
 // Pull-down dismiss threshold: if user drags past this many pixels, we close
 const DISMISS_THRESHOLD = 120;
@@ -67,7 +69,8 @@ export interface AuditEntry {
     | "timer_stopped"
     | "subtask_completed"
     | "subtask_uncompleted"
-    | "subtask_added";
+    | "subtask_added"
+    | "time_logged";
   details?: {
     subtaskTitle?: string;
     oldDue?: string;
@@ -75,6 +78,7 @@ export interface AuditEntry {
     oldEst?: string;
     newEst?: string;
     note?: string;
+    duration?: number;
   };
 }
 
@@ -145,8 +149,30 @@ const fmtSeconds = (s: number) => {
 };
 
 const parseDateTime = (dateStr: string, timeStr: string) => {
-  const [y, m, d] = dateStr.split("-").map(Number);
-  const [h, min] = timeStr.split(":").map(Number);
+  let y, m, d;
+  if (dateStr.includes("/")) {
+    [d, m, y] = dateStr.split("/").map(Number);
+  } else {
+    [y, m, d] = dateStr.split("-").map(Number);
+  }
+
+  const timeRegex = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i;
+  const match = timeStr.match(timeRegex);
+  let h = 0, min = 0;
+  
+  if (match) {
+    let hour12 = Number(match[1]);
+    min = Number(match[2]);
+    const ampm = match[3].toUpperCase();
+    if (ampm === "PM" && hour12 < 12) hour12 += 12;
+    if (ampm === "AM" && hour12 === 12) hour12 = 0;
+    h = hour12;
+  } else {
+    const parts = timeStr.split(":");
+    h = Number(parts[0]);
+    min = Number(parts[1]);
+  }
+
   return new Date(y, m - 1, d, h, min).getTime();
 };
 
@@ -292,103 +318,10 @@ const AUDIT_ICONS: {
     color: "#f0883e",
   },
   subtask_added: { iconName: "plus-square", library: "Feather", label: "Subtask added", color: "#58a6ff" },
+  time_logged: { iconName: "clock", library: "Feather", label: "Manual time logged", color: "#8a2be2" },
 };
 
-const SwipeStartButton = ({
-  onSwipeSuccess,
-  colors,
-  disabled,
-}: {
-  onSwipeSuccess: () => void;
-  colors: any;
-  disabled: boolean;
-}) => {
-  const [trackWidth, setTrackWidth] = useState(0);
-  const translateX = useSharedValue(0);
-  const thumbWidth = 46;
 
-  const onLayout = (e: any) => {
-    setTrackWidth(e.nativeEvent.layout.width);
-  };
-
-  const panGesture = Gesture.Pan()
-    .enabled(!disabled)
-    .activeOffsetX([5, -5])
-    .failOffsetY([-15, 15])
-    .onUpdate((event) => {
-      const maxTranslate = Math.max(0, trackWidth - thumbWidth - 4);
-      translateX.value = Math.max(
-        0,
-        Math.min(event.translationX, maxTranslate)
-      );
-    })
-    .onEnd(() => {
-      const maxTranslate = Math.max(0, trackWidth - thumbWidth - 4);
-      if (translateX.value > maxTranslate * 0.8) {
-        translateX.value = withSpring(maxTranslate, SNAP_SPRING, (finished) => {
-          if (finished) {
-            runOnJS(onSwipeSuccess)();
-            translateX.value = withTiming(0, { duration: 250 });
-          }
-        });
-      } else {
-        translateX.value = withSpring(0, SNAP_SPRING);
-      }
-    });
-
-  const animatedThumbStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ translateX: translateX.value }],
-    };
-  });
-
-  const animatedTrackStyle = useAnimatedStyle(() => {
-    const maxTranslate = Math.max(1, trackWidth - thumbWidth - 4);
-    const opacity = interpolate(
-      translateX.value,
-      [0, maxTranslate * 0.6],
-      [1, 0],
-      Extrapolation.CLAMP
-    );
-    return { opacity };
-  });
-
-  return (
-    <View
-      onLayout={onLayout}
-      style={[
-        styles.swipeTrack,
-        {
-          backgroundColor: colors.ghSurface2,
-          borderColor: colors.ghBorder,
-          opacity: disabled ? 0.5 : 1,
-        },
-      ]}
-    >
-      <Animated.Text
-        style={[
-          styles.swipeText,
-          { color: colors.ghMuted },
-          animatedTrackStyle,
-        ]}
-      >
-        Swipe to start timer
-      </Animated.Text>
-
-      <GestureDetector gesture={panGesture}>
-        <Animated.View
-          style={[
-            styles.swipeThumb,
-            { backgroundColor: colors.ghBlue },
-            animatedThumbStyle,
-          ]}
-        >
-          <Feather name="chevrons-right" size={20} color="#ffffff" />
-        </Animated.View>
-      </GestureDetector>
-    </View>
-  );
-};
 
 const getDeadlineInfo = (dueDate?: string, colors?: any) => {
   if (!dueDate)
@@ -471,13 +404,14 @@ export default function DetailPanel({
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
   const [isClockModalOpen, setIsClockModalOpen] = useState(false);
   const [clockField, setClockField] = useState<"start" | "end">("start");
+  const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false);
 
   const getTodayLocalDateString = () => {
     const d = new Date();
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
     const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
+    return `${day}/${m}/${y}`;
   };
 
   const getLocalTimeString = (offsetMinutes = 0) => {
@@ -532,6 +466,21 @@ export default function DetailPanel({
       return false;
     }
 
+    if (endMs > Date.now()) {
+      setAddSessionError("Cannot log time in the future.");
+      return false;
+    }
+
+    // Validation passed. Instead of saving immediately, open the confirmation modal.
+    setIsConfirmationModalOpen(true);
+    return false; // Return false so LogTimeModal doesn't close yet
+  };
+
+  const commitManualSession = () => {
+    if (!task) return;
+    const startMs = parseDateTime(manualDate, manualStartTime);
+    const endMs = parseDateTime(manualDate, manualEndTime);
+
     const newSess: Session = {
       id: "sess_" + Date.now(),
       start: startMs,
@@ -543,7 +492,7 @@ export default function DetailPanel({
     const audit: AuditEntry = {
       timestamp: Date.now(),
       action: "time_logged",
-      details: { duration },
+      details: { duration, note: manualNote.trim() || undefined },
     };
 
     const updatedSessions = [...(task.sessions || []), newSess].sort((a, b) => b.start - a.start);
@@ -554,7 +503,7 @@ export default function DetailPanel({
       auditLog: [...(task.auditLog || []), audit],
     });
 
-    return true;
+    setIsAddSessionOpen(false); // Close the time logging modal
   };
 
   const activeTab = propActiveTab !== undefined ? propActiveTab : localActiveTab;
@@ -1135,10 +1084,11 @@ export default function DetailPanel({
                   <Text style={{ color: colors.ghMuted, fontSize: 13 }}>
                     No active session.
                   </Text>
-                  <SwipeStartButton
+                  <SwipeButton
+                    text="Swipe to start timer"
+                    onSwipeSuccess={handleStartTimerAuthentication}
                     colors={colors}
                     disabled={isTimerRunning && activeTimerTaskId !== task.id}
-                    onSwipeSuccess={handleStartTimerAuthentication}
                   />
                 </View>
               )}
@@ -1407,6 +1357,10 @@ export default function DetailPanel({
                     entry.details?.note
                   ) {
                     detailsText = `Note: "${entry.details.note}"`;
+                  } else if (entry.action === "time_logged") {
+                    const dur = entry.details?.duration ? fmtSeconds(entry.details.duration) : "";
+                    const noteStr = entry.details?.note ? ` Note: "${entry.details.note}"` : "";
+                    detailsText = `for ${dur}${noteStr}`;
                   } else if (entry.action === "due_changed") {
                     detailsText = `to ${fmtDateDisplay(entry.details?.newDue)}`;
                   }
@@ -1493,6 +1447,15 @@ export default function DetailPanel({
         initialTimeStr={clockField === "start" ? manualStartTime : manualEndTime}
         colors={colors}
         title={clockField === "start" ? "Start Time" : "End Time"}
+      />
+
+      <ConfirmationModal
+        visible={isConfirmationModalOpen}
+        onClose={() => setIsConfirmationModalOpen(false)}
+        onConfirm={commitManualSession}
+        title="Confirm Entry"
+        description={`Log time from ${manualStartTime} to ${manualEndTime}?`}
+        colors={colors}
       />
 
     </Animated.View>
@@ -1761,36 +1724,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  swipeTrack: {
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 1,
-    justifyContent: "center",
-    position: "relative",
-    overflow: "hidden",
-    marginTop: 8,
-  },
-  swipeText: {
-    position: "absolute",
-    alignSelf: "center",
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  swipeThumb: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: "center",
-    justifyContent: "center",
-    position: "absolute",
-    left: 2,
-    top: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
-    elevation: 2,
-  },
+
   sessionsList: {
     gap: 10,
   },
