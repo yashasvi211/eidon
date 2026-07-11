@@ -87,7 +87,12 @@ export interface TaskReminder {
   repeatEvery?: number;       // ms between repeat notifications (optional)
   lastNotifiedAt?: number;    // timestamp of last notification fired
   dismissed?: boolean;        // user dismissed all reminders for this task
+  lastNotificationStatus?: 'success' | 'failed';
+  lastNotificationError?: string;
+  lastNotificationTime?: number;
+  lastNotificationId?: string;
 }
+
 
 export interface Task {
   id: string;
@@ -1010,11 +1015,60 @@ export default function DetailPanel({
                 </View>
 
                 {task.reminder.repeatEvery ? (
-                  <View style={styles.dueRow}>
+                  <View style={[styles.dueRow, { marginBottom: task.reminder.lastNotificationStatus ? 8 : 0 }]}>
                     <Feather name="repeat" size={14} color={colors.ghPurple} style={{ marginRight: 6 }} />
                     <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: "500" }}>
                       Repeat every {formatDuration(task.reminder.repeatEvery)}
                     </Text>
+                  </View>
+                ) : null}
+
+                {task.reminder.lastNotificationStatus ? (
+                  <View style={[styles.dueRow, { marginTop: 8, alignItems: 'flex-start' }]}>
+                    {task.reminder.lastNotificationStatus === 'success' ? (
+                      <>
+                        <Feather name="check-circle" size={14} color={colors.ghGreen} style={{ marginTop: 2, marginRight: 6 }} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: colors.ghGreen, fontSize: 13, fontWeight: "600" }}>
+                            Last reminder sent successfully
+                          </Text>
+                          {task.reminder.lastNotificationTime && (
+                            <Text style={{ color: colors.ghMuted, fontSize: 11, marginTop: 2 }}>
+                              {new Date(task.reminder.lastNotificationTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            </Text>
+                          )}
+                        </View>
+                      </>
+                    ) : (
+                      <>
+                        <Feather name="alert-circle" size={14} color={colors.ghRed} style={{ marginTop: 2, marginRight: 6 }} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: colors.ghRed, fontSize: 13, fontWeight: "600" }}>
+                            Last reminder failed to schedule/send
+                          </Text>
+                          {task.reminder.lastNotificationError ? (
+                            <Text style={{ 
+                              color: colors.ghText, 
+                              fontSize: 11, 
+                              marginTop: 4, 
+                              fontFamily: 'monospace', 
+                              backgroundColor: 'rgba(248, 81, 73, 0.08)', 
+                              padding: 6, 
+                              borderRadius: 4, 
+                              borderWidth: 1, 
+                              borderColor: 'rgba(248, 81, 73, 0.2)' 
+                            }}>
+                              {task.reminder.lastNotificationError}
+                            </Text>
+                          ) : null}
+                          {task.reminder.lastNotificationTime && (
+                            <Text style={{ color: colors.ghMuted, fontSize: 11, marginTop: 2 }}>
+                              {new Date(task.reminder.lastNotificationTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            </Text>
+                          )}
+                        </View>
+                      </>
+                    )}
                   </View>
                 ) : null}
               </View>

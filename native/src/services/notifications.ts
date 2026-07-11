@@ -148,17 +148,17 @@ export async function cancelTaskNotifications(taskId: string) {
  * Sync natively scheduled notifications for a given task.
  * Cancels old ones and schedules new ones if the task has an active reminder.
  */
-export async function syncTaskNotifications(task: Task) {
+export async function syncTaskNotifications(task: Task): Promise<{ success: boolean; error?: string }> {
   await cancelTaskNotifications(task.id);
 
   if (task.done || !task.due || !task.reminder || task.reminder.dismissed) {
-    return;
+    return { success: true };
   }
 
   const now = Date.now();
   const dueEndOfDay = getDueEndOfDay(task.due);
 
-  if (now >= dueEndOfDay) return;
+  if (now >= dueEndOfDay) return { success: true };
 
   let targetDueTime: number;
   if (task.dueTime) {
@@ -173,7 +173,7 @@ export async function syncTaskNotifications(task: Task) {
   const reminderStartTime = targetDueTime - task.reminder.remindBefore;
   
   // If exact due time has passed, stop reminding
-  if (task.dueTime && now >= targetDueTime) return;
+  if (task.dueTime && now >= targetDueTime) return { success: true };
 
   let scheduleTime = reminderStartTime;
   
@@ -211,8 +211,9 @@ export async function syncTaskNotifications(task: Task) {
           channelId: 'default',
         },
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to schedule notification', err);
+      return { success: false, error: err?.message || String(err) };
     }
 
     count++;
@@ -221,5 +222,7 @@ export async function syncTaskNotifications(task: Task) {
     }
     scheduleTime += task.reminder.repeatEvery;
   }
+
+  return { success: true };
 }
 

@@ -189,6 +189,111 @@ export default function AppIndex() {
     }
   }, [activeNotification, notificationQueue]);
 
+  const handleSyncNotifications = async (task: Task) => {
+    try {
+      const res = await syncTaskNotifications(task);
+      if (task.reminder) {
+        const currentStatus = task.reminder.lastNotificationStatus;
+        const currentError = task.reminder.lastNotificationError;
+        
+        const newStatus = res.success ? 'success' : 'failed';
+        const newError = res.success ? undefined : res.error;
+        
+        if (currentStatus !== newStatus || currentError !== newError) {
+          const updatedReminder = {
+            ...task.reminder,
+            lastNotificationStatus: newStatus as 'success' | 'failed',
+            lastNotificationError: newError,
+            lastNotificationTime: Date.now(),
+          };
+          const updatedTask = { ...task, reminder: updatedReminder };
+          
+          setTasks(prev => prev.map(t => t.id === task.id ? updatedTask : t));
+          await api.updateTask(task.id, { reminder: updatedReminder });
+        }
+      }
+    } catch (err) {
+      console.error("Failed to sync notifications:", err);
+    }
+  };
+
+  useEffect(() => {
+    const receivedSubscription = Notifications.addNotificationReceivedListener(async notification => {
+      const { request } = notification;
+      const notifId = request.identifier;
+      const parts = notifId.split('_');
+      const taskId = parts[0];
+      
+      const allTasks = tasksRef.current;
+      const existingTask = allTasks.find(t => t.id === taskId);
+      if (existingTask && existingTask.reminder) {
+        const updatedReminder = {
+          ...existingTask.reminder,
+          lastNotifiedAt: Date.now(),
+          lastNotificationStatus: 'success' as const,
+          lastNotificationError: undefined,
+          lastNotificationTime: Date.now(),
+          lastNotificationId: notifId,
+        };
+        const updatedTask = { ...existingTask, reminder: updatedReminder };
+        
+        setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
+        await api.updateTask(taskId, { reminder: updatedReminder }).catch(err => {
+          console.error('Failed to update notification delivery status in DB:', err);
+        });
+        
+        // Replenish notification scheduling window
+        await handleSyncNotifications(updatedTask);
+      }
+
+      // Show in-app banner
+      const { title, body } = request.content;
+      const task = tasksRef.current.find(t => t.id === taskId);
+      const newNotification: NotificationData = {
+        taskId,
+        taskTitle: title || task?.title || 'Reminder',
+        message: body || '',
+        dueDate: task?.due || '',
+      };
+      setNotificationQueue(prev => [...prev, newNotification]);
+    });
+
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener(async response => {
+      const { request } = response.notification;
+      const notifId = request.identifier;
+      const taskId = notifId.split('_')[0];
+
+      const allTasks = tasksRef.current;
+      const existingTask = allTasks.find(t => t.id === taskId);
+      if (existingTask && existingTask.reminder) {
+        const updatedReminder = {
+          ...existingTask.reminder,
+          lastNotifiedAt: Date.now(),
+          lastNotificationStatus: 'success' as const,
+          lastNotificationError: undefined,
+          lastNotificationTime: Date.now(),
+          lastNotificationId: notifId,
+        };
+        const updatedTask = { ...existingTask, reminder: updatedReminder };
+        
+        setTasks(prev => prev.map(t => t.id === taskId ? updatedTask : t));
+        await api.updateTask(taskId, { reminder: updatedReminder }).catch(err => {
+          console.error('Failed to update notification tap success in DB:', err);
+        });
+        
+        // Replenish notification scheduling window
+        await handleSyncNotifications(updatedTask);
+      }
+
+      setSelectedTaskId(taskId);
+    });
+
+    return () => {
+      receivedSubscription.remove();
+      responseSubscription.remove();
+    };
+  }, []);
+
   // Sleep mode state
   const [isSleeping, setIsSleeping] = useState(false);
   const [sleepStartTime, setSleepStartTime] = useState<number | null>(null);
@@ -232,6 +337,17 @@ export default function AppIndex() {
         if (fetchedSettings) {
           setIsSleeping(fetchedSettings.isSleeping);
           setSleepStartTime(fetchedSettings.sleepStartTime);
+        }
+
+        if (fetchedTasks) {
+          // Re-sync notifications on app startup to replenish the 10 scheduled slots
+          for (const task of fetchedTasks) {
+            if (!task.done && task.reminder && !task.reminder.dismissed) {
+              syncTaskNotifications(task).catch(err => {
+                console.error("Failed to sync notifications on startup for task:", task.id, err);
+              });
+            }
+          }
         }
       } catch (err: any) {
         console.error("Failed to load data:", err);
@@ -338,7 +454,7 @@ export default function AppIndex() {
     api.updateTask(id, { done: isDone, completedAt })
       .then(() => {
         if (isDone) cancelTaskNotifications(id);
-        else syncTaskNotifications({ ...tasks.find(t => t.id === id)!, done: isDone, completedAt });
+        else handleSyncNotifications({ ...tasks.find(t => t.id === id)!, done: isDone, completedAt });
         return api.createAuditLog(id, auditEntry);
       })
       .catch((err: any) => {
@@ -443,7 +559,7 @@ export default function AppIndex() {
       });
     }
     
-    syncTaskNotifications(updatedTask);
+    handleSyncNotifications(updatedTask);
   };
 
   const handleAddTask = (
@@ -486,7 +602,7 @@ export default function AppIndex() {
           if (prev.some(t => t.id === newTask.id)) return prev;
           return [...prev, newTask];
         });
-        syncTaskNotifications(newTask);
+        handleSyncNotifications(newTask);
         showToast(reminderConfig ? "Task created with reminder!" : "Task created!");
       })
       .catch((err: any) => {
