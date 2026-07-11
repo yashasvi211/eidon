@@ -38,6 +38,7 @@ import Animated, {
   withRepeat,
 } from "react-native-reanimated";
 import { api } from "../services/api";
+import * as EidonAlarm from "../../modules/expo-eidon-alarm";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => {
@@ -191,8 +192,6 @@ export default function AppIndex() {
   // Keep ref in sync
   useEffect(() => { reminderStyleRef.current = reminderStyle; }, [reminderStyle]);
 
-  // Remove polling loop in favor of native OS-scheduled notifications
-
   // Pop next notification from queue when current one is dismissed
   useEffect(() => {
     if (!activeNotification && notificationQueue.length > 0) {
@@ -200,6 +199,31 @@ export default function AppIndex() {
       setNotificationQueue(prev => prev.slice(1));
     }
   }, [activeNotification, notificationQueue]);
+
+  // Check for native Alarm Fired (Deep Android Alarm)
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    
+    const interval = setInterval(async () => {
+      const enqueuedTaskId = EidonAlarm.getEnqueuedAlarm();
+      if (enqueuedTaskId) {
+        // Find task
+        const task = tasksRef.current.find(t => t.id === enqueuedTaskId);
+        const currentSettings = await api.getSettings();
+        
+        setFullScreenNotification({
+          taskId: enqueuedTaskId,
+          taskTitle: task?.title || 'Reminder',
+          message: 'Time to focus!',
+          dueDate: task?.due || '',
+        });
+        setReminderStyle('fullscreen');
+        setReminderRequireAuth(currentSettings.reminderRequireAuth || false);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const handleSyncNotifications = async (task: Task) => {
     try {

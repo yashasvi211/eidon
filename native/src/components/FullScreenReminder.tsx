@@ -15,8 +15,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as LocalAuthentication from "expo-local-authentication";
-import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { Feather } from "@expo/vector-icons";
+import * as EidonAlarm from "../../modules/expo-eidon-alarm";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -110,17 +110,6 @@ export default function FullScreenReminder({
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [authSuccess, setAuthSuccess] = useState(false);
 
-  // ── Audio Alarm ──
-  const player = useAudioPlayer(
-    require("../../assets/notification/notification_sound_1.mp3")
-  );
-
-  useEffect(() => {
-    if (player) {
-      player.loop = true;
-    }
-  }, [player]);
-
   // ── Animations ──
   const overlayOpacity = useSharedValue(0);
   const contentScale = useSharedValue(0.9);
@@ -136,27 +125,19 @@ export default function FullScreenReminder({
   }, [visible]);
 
   // ── Start / stop alarm sound ──
-  const startAlarmSound = useCallback(async () => {
-    try {
-      await setAudioModeAsync({
-        playsInSilentMode: true,
-        shouldPlayInBackground: true,
-      });
-      player.play();
-    } catch (err) {
-      console.warn("Failed to play alarm sound:", err);
-    }
+  const startAlarmSound = useCallback(() => {
+    // Handled completely by the native foreground service now!
   }, []);
 
   const stopAlarmSound = useCallback(() => {
     try {
-      if (player) {
-        player.pause();
+      if (Platform.OS === 'android') {
+        EidonAlarm.stopAlarm();
       }
     } catch (e) {
       console.log("Audio pause error caught:", e);
     }
-  }, [player]);
+  }, []);
 
   // ── Modal lifecycle ──
   useEffect(() => {

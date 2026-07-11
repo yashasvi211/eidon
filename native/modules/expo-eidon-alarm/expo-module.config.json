@@ -1,0 +1,9 @@
+{
+  "platforms": ["apple", "android", "web"],
+  "apple": {
+    "modules": ["ExpoEidonAlarmModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.eidonalarm.ExpoEidonAlarmModule"]
+  }
+}

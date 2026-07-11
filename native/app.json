@@ -24,7 +24,11 @@
       "predictiveBackGestureEnabled": false,
       "softwareKeyboardLayoutMode": "pan",
       "permissions": [
-        "android.permission.SCHEDULE_EXACT_ALARM"
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ]
     },
     "androidStatusBar": {
@@ -56,11 +60,18 @@
       ],
       "expo-web-browser",
       "expo-sharing",
-      "expo-audio"
+      "expo-audio",
+      "./modules/expo-eidon-alarm/app.plugin.js"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "55629431-173e-439b-b260-3881021fc12a"
+      }
     }
   }
 }

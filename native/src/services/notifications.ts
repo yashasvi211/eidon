@@ -1,5 +1,8 @@
 import { Task } from '../components/DetailPanel';
 import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
+import { api } from './api';
+import * as EidonAlarm from '../../modules/expo-eidon-alarm';
 
 export interface ReminderNotification {
   taskId: string;
@@ -139,6 +142,13 @@ export async function cancelTaskNotifications(taskId: string) {
         await Notifications.cancelScheduledNotificationAsync(notif.identifier);
       }
     }
+    if (Platform.OS === 'android') {
+      try {
+        EidonAlarm.cancelAlarm(taskId);
+      } catch (e) {
+        console.warn('Failed to cancel EidonAlarm:', e);
+      }
+    }
   } catch (err) {
     console.error('Failed to cancel notifications for task:', taskId, err);
   }
@@ -189,6 +199,9 @@ export async function syncTaskNotifications(task: Task): Promise<{ success: bool
     }
   }
 
+  const settings = await api.getSettings();
+  const useNativeAlarm = Platform.OS === 'android' && settings.reminderStyle === 'fullscreen';
+
   // Schedule up to 10 repeating notifications
   let count = 0;
   while (scheduleTime < targetDueTime && count < 10) {
@@ -198,27 +211,35 @@ export async function syncTaskNotifications(task: Task): Promise<{ success: bool
       : `Due in ${formatDuration(dueEndOfDay - scheduleTime)}` + (count > 0 ? ' — reminder' : '');
 
     try {
-      await Notifications.scheduleNotificationAsync({
-        identifier: `${task.id}_${count}`,
-        content: {
-          title: task.title,
-          body: message,
-          sound: true,
-        },
-        trigger: { 
-          type: Notifications.SchedulableTriggerInputTypes.DATE,
-          date: new Date(scheduleTime),
-          channelId: 'default',
-        },
-      });
+      if (useNativeAlarm) {
+        // Just schedule the first one with AlarmManager for the true alarm experience.
+        // AlarmManager will wake the device, so we only need the exact next trigger.
+        if (count === 0) {
+          EidonAlarm.scheduleAlarm(task.id, scheduleTime);
+        }
+      } else {
+        await Notifications.scheduleNotificationAsync({
+          identifier: `${task.id}_${count}`,
+          content: {
+            title: task.title,
+            body: message,
+            sound: true,
+          },
+          trigger: { 
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: new Date(scheduleTime),
+            channelId: 'default',
+          },
+        });
+      }
     } catch (err: any) {
       console.error('Failed to schedule notification', err);
       return { success: false, error: err?.message || String(err) };
     }
 
     count++;
-    if (!task.reminder.repeatEvery || task.reminder.repeatEvery <= 0) {
-      break;
+    if (!task.reminder.repeatEvery || task.reminder.repeatEvery <= 0 || useNativeAlarm) {
+      break; // Native alarms loop internally until dismissed, no need to schedule 10!
     }
     scheduleTime += task.reminder.repeatEvery;
   }
