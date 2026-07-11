@@ -12,7 +12,7 @@ export default function TabLayout() {
   const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
 
   useEffect(() => {
-    SystemUI.setBackgroundColorAsync(colors.background);
+    SystemUI.setBackgroundColorAsync(colors.background).catch(() => {});
   }, [colors.background]);
 
   return (

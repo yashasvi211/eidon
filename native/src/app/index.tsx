@@ -26,6 +26,7 @@ import Header from "../components/Header";
 import AddTaskModal from "../components/AddTaskModal";
 import type { ReminderConfig } from "../components/AddTaskModal";
 import NotificationBanner, { NotificationData } from "../components/NotificationBanner";
+import FullScreenReminder from "../components/FullScreenReminder";
 import { syncTaskNotifications, cancelTaskNotifications } from "../services/notifications";
 import * as Notifications from 'expo-notifications';
 import Animated, {
@@ -39,13 +40,15 @@ import Animated, {
 import { api } from "../services/api";
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
+  handleNotification: async () => {
+    const settings = await api.getSettings();
+    const isFullscreen = settings.reminderStyle === 'fullscreen';
+    return {
+      shouldShowAlert: !isFullscreen, // OS banner hidden if in fullscreen mode
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    };
+  },
 });
 
 const LoadingLine = ({ colors }: { colors: any }) => {
@@ -179,6 +182,15 @@ export default function AppIndex() {
   // Keep ref in sync with tasks state
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
 
+  // Reminder settings state
+  const [reminderStyle, setReminderStyle] = useState<'banner' | 'fullscreen'>('banner');
+  const [reminderRequireAuth, setReminderRequireAuth] = useState(false);
+  const [fullScreenNotification, setFullScreenNotification] = useState<NotificationData | null>(null);
+  const reminderStyleRef = useRef<'banner' | 'fullscreen'>('banner');
+
+  // Keep ref in sync
+  useEffect(() => { reminderStyleRef.current = reminderStyle; }, [reminderStyle]);
+
   // Remove polling loop in favor of native OS-scheduled notifications
 
   // Pop next notification from queue when current one is dismissed
@@ -246,7 +258,11 @@ export default function AppIndex() {
         await handleSyncNotifications(updatedTask);
       }
 
-      // Show in-app banner
+      // Show in-app reminder based on style setting
+      // Read fresh settings to ensure we use the latest reminderStyle
+      const currentSettings = await api.getSettings();
+      const currentStyle = currentSettings.reminderStyle || 'banner';
+
       const { title, body } = request.content;
       const task = tasksRef.current.find(t => t.id === taskId);
       const newNotification: NotificationData = {
@@ -255,7 +271,17 @@ export default function AppIndex() {
         message: body || '',
         dueDate: task?.due || '',
       };
-      setNotificationQueue(prev => [...prev, newNotification]);
+
+      if (currentStyle === 'fullscreen') {
+        // Full-screen alarm mode
+        setFullScreenNotification(newNotification);
+        // Also sync the local state
+        setReminderStyle(currentSettings.reminderStyle || 'banner');
+        setReminderRequireAuth(currentSettings.reminderRequireAuth || false);
+      } else {
+        // Banner mode (existing behavior)
+        setNotificationQueue(prev => [...prev, newNotification]);
+      }
     });
 
     const responseSubscription = Notifications.addNotificationResponseReceivedListener(async response => {
@@ -285,7 +311,24 @@ export default function AppIndex() {
         await handleSyncNotifications(updatedTask);
       }
 
-      setSelectedTaskId(taskId);
+      // Check settings to see if we should show the full screen reminder
+      const currentSettings = await api.getSettings();
+      const currentStyle = currentSettings.reminderStyle || 'banner';
+
+      if (currentStyle === 'fullscreen') {
+        const { title, body } = request.content;
+        const task = tasksRef.current.find(t => t.id === taskId);
+        setFullScreenNotification({
+          taskId,
+          taskTitle: title || task?.title || 'Reminder',
+          message: body || '',
+          dueDate: task?.due || '',
+        });
+        setReminderStyle(currentSettings.reminderStyle || 'banner');
+        setReminderRequireAuth(currentSettings.reminderRequireAuth || false);
+      } else {
+        setSelectedTaskId(taskId);
+      }
     });
 
     return () => {
@@ -337,6 +380,8 @@ export default function AppIndex() {
         if (fetchedSettings) {
           setIsSleeping(fetchedSettings.isSleeping);
           setSleepStartTime(fetchedSettings.sleepStartTime);
+          setReminderStyle(fetchedSettings.reminderStyle || 'banner');
+          setReminderRequireAuth(fetchedSettings.reminderRequireAuth || false);
         }
 
         if (fetchedTasks) {
@@ -1036,6 +1081,34 @@ export default function AppIndex() {
           setSelectedTaskId(taskId);
           setActiveNotification(null);
         }}
+      />
+
+      {/* Full-Screen Reminder */}
+      <FullScreenReminder
+        visible={!!fullScreenNotification}
+        notification={fullScreenNotification}
+        task={fullScreenNotification ? tasks.find(t => t.id === fullScreenNotification.taskId) || null : null}
+        requireAuth={reminderRequireAuth}
+        onDismiss={() => setFullScreenNotification(null)}
+        onComplete={async (taskId: string, reflectionText: string) => {
+          const audit: AuditEntry = {
+            timestamp: Date.now(),
+            action: 'reminder_triggered',
+            details: {
+              reminderResponse: reflectionText || undefined,
+              reminderTriggerTime: Date.now(),
+            },
+          };
+          setTasks(prev => prev.map(t => {
+            if (t.id !== taskId) return t;
+            return { ...t, auditLog: [...(t.auditLog || []), audit] };
+          }));
+          await api.createAuditLog(taskId, audit).catch(err => {
+            console.error('Failed to save reminder reflection:', err);
+          });
+          setFullScreenNotification(null);
+        }}
+        colors={colors}
       />
     </View>
   );

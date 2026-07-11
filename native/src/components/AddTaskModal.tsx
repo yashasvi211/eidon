@@ -46,6 +46,7 @@ const REMIND_PRESETS = [
 /** All possible repeat-every options (filtered dynamically) */
 const REPEAT_OPTIONS = [
   { label: '5s ⚡',    value: 5 * 1000,                 },
+  { label: '2 min',      value: 2 * 60 * 1000,            },
   { label: '30 min',   value: 30 * 60 * 1000,           },
   { label: '1 hour',   value: 60 * 60 * 1000,           },
   { label: '2 hours',  value: 2 * 60 * 60 * 1000,       },

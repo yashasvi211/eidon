@@ -89,6 +89,10 @@ export default function Sidebar({
   const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
   const [connectionLoading, setConnectionLoading] = useState(false);
 
+  // Reminder settings state
+  const [reminderStyle, setReminderStyle] = useState<'banner' | 'fullscreen'>('banner');
+  const [reminderRequireAuth, setReminderRequireAuth] = useState(false);
+
   // Load settings on mount / when settings opens
   useEffect(() => {
     if (isSettingsOpen) {
@@ -104,6 +108,8 @@ export default function Sidebar({
         setSyncInterval(String(s.syncIntervalMinutes || 30));
         setAutoSyncEnabled(s.autoSyncEnabled || false);
         setLastSyncTime(s.lastSyncTime || null);
+        setReminderStyle(s.reminderStyle || 'banner');
+        setReminderRequireAuth(s.reminderRequireAuth || false);
       });
     } else {
       setSyncStatus(null);
@@ -397,6 +403,79 @@ export default function Sidebar({
                   <Switch
                     value={showCompleted}
                     onValueChange={setShowCompleted}
+                    trackColor={{ false: colors.ghBorder, true: colors.ghBlue }}
+                    thumbColor="#fff"
+                  />
+                </View>
+              </View>
+
+              {/* REMINDERS */}
+              <View style={styles.settingsSection}>
+                <Text style={[styles.settingsSectionTitle, { color: colors.ghMuted }]}>REMINDERS</Text>
+                
+                <Text style={[styles.settingsLabel, { color: colors.ghText, marginBottom: 8 }]}>Reminder Style</Text>
+                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
+                  <TouchableOpacity
+                    style={[{
+                      flex: 1,
+                      borderWidth: 1.5,
+                      borderRadius: 8,
+                      padding: 12,
+                      alignItems: 'center',
+                      borderColor: reminderStyle === 'banner' ? colors.ghBlue : colors.ghBorder,
+                      backgroundColor: reminderStyle === 'banner' ? colors.ghBlue + '12' : 'transparent',
+                    }]}
+                    onPress={() => {
+                      setReminderStyle('banner');
+                      api.updateSettings({ reminderStyle: 'banner' });
+                    }}
+                  >
+                    <Feather name="bell" size={18} color={reminderStyle === 'banner' ? colors.ghBlue : colors.ghMuted} />
+                    <Text style={{ color: reminderStyle === 'banner' ? colors.ghBlue : colors.ghMuted, fontSize: 12, fontWeight: '600', marginTop: 6 }}>
+                      Banner
+                    </Text>
+                    <Text style={{ color: colors.ghMuted, fontSize: 10, marginTop: 2, textAlign: 'center' }}>
+                      Drop-down notification
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[{
+                      flex: 1,
+                      borderWidth: 1.5,
+                      borderRadius: 8,
+                      padding: 12,
+                      alignItems: 'center',
+                      borderColor: reminderStyle === 'fullscreen' ? colors.ghBlue : colors.ghBorder,
+                      backgroundColor: reminderStyle === 'fullscreen' ? colors.ghBlue + '12' : 'transparent',
+                    }]}
+                    onPress={() => {
+                      setReminderStyle('fullscreen');
+                      api.updateSettings({ reminderStyle: 'fullscreen' });
+                    }}
+                  >
+                    <Feather name="maximize" size={18} color={reminderStyle === 'fullscreen' ? colors.ghBlue : colors.ghMuted} />
+                    <Text style={{ color: reminderStyle === 'fullscreen' ? colors.ghBlue : colors.ghMuted, fontSize: 12, fontWeight: '600', marginTop: 6 }}>
+                      Full Screen
+                    </Text>
+                    <Text style={{ color: colors.ghMuted, fontSize: 10, marginTop: 2, textAlign: 'center' }}>
+                      Alarm-style takeover
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.settingsRow}>
+                  <View style={{ flex: 1, paddingRight: 10 }}>
+                    <Text style={[styles.settingsLabel, { color: colors.ghText }]}>Require Authentication</Text>
+                    <Text style={[styles.settingsHelp, { color: colors.ghMuted }]}>
+                      Require authentication before viewing reminder content.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={reminderRequireAuth}
+                    onValueChange={(val) => {
+                      setReminderRequireAuth(val);
+                      api.updateSettings({ reminderRequireAuth: val });
+                    }}
                     trackColor={{ false: colors.ghBorder, true: colors.ghBlue }}
                     thumbColor="#fff"
                   />

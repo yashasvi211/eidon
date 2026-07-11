@@ -70,7 +70,8 @@ export interface AuditEntry {
     | "subtask_completed"
     | "subtask_uncompleted"
     | "subtask_added"
-    | "time_logged";
+    | "time_logged"
+    | "reminder_triggered";
   details?: {
     subtaskTitle?: string;
     oldDue?: string;
@@ -79,6 +80,8 @@ export interface AuditEntry {
     newEst?: string;
     note?: string;
     duration?: number;
+    reminderResponse?: string;
+    reminderTriggerTime?: number;
   };
 }
 
@@ -324,6 +327,7 @@ const AUDIT_ICONS: {
   },
   subtask_added: { iconName: "plus-square", library: "Feather", label: "Subtask added", color: "#58a6ff" },
   time_logged: { iconName: "clock", library: "Feather", label: "Manual time logged", color: "#8a2be2" },
+  reminder_triggered: { iconName: "bell", library: "Feather", label: "Reminder triggered", color: "#58a6ff" },
 };
 
 
@@ -1419,6 +1423,10 @@ export default function DetailPanel({
                     detailsText = `for ${dur}${noteStr}`;
                   } else if (entry.action === "due_changed") {
                     detailsText = `to ${fmtDateDisplay(entry.details?.newDue)}`;
+                  } else if (entry.action === "reminder_triggered") {
+                    detailsText = entry.details?.reminderResponse
+                      ? `Response: "${entry.details.reminderResponse}"`
+                      : "(no response)";
                   }
 
                   return (

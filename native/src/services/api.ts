@@ -22,6 +22,8 @@ interface AppDatabase {
     syncIntervalMinutes: number;
     lastSyncTime: number | null;
     autoSyncEnabled: boolean;
+    reminderStyle: 'banner' | 'fullscreen';
+    reminderRequireAuth: boolean;
   };
 }
 
@@ -38,6 +40,8 @@ let memoryDb: AppDatabase = {
     syncIntervalMinutes: 30,
     lastSyncTime: null,
     autoSyncEnabled: false,
+    reminderStyle: 'banner',
+    reminderRequireAuth: false,
   }
 };
 
@@ -63,6 +67,8 @@ async function loadDb() {
           syncIntervalMinutes: 30,
           lastSyncTime: null,
           autoSyncEnabled: false,
+          reminderStyle: 'banner',
+          reminderRequireAuth: false,
         };
       } else {
         memoryDb.settings = {
@@ -75,6 +81,8 @@ async function loadDb() {
           syncIntervalMinutes: memoryDb.settings.syncIntervalMinutes ?? 30,
           lastSyncTime: memoryDb.settings.lastSyncTime ?? null,
           autoSyncEnabled: memoryDb.settings.autoSyncEnabled ?? false,
+          reminderStyle: memoryDb.settings.reminderStyle ?? 'banner',
+          reminderRequireAuth: memoryDb.settings.reminderRequireAuth ?? false,
         };
       }
     }
@@ -333,7 +341,7 @@ export const api = {
         if (parsed.tasks) {
           memoryDb = { ...memoryDb, ...parsed };
           if (!memoryDb.settings) {
-            memoryDb.settings = { isSleeping: false, sleepStartTime: null, dropboxToken: '', dropboxRefreshToken: '', tokenExpiresAt: 0, dropboxPath: '/eidon_db.json', syncIntervalMinutes: 30, lastSyncTime: null, autoSyncEnabled: false };
+            memoryDb.settings = { isSleeping: false, sleepStartTime: null, dropboxToken: '', dropboxRefreshToken: '', tokenExpiresAt: 0, dropboxPath: '/eidon_db.json', syncIntervalMinutes: 30, lastSyncTime: null, autoSyncEnabled: false, reminderStyle: 'banner', reminderRequireAuth: false };
           }
           await saveDb();
           return true;

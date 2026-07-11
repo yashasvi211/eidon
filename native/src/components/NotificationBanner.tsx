@@ -70,15 +70,17 @@ export default function NotificationBanner({ notification, onDismiss, onPress }:
 
   if (!notification) return null;
 
+  const isDark = scheme === 'dark';
+
   return (
     <Animated.View
       style={[
         styles.container,
         {
-          top: insets.top + 8,
-          backgroundColor: colors.ghSurface,
-          borderColor: colors.ghBlue,
-          shadowColor: colors.ghBlue,
+          top: insets.top + 12,
+          backgroundColor: isDark ? 'rgba(30, 35, 40, 0.95)' : 'rgba(255, 255, 255, 0.95)',
+          borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)',
+          shadowColor: '#000',
         },
         animatedStyle,
       ]}
@@ -89,11 +91,14 @@ export default function NotificationBanner({ notification, onDismiss, onPress }:
           if (onPress) onPress(notification.taskId);
           dismiss();
         }}
-        activeOpacity={0.8}
+        activeOpacity={0.7}
       >
-        <View style={[styles.iconCircle, { backgroundColor: colors.ghBlue + '20' }]}>
-          <Feather name="bell" size={16} color={colors.ghBlue} />
+        <View style={styles.iconContainer}>
+          <View style={[styles.iconCircle, { backgroundColor: colors.ghBlue + '15' }]}>
+            <Feather name="bell" size={16} color={colors.ghBlue} />
+          </View>
         </View>
+        
         <View style={styles.textContainer}>
           <Text style={[styles.title, { color: colors.ghText }]} numberOfLines={1}>
             {notification.taskTitle}
@@ -102,14 +107,12 @@ export default function NotificationBanner({ notification, onDismiss, onPress }:
             {notification.message}
           </Text>
         </View>
-        <TouchableOpacity
-          style={[styles.dismissBtn, { backgroundColor: colors.ghSurface2 }]}
-          onPress={dismiss}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Feather name="x" size={14} color={colors.ghMuted} />
-        </TouchableOpacity>
       </TouchableOpacity>
+
+      {/* Swipe up indicator line at bottom */}
+      <View style={styles.indicatorContainer}>
+        <View style={[styles.indicatorLine, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)' }]} />
+      </View>
     </Animated.View>
   );
 }
@@ -117,46 +120,56 @@ export default function NotificationBanner({ notification, onDismiss, onPress }:
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    left: 16,
-    right: 16,
+    left: 12,
+    right: 12,
     zIndex: 10000,
-    borderRadius: 12,
+    borderRadius: 18,
     borderWidth: 1,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 8,
+    overflow: 'hidden',
   },
   content: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 14,
-    gap: 12,
+    padding: 16,
+    paddingBottom: 14,
+    gap: 14,
+  },
+  iconContainer: {
+    alignSelf: 'flex-start',
+    marginTop: 2,
   },
   iconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   textContainer: {
     flex: 1,
-    gap: 2,
+    gap: 4,
   },
   title: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: -0.3,
   },
   message: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '400',
+    lineHeight: 18,
   },
-  dismissBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  indicatorContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingBottom: 8,
+  },
+  indicatorLine: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
   },
 });
