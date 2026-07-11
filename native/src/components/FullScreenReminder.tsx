@@ -8,9 +8,10 @@ import {
   TextInput,
   useColorScheme,
   useWindowDimensions,
-  StatusBar,
   KeyboardAvoidingView,
   Platform,
+  Image,
+  StatusBar,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as LocalAuthentication from "expo-local-authentication";
@@ -37,7 +38,7 @@ import SwipeButton from "./sub_components/SwipeButton";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-type ReminderPhase = "locked" | "details" | "acknowledge" | "reflect";
+type ReminderPhase = "locked" | "details" | "acknowledge" | "reflect" | "final_confirm";
 
 interface FullScreenReminderProps {
   visible: boolean;
@@ -125,6 +126,7 @@ export default function FullScreenReminder({
   const contentScale = useSharedValue(0.9);
   const phaseProgress = useSharedValue(0);
   const authSuccessProgress = useSharedValue(0);
+  const finalSignatureProgress = useSharedValue(0);
 
   // ── Clock tick ──
   useEffect(() => {
@@ -147,8 +149,12 @@ export default function FullScreenReminder({
   }, []);
 
   const stopAlarmSound = useCallback(() => {
-    if (player) {
-      player.pause();
+    try {
+      if (player) {
+        player.pause();
+      }
+    } catch (e) {
+      console.log("Audio pause error caught:", e);
     }
   }, [player]);
 
@@ -162,6 +168,7 @@ export default function FullScreenReminder({
       setAuthSuccess(false);
       authSuccessProgress.value = 0;
       phaseProgress.value = 0;
+      finalSignatureProgress.value = 0;
 
       // Animate in
       overlayOpacity.value = withTiming(1, { duration: 400 });
@@ -242,17 +249,24 @@ export default function FullScreenReminder({
     setPhase("reflect");
   };
 
-  // ── Submit reflection ──
-  const handleSubmitReflection = () => {
-    if (notification) {
-      onComplete(notification.taskId, reflectionText.trim());
+  const handlePlanSubmitted = () => {
+    if (reflectionText.trim()) {
+      setPhase("final_confirm");
     }
   };
 
   const handleSkipReflection = () => {
-    if (notification) {
-      onComplete(notification.taskId, "");
-    }
+    setPhase("final_confirm");
+  };
+
+  const handleFinalize = () => {
+    // Play the signature animation then complete
+    finalSignatureProgress.value = withTiming(1, { duration: 1500 });
+    setTimeout(() => {
+      if (notification) {
+        onComplete(notification.taskId, reflectionText.trim());
+      }
+    }, 1500);
   };
 
   // ── Animated styles ──
@@ -291,6 +305,15 @@ export default function FullScreenReminder({
     return { opacity, transform: [{ translateY }] };
   });
 
+  const signatureCheckStyle = useAnimatedStyle(() => {
+    return {
+      opacity: interpolate(finalSignatureProgress.value, [0, 0.1, 0.8, 1], [0, 1, 1, 0]),
+      transform: [
+        { scale: interpolate(finalSignatureProgress.value, [0, 0.5, 1], [0.5, 1.2, 1.5]) }
+      ]
+    };
+  });
+
   // ── Time display ──
   const hours = currentTime.getHours();
   const minutes = currentTime.getMinutes();
@@ -314,7 +337,9 @@ export default function FullScreenReminder({
       transparent
       animationType="none"
       statusBarTranslucent
-      onRequestClose={onDismiss}
+      onRequestClose={() => {
+        // Prevent back button from dismissing
+      }}
     >
       <GestureHandlerRootView style={{ flex: 1 }}>
         <StatusBar barStyle="light-content" />
@@ -395,34 +420,31 @@ export default function FullScreenReminder({
               </Animated.View>
             )}
 
-            {/* ─── PHASE: DETAILS ─── */}
+                {/* ─── PHASE: DETAILS ─── */}
             {phase === "details" && (
               <Animated.View
                 entering={FadeIn.duration(400)}
                 style={styles.phaseContainer}
               >
-                {/* Time */}
-                <View style={styles.timeContainer}>
-                  <Text style={styles.timeText}>{time12Str}</Text>
-                  <Text style={styles.ampmText}>{ampm}</Text>
-                </View>
-
-                {/* Reminder Label */}
-                <View style={styles.reminderLabelRow}>
-                  <View style={styles.bellPulse}>
-                    <Feather name="bell" size={20} color="#58a6ff" />
+                <View style={styles.centerAllContainer}>
+                  {/* App Icon */}
+                  <Image source={require("../../assets/images/icon.png")} style={styles.appIcon} />
+                  
+                  {/* Time */}
+                  <View style={[styles.timeContainer, { marginTop: 12 }]}>
+                    <Text style={styles.timeText}>{time12Str}</Text>
+                    <Text style={styles.ampmText}>{ampm}</Text>
                   </View>
-                  <Text style={styles.reminderLabel}>Reminder</Text>
-                </View>
 
-                {/* Task Details */}
-                <View style={styles.detailsCard}>
-                  <Text style={styles.taskTitle} numberOfLines={3}>
+                  <View style={styles.dividerLine} />
+
+                  {/* Task Details perfectly centered */}
+                  <Text style={styles.taskTitleCentered} numberOfLines={3}>
                     {task?.title || notification.taskTitle}
                   </Text>
 
                   {task?.due && (
-                    <View style={styles.detailRow}>
+                    <View style={styles.detailRowCentered}>
                       <Feather name="calendar" size={14} color={deadlineColor} />
                       <Text style={[styles.detailText, { color: deadlineColor }]}>
                         {fmtDateDisplay(task.due)}
@@ -433,7 +455,7 @@ export default function FullScreenReminder({
                   )}
 
                   {task?.project && (
-                    <View style={styles.detailRow}>
+                    <View style={styles.detailRowCentered}>
                       <Feather name="folder" size={14} color="#bc8cff" />
                       <Text style={[styles.detailText, { color: "#bc8cff" }]}>
                         {task.project}
@@ -442,7 +464,7 @@ export default function FullScreenReminder({
                   )}
 
                   {task?.notes && (
-                    <View style={styles.notesSection}>
+                    <View style={[styles.notesSection, { alignSelf: 'stretch', marginTop: 24 }]}>
                       <Text style={styles.notesLabel}>Notes</Text>
                       <Text style={styles.notesText} numberOfLines={4}>
                         {task.notes}
@@ -527,9 +549,9 @@ export default function FullScreenReminder({
                       placeholderTextColor="rgba(255,255,255,0.3)"
                       value={reflectionText}
                       onChangeText={setReflectionText}
-                      multiline
-                      numberOfLines={4}
-                      textAlignVertical="top"
+                      returnKeyType="done"
+                      blurOnSubmit={true}
+                      onSubmitEditing={handlePlanSubmitted}
                       autoFocus
                     />
                   </View>
@@ -545,7 +567,7 @@ export default function FullScreenReminder({
                             : "rgba(63, 185, 80, 0.3)",
                         },
                       ]}
-                      onPress={handleSubmitReflection}
+                      onPress={handlePlanSubmitted}
                       disabled={!reflectionText.trim()}
                       activeOpacity={0.7}
                     >
@@ -567,6 +589,48 @@ export default function FullScreenReminder({
                     </TouchableOpacity>
                   </View>
                 </KeyboardAvoidingView>
+              </Animated.View>
+            )}
+            {/* ─── PHASE: FINAL CONFIRM ─── */}
+            {phase === "final_confirm" && (
+              <Animated.View
+                entering={FadeIn.duration(400)}
+                style={styles.phaseContainer}
+              >
+                <View style={styles.centerAllContainer}>
+                  <View style={[styles.ackIconCircle, { backgroundColor: 'rgba(63, 185, 80, 0.12)' }]}>
+                    <Feather name="check-circle" size={32} color="#3fb950" />
+                  </View>
+                  <Text style={styles.ackTitle}>Plan Captured</Text>
+                  <Text style={styles.ackSubtitle} numberOfLines={2}>
+                    {reflectionText ? `"${reflectionText}"` : "No reflection added"}
+                  </Text>
+
+                  {/* E-Signature checkmark overlay */}
+                  <Animated.View 
+                    style={[
+                      StyleSheet.absoluteFill, 
+                      { alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' },
+                      signatureCheckStyle
+                    ]}
+                  >
+                    <Feather name="check" size={120} color="#3fb950" />
+                  </Animated.View>
+                </View>
+
+                <View style={[styles.bottomAction, { paddingHorizontal: 32 }]}>
+                  <SwipeButton
+                    text="Swipe to Finalize"
+                    onSwipeSuccess={handleFinalize}
+                    colors={{
+                      ...colors,
+                      ghSurface2: "rgba(255,255,255,0.08)",
+                      ghBorder: "rgba(255,255,255,0.15)",
+                      ghMuted: "rgba(255,255,255,0.5)",
+                      ghBlue: "#3fb950", // Use green for finalize
+                    }}
+                  />
+                </View>
               </Animated.View>
             )}
           </Animated.View>
@@ -593,11 +657,22 @@ const styles = StyleSheet.create({
   },
 
   // ── Time ──
+  centerAllContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
+  appIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    marginBottom: 8,
+  },
   timeContainer: {
     flexDirection: "row",
     alignItems: "baseline",
     justifyContent: "center",
-    marginTop: 24,
     gap: 8,
   },
   timeText: {
@@ -704,6 +779,27 @@ const styles = StyleSheet.create({
   },
 
   // ── Details Phase ──
+  dividerLine: {
+    height: 1,
+    width: "40%",
+    backgroundColor: "rgba(255,255,255,0.15)",
+    marginVertical: 24,
+  },
+  taskTitleCentered: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#ffffff",
+    marginBottom: 20,
+    lineHeight: 36,
+    textAlign: "center",
+  },
+  detailRowCentered: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    marginBottom: 12,
+  },
   detailsCard: {
     flex: 1,
     justifyContent: "center",
