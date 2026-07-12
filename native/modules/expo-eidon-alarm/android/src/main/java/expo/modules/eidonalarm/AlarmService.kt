@@ -103,19 +103,25 @@ class AlarmService : Service() {
         // 5. Play Sound
         try {
             val soundResId = resources.getIdentifier("notification_sound_1", "raw", packageName)
+            Log.d("EidonAlarm", "Sound resource ID: $soundResId")
             if (soundResId != 0) {
-                mediaPlayer = MediaPlayer.create(this, soundResId)?.apply {
-                    isLooping = true
-                    val audioAttributes = AudioAttributes.Builder()
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .build()
+                val audioAttributes = AudioAttributes.Builder()
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .build()
+                // Create MediaPlayer manually so we set AudioAttributes BEFORE prepare
+                mediaPlayer = MediaPlayer().apply {
                     setAudioAttributes(audioAttributes)
+                    val afd = resources.openRawResourceFd(soundResId)
+                    setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                    afd.close()
+                    isLooping = true
+                    prepare()
                     start()
                 }
-                Log.d("EidonAlarm", "Alarm sound started playing")
+                Log.d("EidonAlarm", "Alarm sound started playing successfully")
             } else {
-                Log.w("EidonAlarm", "notification_sound_1.mp3 not found in res/raw")
+                Log.w("EidonAlarm", "notification_sound_1 not found in res/raw!")
             }
         } catch (e: Exception) {
             Log.e("EidonAlarm", "Failed to play sound", e)

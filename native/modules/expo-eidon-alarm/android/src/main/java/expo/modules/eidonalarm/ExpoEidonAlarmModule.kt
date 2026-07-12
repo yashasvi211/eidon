@@ -4,7 +4,10 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
+import android.util.Log
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
@@ -43,6 +46,7 @@ class ExpoEidonAlarmModule : Module() {
           val alarmClockInfo = AlarmManager.AlarmClockInfo(triggerTimeMs.toLong(), pendingIntent)
           alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
         }
+        Log.d("EidonAlarm", "Alarm scheduled for taskId=$taskId at $triggerTimeMs")
       }
     }
 
@@ -71,20 +75,21 @@ class ExpoEidonAlarmModule : Module() {
         // Clear the shared preference
         val prefs = context.getSharedPreferences("eidon_alarm_prefs", Context.MODE_PRIVATE)
         prefs.edit().remove("enqueued_task_id").apply()
+        Log.d("EidonAlarm", "stopAlarm called — service stopped, prefs cleared")
       }
     }
 
     Function("getEnqueuedAlarm") { ->
       var taskId: String? = null
 
-      // Method 1: Check the activity intent extras (set by AlarmService launching the activity)
+      // Method 1: Check the activity intent extras
       val activity = appContext.currentActivity
       if (activity != null) {
         val intent = activity.intent
         if (intent?.getBooleanExtra("expo.modules.eidonalarm.isAlarm", false) == true) {
           taskId = intent.getStringExtra("expo.modules.eidonalarm.taskId")
-          // Clear the flag so we don't trigger it again on hot reload
           intent.removeExtra("expo.modules.eidonalarm.isAlarm")
+          Log.d("EidonAlarm", "getEnqueuedAlarm: found via intent extras: $taskId")
         }
       }
 
@@ -96,13 +101,59 @@ class ExpoEidonAlarmModule : Module() {
           val storedTaskId = prefs.getString("enqueued_task_id", null)
           if (storedTaskId != null) {
             taskId = storedTaskId
-            // Clear it after reading
             prefs.edit().remove("enqueued_task_id").apply()
+            Log.d("EidonAlarm", "getEnqueuedAlarm: found via SharedPreferences: $taskId")
           }
         }
       }
 
       taskId
+    }
+
+    // ── Overlay Permission (Draw Over Other Apps) ──
+
+    Function("canDrawOverlays") { ->
+      val context = appContext.reactContext
+      if (context != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        Settings.canDrawOverlays(context)
+      } else {
+        true // Pre-M doesn't need this permission
+      }
+    }
+
+    Function("openOverlaySettings") {
+      val activity = appContext.currentActivity
+      if (activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        val intent = Intent(
+          Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+          Uri.parse("package:${activity.packageName}")
+        )
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        activity.startActivity(intent)
+      }
+    }
+
+    // ── Exact Alarm Permission ──
+
+    Function("canScheduleExactAlarms") { ->
+      val context = appContext.reactContext
+      if (context != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        alarmManager.canScheduleExactAlarms()
+      } else {
+        true // Pre-S doesn't need this
+      }
+    }
+
+    Function("openExactAlarmSettings") {
+      val activity = appContext.currentActivity
+      if (activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+          data = Uri.parse("package:${activity.packageName}")
+          addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        activity.startActivity(intent)
+      }
     }
   }
 }

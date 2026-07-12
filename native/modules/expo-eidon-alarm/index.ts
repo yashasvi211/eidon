@@ -19,3 +19,21 @@ export function stopAlarm(): void {
 export function getEnqueuedAlarm(): string | null {
   return ExpoEidonAlarmModule.getEnqueuedAlarm();
 }
+
+// ── Permissions ──
+
+export function canDrawOverlays(): boolean {
+  return ExpoEidonAlarmModule.canDrawOverlays();
+}
+
+export function openOverlaySettings(): void {
+  return ExpoEidonAlarmModule.openOverlaySettings();
+}
+
+export function canScheduleExactAlarms(): boolean {
+  return ExpoEidonAlarmModule.canScheduleExactAlarms();
+}
+
+export function openExactAlarmSettings(): void {
+  return ExpoEidonAlarmModule.openExactAlarmSettings();
+}

@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Modal,
   Platform,
+  Alert,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -453,6 +454,48 @@ export default function AppIndex() {
     loadInitialData();
     registerForPushNotificationsAsync();
   }, []);
+
+  // Check Android alarm permissions when reminderStyle changes to fullscreen
+  useEffect(() => {
+    if (Platform.OS !== 'android' || reminderStyle !== 'fullscreen') return;
+
+    const checkPermissions = async () => {
+      try {
+        const hasOverlay = EidonAlarm.canDrawOverlays();
+        const hasExactAlarm = EidonAlarm.canScheduleExactAlarms();
+
+        if (!hasOverlay) {
+          Alert.alert(
+            'Permission Required',
+            'To show full-screen reminders even when the app is closed, Eidon needs the "Display over other apps" permission.\n\nPlease enable it in the next screen.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Open Settings',
+                onPress: () => EidonAlarm.openOverlaySettings(),
+              },
+            ]
+          );
+        } else if (!hasExactAlarm) {
+          Alert.alert(
+            'Permission Required',
+            'To schedule precise alarm reminders, Eidon needs the "Alarms & reminders" permission.\n\nPlease enable it in the next screen.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              {
+                text: 'Open Settings',
+                onPress: () => EidonAlarm.openExactAlarmSettings(),
+              },
+            ]
+          );
+        }
+      } catch (e) {
+        console.warn('Permission check failed:', e);
+      }
+    };
+
+    checkPermissions();
+  }, [reminderStyle]);
 
   // Start auto-sync if enabled
   useEffect(() => {
