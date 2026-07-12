@@ -718,7 +718,7 @@ export default function AppIndex() {
           return [...prev, newTask];
         });
         handleSyncNotifications(newTask);
-        showToast(reminderConfig ? "Task created with reminder!" : "Task created!");
+        // showToast(reminderConfig ? "Task created with reminder!" : "Task created!");
       })
       .catch((err: any) => {
         console.error("Failed to create task:", err);

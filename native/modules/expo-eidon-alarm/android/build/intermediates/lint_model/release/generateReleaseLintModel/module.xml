@@ -1,0 +1,18 @@
+<lint-module
+    format="1"
+    dir="/run/media/anuj/Drive/Projects/eidon/native/modules/expo-eidon-alarm/android"
+    name=":expo-eidon-alarm"
+    type="LIBRARY"
+    maven="expo.modules.eidonalarm:expo-eidon-alarm:0.1.0"
+    agpVersion="8.12.0"
+    buildFolder="build"
+    bootClassPath="/home/anuj/Android/Sdk/platforms/android-36/android.jar:/home/anuj/Android/Sdk/build-tools/35.0.0/core-lambda-stubs.jar"
+    javaSourceLevel="17"
+    compileTarget="android-36"
+    neverShrinking="true">
+  <lintOptions
+      absolutePaths="true"
+      checkReleaseBuilds="true"
+      explainIssues="true"/>
+  <variant name="release"/>
+</lint-module>

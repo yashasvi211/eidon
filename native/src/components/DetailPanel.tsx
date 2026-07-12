@@ -340,7 +340,10 @@ const AUDIT_ICONS: {
 
 
 
-const getDeadlineInfo = (dueDate?: string, colors?: any) => {
+const getDeadlineInfo = (dueDate?: string, colors?: any, isDone?: boolean) => {
+  if (isDone) {
+    return { color: colors.ghGreen || "#3fb950", label: "Completed", dotColor: colors.ghGreen || "#3fb950" };
+  }
   if (!dueDate)
     return { color: colors.ghText, label: "", dotColor: "transparent" };
   const now = new Date();
@@ -706,7 +709,7 @@ export default function DetailPanel({
   const totalSubtasks = subtasks.length;
   const progress = getSubtaskProgressInfo(subtasksDone, totalSubtasks, colors);
 
-  const dlInfo = getDeadlineInfo(task.due, colors);
+  const dlInfo = getDeadlineInfo(task.due, colors, task.done);
   const isThisTaskTimerRunning =
     isTimerRunning && activeTimerTaskId === task.id;
 

@@ -211,12 +211,12 @@ export default function CalendarModal({ visible, onClose, onSelectDate, initialD
           ))}
 
           {/* Footer Actions */}
-          <View style={[styles.calendarFooter, { borderColor: colors.ghBorder }]}>
-            <TouchableOpacity style={[styles.btnTime, { borderColor: colors.ghBorder, backgroundColor: colors.ghSurface2 }]} onPress={() => animateClose(onClose)}>
-              <Text style={[styles.btnTextTime, { color: colors.ghText }]}>Cancel</Text>
+          <View style={[styles.calendarFooter, { borderColor: 'transparent' }]}>
+            <TouchableOpacity style={[styles.btnTime, { borderColor: colors.ghBorder }]} onPress={() => animateClose(onClose)}>
+              <Text style={{ color: colors.ghMuted, fontSize: 13, fontWeight: '500' }}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.btnTime, { backgroundColor: colors.ghBlue, borderColor: colors.ghBlue }]} onPress={handleSave}>
-              <Text style={[styles.btnTextTime, { color: "#ffffff" }]}>OK</Text>
+              <Text style={{ color: "#ffffff", fontSize: 13, fontWeight: '600' }}>OK</Text>
             </TouchableOpacity>
           </View>
         </RNAnimated.View>
@@ -278,23 +278,18 @@ const styles = StyleSheet.create({
   },
   calendarFooter: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    justifyContent: "flex-end",
+    gap: 10,
     marginTop: 16,
-    borderTopWidth: 1,
+    borderTopWidth: 0,
     paddingTop: 16,
-    borderColor: 'transparent',
   },
   btnTime: {
-    flex: 1,
-    height: 40,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    marginHorizontal: 4,
-  },
-  btnTextTime: {
-    fontSize: 14,
-    fontWeight: "600",
   },
 });

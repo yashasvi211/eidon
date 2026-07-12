@@ -260,151 +260,130 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
     setShowClock(false);
   };
 
-  const canSubmit = title.trim().length > 0 && (!due || (due && dueTime !== null));
-
+  const isPastDue = due !== null && dueTime !== null && dueDateTimeMs !== null && dueDateTimeMs <= Date.now();
+  const hasDateButNoTime = due !== null && dueTime === null;
+  const hasTimeButNoDate = due === null && dueTime !== null;
+  const canSubmit = title.trim().length > 0 && due !== null && !hasDateButNoTime && !hasTimeButNoDate && !isPastDue;
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
-        <RNAnimated.View style={[styles.modal, { backgroundColor: colors.ghSurface, borderColor: colors.ghBorder, transform: [{ scale: scaleAnim }], opacity: opacityAnim }]}>
-          <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-            <Text style={[styles.modalTitle, { color: colors.ghText }]}>New Task</Text>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <RNAnimated.View style={[styles.overlay, { opacity: opacityAnim }]}>
+          <RNAnimated.View style={[styles.modal, { backgroundColor: colors.ghSurface, borderColor: colors.ghBorder, transform: [{ scale: scaleAnim }] }]}>
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <Text style={[styles.modalTitle, { color: colors.ghText }]}>New Task</Text>
 
-            {/* ── Title ── */}
-            <Text style={[styles.label, { color: colors.ghMuted }]}>Title</Text>
-            <TextInput
-              style={[styles.input, { color: colors.ghText, backgroundColor: colors.ghBg, borderColor: colors.ghBorder }]}
-              placeholder="What needs to be done?"
-              placeholderTextColor={colors.ghMuted}
-              value={title}
-              onChangeText={setTitle}
-              autoFocus
-            />
+              {/* ── Title ── */}
+              <Text style={[styles.label, { color: colors.ghMuted }]}>Title</Text>
+              <TextInput
+                style={[styles.input, { color: colors.ghText, backgroundColor: colors.ghBg, borderColor: colors.ghBorder }]}
+                placeholder="What needs to be done?"
+                placeholderTextColor={colors.ghMuted}
+                value={title}
+                onChangeText={setTitle}
+                autoFocus
+              />
 
-            {/* ── Project ── */}
-            <Text style={[styles.label, { color: colors.ghMuted }]}>Project</Text>
-            <View style={styles.chipRow}>
-              {allProjects.map((p) => (
-                <TouchableOpacity
-                  key={p.name}
-                  style={[
-                    styles.chip,
-                    {
-                      borderColor: project === p.name ? p.color : colors.ghBorder,
-                      backgroundColor: project === p.name ? p.color + '18' : 'transparent',
-                    },
-                  ]}
-                  onPress={() => setProject(p.name)}
-                >
-                  <Text style={{ color: project === p.name ? p.color : colors.ghMuted, fontSize: 12, fontWeight: '500' }}>
-                    {p.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            {/* ── Due Date ── */}
-            <Text style={[styles.label, { color: colors.ghMuted }]}>Due Date</Text>
-            <View style={styles.dueDateRow}>
-              <TouchableOpacity
-                style={[
-                  styles.dateBtn,
-                  {
-                    backgroundColor: colors.ghBg,
-                    borderColor: due ? colors.ghBlue : colors.ghBorder,
-                  },
-                ]}
-                onPress={() => setShowCalendar(true)}
-              >
-                <Feather name="calendar" size={14} color={due ? colors.ghBlue : colors.ghMuted} />
-                <Text style={{ color: due ? colors.ghText : colors.ghMuted, fontSize: 13, flex: 1 }}>
-                  {due ? fmtDateDisplay(due) : 'Select date…'}
-                </Text>
-              </TouchableOpacity>
-              {due && (
-                <TouchableOpacity
-                  style={[styles.clearBtn, { backgroundColor: colors.ghSurface2 }]}
-                  onPress={handleClearDate}
-                >
-                  <Feather name="x" size={14} color={colors.ghMuted} />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* Calendar & Clock Modals */}
-            <CalendarModal
-              visible={showCalendar}
-              onClose={() => setShowCalendar(false)}
-              onSelectDate={handleSelectDate}
-              initialDateStr={due ? due.split('-').reverse().join('/') : ''}
-              colors={colors}
-            />
-
-            <AnalogClockModal
-              visible={showClock}
-              onClose={() => setShowClock(false)}
-              onSelectTime={handleSelectTime}
-              // Basic conversion for initialTimeStr
-              initialTimeStr={
-                dueTime 
-                  ? (() => {
-                      const [h, m] = dueTime.split(':').map(Number);
-                      const ampm = h >= 12 ? 'PM' : 'AM';
-                      const hour12 = h % 12 || 12;
-                      return `${hour12}:${m.toString().padStart(2, '0')} ${ampm}`;
-                    })()
-                  : '09:00 AM'
-              }
-              colors={colors}
-              title="Select Due Time"
-            />
-            
-            {/* Time selection when date is selected */}
-            {due && (
-              <View style={{ marginTop: 12 }}>
-                <Text style={[styles.label, { color: colors.ghMuted, marginTop: 4, marginBottom: 6 }]}>Due Time (Required)</Text>
-                
-                <View style={[styles.chipRow, { marginBottom: 8 }]}>
+              {/* ── Project ── */}
+              <Text style={[styles.label, { color: colors.ghMuted }]}>Project</Text>
+              <View style={styles.chipRow}>
+                {allProjects.map((p) => (
                   <TouchableOpacity
+                    key={p.name}
                     style={[
                       styles.chip,
                       {
-                        borderColor: dueTime ? colors.ghBlue : colors.ghPurple,
-                        backgroundColor: (dueTime ? colors.ghBlue : colors.ghPurple) + '18',
-                        paddingVertical: 6,
-                        paddingHorizontal: 12,
+                        borderColor: project === p.name ? p.color : colors.ghBorder,
+                        backgroundColor: project === p.name ? p.color + '18' : 'transparent',
+                      },
+                    ]}
+                    onPress={() => setProject(p.name)}
+                  >
+                    <Text style={{ color: project === p.name ? p.color : colors.ghMuted, fontSize: 12, fontWeight: '500' }}>
+                      {p.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* ── Due Date & Time ── */}
+              <View>
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.label, { color: colors.ghMuted }]}>Due Date</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.label, { color: colors.ghMuted }]}>Due Time *</Text>
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                  <TouchableOpacity
+                    style={[
+                      styles.dateBtn,
+                      {
+                        backgroundColor: colors.ghBg,
+                        borderColor: due ? colors.ghBlue : colors.ghBorder,
+                      },
+                    ]}
+                    onPress={() => setShowCalendar(true)}
+                  >
+                    <Feather name="calendar" size={14} color={due ? colors.ghBlue : colors.ghMuted} />
+                    <Text style={{ color: due ? colors.ghText : colors.ghMuted, fontSize: 13, flex: 1 }} numberOfLines={1}>
+                      {due ? fmtDateDisplay(due) : 'Select date…'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.dateBtn,
+                      {
+                        backgroundColor: colors.ghBg,
+                        borderColor: dueTime ? colors.ghBlue : colors.ghBorder,
                       },
                     ]}
                     onPress={() => setShowClock(true)}
                   >
-                    <Text style={{ color: dueTime ? colors.ghBlue : colors.ghPurple, fontSize: 12, fontWeight: '600' }}>
-                      {dueTime ? `Time: ${formatTime12h(dueTime)}` : 'Select Time'}
+                    <Feather name="clock" size={14} color={dueTime ? colors.ghBlue : colors.ghMuted} />
+                    <Text style={{ color: dueTime ? colors.ghText : colors.ghMuted, fontSize: 13, flex: 1 }} numberOfLines={1}>
+                      {dueTime ? formatTime12h(dueTime) : 'Select time…'}
                     </Text>
                   </TouchableOpacity>
-
-                  {dueTime && (
-                    <TouchableOpacity
-                      style={[
-                        styles.chip,
-                        {
-                          borderColor: colors.ghBorder,
-                          backgroundColor: 'transparent',
-                          paddingVertical: 6,
-                          paddingHorizontal: 12,
-                        },
-                      ]}
-                      onPress={() => setDueTime(null)}
-                    >
-                      <Text style={{ color: colors.ghMuted, fontSize: 12, fontWeight: '600' }}>
-                        Clear Time
-                      </Text>
-                    </TouchableOpacity>
-                  )}
                 </View>
+                {isPastDue && (
+                  <Text style={{ color: colors.ghRed || '#f85149', fontSize: 12, marginTop: 8, fontStyle: 'italic' }}>
+                    * Due time cannot be in the past
+                  </Text>
+                )}
               </View>
-            )}
 
-            {/* ── Reminders (Side by Side layout) ── */}
-            {due && (
+              {/* Calendar & Clock Modals */}
+              <CalendarModal
+                visible={showCalendar}
+                onClose={() => setShowCalendar(false)}
+                onSelectDate={handleSelectDate}
+                initialDateStr={due ? due.split('-').reverse().join('/') : ''}
+                colors={colors}
+              />
+
+              <AnalogClockModal
+                visible={showClock}
+                onClose={() => setShowClock(false)}
+                onSelectTime={handleSelectTime}
+                // Basic conversion for initialTimeStr
+                initialTimeStr={
+                  dueTime 
+                    ? (() => {
+                        const [h, m] = dueTime.split(':').map(Number);
+                        const ampm = h >= 12 ? 'PM' : 'AM';
+                        const hour12 = h % 12 || 12;
+                        return `${hour12}:${m.toString().padStart(2, '0')} ${ampm}`;
+                      })()
+                    : '09:00 AM'
+                }
+                colors={colors}
+                title="Select Due Time"
+              />
+
+              {/* ── Reminders (Side by Side layout) ── */}
               <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
                 {/* Start Reminding */}
                 <View style={{ flex: 1 }}>
@@ -415,87 +394,64 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
                     </Text>
                   </View>
 
-                  {availableOffsets.length > 0 ? (
-                    <TouchableOpacity
-                      style={[
-                        styles.chip,
-                        {
-                          borderColor: colors.ghBorder,
-                          backgroundColor: colors.ghBg,
-                          paddingVertical: 10,
-                          paddingHorizontal: 12,
-                          flexDirection: 'row',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          borderRadius: 8,
-                        },
-                      ]}
-                      onPress={() => setShowOffsetDropdown(true)}
-                    >
-                      <Text style={{ color: remindBefore !== null ? colors.ghText : colors.ghMuted, fontSize: 13, fontWeight: '500' }}>
-                        {remindBefore !== null ? availableOffsets.find(p => p.value === remindBefore)?.label : 'Select...'}
-                      </Text>
-                      <Feather name="chevron-down" size={16} color={colors.ghMuted} />
-                    </TouchableOpacity>
-                  ) : (
-                    <Text style={[styles.hintText, { color: colors.ghMuted }]}>
-                      Due too soon.
+                  <TouchableOpacity
+                    style={[
+                      styles.dateBtn,
+                      {
+                        borderColor: colors.ghBorder,
+                        backgroundColor: colors.ghBg,
+                        opacity: !due ? 0.5 : 1,
+                      },
+                    ]}
+                    onPress={() => { if (due) setShowOffsetDropdown(true); }}
+                    disabled={!due || availableOffsets.length === 0}
+                  >
+                    <Text style={{ color: remindBefore !== null ? colors.ghText : colors.ghMuted, fontSize: 13, flex: 1 }} numberOfLines={1}>
+                      {remindBefore !== null ? availableOffsets.find(p => p.value === remindBefore)?.label : (due && availableOffsets.length === 0 ? 'Due too soon' : 'Select...')}
                     </Text>
-                  )}
+                    <Feather name="chevron-down" size={16} color={colors.ghMuted} />
+                  </TouchableOpacity>
                 </View>
 
                 {/* Repeat Every */}
-                {remindBefore !== null && (
-                  <View style={{ flex: 1 }}>
-                    <View style={[styles.sectionHeader, { marginTop: 0 }]}>
-                      <Feather name="repeat" size={13} color={colors.ghMuted} />
-                      <Text style={[styles.label, { color: colors.ghMuted, marginTop: 0, marginBottom: 0 }]}>
-                        Repeat Every
-                      </Text>
-                    </View>
-
-                    {availableRepeatOptions.length > 0 ? (
-                      <TouchableOpacity
-                        style={[
-                          styles.chip,
-                          {
-                            borderColor: colors.ghBorder,
-                            backgroundColor: colors.ghBg,
-                            paddingVertical: 10,
-                            paddingHorizontal: 12,
-                            flexDirection: 'row',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            borderRadius: 8,
-                          },
-                        ]}
-                        onPress={() => setShowRepeatDropdown(true)}
-                      >
-                        <Text style={{ color: repeatEvery !== null ? colors.ghText : colors.ghMuted, fontSize: 13, fontWeight: '500' }}>
-                          {repeatEvery !== null ? availableRepeatOptions.find(p => p.value === repeatEvery)?.label : 'Once'}
-                        </Text>
-                        <Feather name="chevron-down" size={16} color={colors.ghMuted} />
-                      </TouchableOpacity>
-                    ) : (
-                      <Text style={[styles.hintText, { color: colors.ghMuted }]}>
-                        No repeats fit.
-                      </Text>
-                    )}
+                <View style={{ flex: 1 }}>
+                  <View style={[styles.sectionHeader, { marginTop: 0 }]}>
+                    <Feather name="repeat" size={13} color={colors.ghMuted} />
+                    <Text style={[styles.label, { color: colors.ghMuted, marginTop: 0, marginBottom: 0 }]}>
+                      Repeat Every
+                    </Text>
                   </View>
-                )}
+
+                  <TouchableOpacity
+                    style={[
+                      styles.dateBtn,
+                      {
+                        borderColor: colors.ghBorder,
+                        backgroundColor: colors.ghBg,
+                        opacity: remindBefore === null ? 0.5 : 1,
+                      },
+                    ]}
+                    onPress={() => { if (remindBefore !== null) setShowRepeatDropdown(true); }}
+                    disabled={remindBefore === null || availableRepeatOptions.length === 0}
+                  >
+                    <Text style={{ color: repeatEvery !== null ? colors.ghText : colors.ghMuted, fontSize: 13, flex: 1 }} numberOfLines={1}>
+                      {repeatEvery !== null ? availableRepeatOptions.find(p => p.value === repeatEvery)?.label : (remindBefore !== null && availableRepeatOptions.length === 0 ? 'No repeats fit' : 'Once')}
+                    </Text>
+                    <Feather name="chevron-down" size={16} color={colors.ghMuted} />
+                  </TouchableOpacity>
+                </View>
               </View>
-            )}
 
 
-            {/* ── Total Reminders ── */}
-            {due && remindBefore !== null && schedulePreview.length > 0 && (
-              <View style={[styles.summaryBox, { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.ghBg, borderColor: colors.ghBorder, marginTop: 16 }]}>
-                <Feather name="bell" size={14} color={colors.ghBlue} />
-                <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: '600', marginLeft: 8 }}>
-                  Total Reminders: {totalReminders}
-                </Text>
-              </View>
-            )}
+              {/* ── Total Reminders ── */}
+              {due && remindBefore !== null && schedulePreview.length > 0 && (
+                <View style={[styles.summaryBox, { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.ghBg, borderColor: colors.ghBorder, marginTop: 16 }]}>
+                  <Feather name="bell" size={14} color={colors.ghBlue} />
+                  <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: '600', marginLeft: 8 }}>
+                    Total Reminders: {totalReminders}
+                  </Text>
+                </View>
+              )}
 
             {/* ── Actions ── */}
             <View style={styles.actions}>
@@ -517,6 +473,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
               </TouchableOpacity>
             </View>
           </ScrollView>
+        </RNAnimated.View>
         </RNAnimated.View>
       </KeyboardAvoidingView>
       <ConfirmationModal

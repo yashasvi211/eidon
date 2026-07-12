@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Modal, StyleSheet, Animated as RNAnimated } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
@@ -21,11 +21,13 @@ export default function SelectModal({
   onSelect,
   colors,
 }: SelectModalProps) {
+  const [tempValue, setTempValue] = useState<number | null>(selectedValue);
   const scaleAnim = useRef(new RNAnimated.Value(0.9)).current;
   const opacityAnim = useRef(new RNAnimated.Value(0)).current;
 
   useEffect(() => {
     if (visible) {
+      setTempValue(selectedValue);
       scaleAnim.setValue(0.9);
       opacityAnim.setValue(0);
       RNAnimated.parallel([
@@ -42,7 +44,7 @@ export default function SelectModal({
         }),
       ]).start();
     }
-  }, [visible]);
+  }, [visible, selectedValue]);
 
   const animateClose = (callback: () => void) => {
     RNAnimated.parallel([
@@ -64,7 +66,13 @@ export default function SelectModal({
   };
 
   const handleSelect = (val: number) => {
-    onSelect(val);
+    setTempValue(val);
+  };
+
+  const handleConfirm = () => {
+    if (tempValue !== null) {
+      onSelect(tempValue);
+    }
     handleClose();
   };
 
@@ -83,13 +91,10 @@ export default function SelectModal({
         >
           <View style={styles.header}>
             <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.ghText }}>{title}</Text>
-            <TouchableOpacity onPress={handleClose}>
-              <Feather name="x" size={20} color={colors.ghMuted} />
-            </TouchableOpacity>
           </View>
-          <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
+          <ScrollView style={{ maxHeight: 300, marginBottom: 16 }} showsVerticalScrollIndicator={false}>
             {options.map((opt) => {
-              const active = selectedValue === opt.value;
+              const active = tempValue === opt.value;
               return (
                 <TouchableOpacity
                   key={opt.value}
@@ -110,6 +115,14 @@ export default function SelectModal({
               );
             })}
           </ScrollView>
+          <View style={styles.footer}>
+            <TouchableOpacity onPress={handleClose} style={[styles.btn, { borderColor: colors.ghBorder }]}>
+              <Text style={{ color: colors.ghMuted, fontSize: 13, fontWeight: '500' }}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleConfirm} style={[styles.btn, { backgroundColor: colors.ghBlue, borderColor: colors.ghBlue }]}>
+              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>OK</Text>
+            </TouchableOpacity>
+          </View>
         </RNAnimated.View>
       </RNAnimated.View>
     </Modal>
@@ -144,5 +157,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  btn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
   },
 });

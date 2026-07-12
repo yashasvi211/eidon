@@ -292,11 +292,11 @@ export default function AnalogClockModal({ visible, onClose, onSelectTime, initi
 
           {/* Footer Actions */}
           <View style={styles.clockFooter}>
-            <TouchableOpacity style={[styles.btnTime, { borderColor: colors.ghBorder, backgroundColor: colors.ghSurface2 }]} onPress={() => animateClose(onClose)}>
-              <Text style={[styles.btnTextTime, { color: colors.ghText }]}>Cancel</Text>
+            <TouchableOpacity style={[styles.btnTime, { borderColor: colors.ghBorder }]} onPress={() => animateClose(onClose)}>
+              <Text style={{ color: colors.ghMuted, fontSize: 13, fontWeight: '500' }}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.btnTime, { backgroundColor: colors.ghBlue, borderColor: colors.ghBlue }]} onPress={handleSave}>
-              <Text style={[styles.btnTextTime, { color: "#ffffff" }]}>OK</Text>
+              <Text style={{ color: "#ffffff", fontSize: 13, fontWeight: '600' }}>OK</Text>
             </TouchableOpacity>
           </View>
         </RNAnimated.View>
@@ -380,14 +380,10 @@ const styles = StyleSheet.create({
   },
   btnTime: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
     borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
-  },
-  btnTextTime: {
-    fontSize: 13,
-    fontWeight: "600",
   },
 });

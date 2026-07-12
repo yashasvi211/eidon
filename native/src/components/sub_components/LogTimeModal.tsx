@@ -204,16 +204,16 @@ export default function LogTimeModal({
           {/* Actions */}
           <View style={styles.modalFooterTime}>
             <TouchableOpacity
-              style={[styles.btnTime, { borderColor: colors.ghBorder, backgroundColor: colors.ghSurface2 }]}
+              style={[styles.btnTime, { borderColor: colors.ghBorder }]}
               onPress={handleCancel}
             >
-              <Text style={[styles.btnTextTime, { color: colors.ghText }]}>Cancel</Text>
+              <Text style={{ color: colors.ghMuted, fontSize: 13, fontWeight: '500' }}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.btnTime, { backgroundColor: colors.ghBlue, borderColor: colors.ghBlue }]}
               onPress={handleSave}
             >
-              <Text style={[styles.btnTextTime, { color: "#ffffff" }]}>Save Entry</Text>
+              <Text style={{ color: "#ffffff", fontSize: 13, fontWeight: '600' }}>Save Entry</Text>
             </TouchableOpacity>
           </View>
         </RNAnimated.View>
@@ -293,14 +293,10 @@ const styles = StyleSheet.create({
   },
   btnTime: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
     borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
-  },
-  btnTextTime: {
-    fontSize: 13,
-    fontWeight: "600",
   },
 });
