@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, useColorScheme, Modal, Switch } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, useColorScheme, Modal, Switch, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../constants/theme';
 import { Task } from './DetailPanel';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { Feather } from '@expo/vector-icons';
 import { api } from '../services/api';
+import * as EidonAlarm from '../../modules/expo-eidon-alarm';
 import * as WebBrowser from 'expo-web-browser';
 import { DROPBOX_APP_KEY, DROPBOX_APP_SECRET } from '../constants/env';
-
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system";
 interface Project {
   name: string;
   color: string;
@@ -92,6 +94,7 @@ export default function Sidebar({
   // Reminder settings state
   const [reminderStyle, setReminderStyle] = useState<'banner' | 'fullscreen'>('banner');
   const [reminderRequireAuth, setReminderRequireAuth] = useState(false);
+  const [alarmSound, setAlarmSound] = useState('notification_sound_1');
 
   // Load settings on mount / when settings opens
   useEffect(() => {
@@ -110,13 +113,39 @@ export default function Sidebar({
         setLastSyncTime(s.lastSyncTime || null);
         setReminderStyle(s.reminderStyle || 'banner');
         setReminderRequireAuth(s.reminderRequireAuth || false);
+        if (Platform.OS === 'android') {
+          const snd = EidonAlarm.getAlarmSound();
+          if (snd) setAlarmSound(snd);
+        }
       });
     } else {
       setSyncStatus(null);
       setConnectionStatus(null);
     }
   }, [isSettingsOpen]);
-
+  const handlePickAlarmSound = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: 'audio/*',
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const originalUri = result.assets[0].uri;
+        const filename = result.assets[0].name || `custom_alarm_${Date.now()}.mp3`;
+        const newUri = FileSystem.documentDirectory + filename;
+        
+        // Copy the file to the app's document directory so the native service can always read it
+        await FileSystem.copyAsync({
+          from: originalUri,
+          to: newUri
+        });
+        
+        setAlarmSound(newUri);
+        EidonAlarm.setAlarmSound(newUri);
+      }
+    } catch (e) {
+      console.warn('Error picking alarm sound:', e);
+    }
+  };
   const [authCode, setAuthCode] = useState('');
 
   const handleGetAuthCode = async () => {
@@ -480,6 +509,55 @@ export default function Sidebar({
                     thumbColor="#fff"
                   />
                 </View>
+
+                {Platform.OS === 'android' && reminderStyle === 'fullscreen' && (
+                  <View style={[styles.settingsRow, { flexDirection: 'column', alignItems: 'stretch' }]}>
+                    <View style={{ marginBottom: 10 }}>
+                      <Text style={[styles.settingsLabel, { color: colors.ghText }]}>Alarm Sound</Text>
+                      <Text style={[styles.settingsHelp, { color: colors.ghMuted }]}>
+                        Choose the sound to play for full screen alarms.
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
+                      <TouchableOpacity
+                        style={[
+                          styles.btn,
+                          { 
+                            borderColor: alarmSound === 'notification_sound_1' ? colors.ghBlue : colors.ghBorder,
+                            backgroundColor: alarmSound === 'notification_sound_1' ? colors.ghBlue + '20' : colors.ghSurface2
+                          }
+                        ]}
+                        onPress={() => {
+                          setAlarmSound('notification_sound_1');
+                          EidonAlarm.setAlarmSound('notification_sound_1');
+                        }}
+                      >
+                        <Text style={{ color: alarmSound === 'notification_sound_1' ? colors.ghBlue : colors.ghText, fontSize: 12 }}>
+                          Default Sound
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.btn,
+                          { 
+                            borderColor: alarmSound !== 'notification_sound_1' && alarmSound ? colors.ghBlue : colors.ghBorder,
+                            backgroundColor: alarmSound !== 'notification_sound_1' && alarmSound ? colors.ghBlue + '20' : colors.ghSurface2
+                          }
+                        ]}
+                        onPress={handlePickAlarmSound}
+                      >
+                        <Text style={{ color: alarmSound !== 'notification_sound_1' && alarmSound ? colors.ghBlue : colors.ghText, fontSize: 12 }}>
+                          Upload Custom
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                    {alarmSound && alarmSound !== 'notification_sound_1' && (
+                      <Text style={{ color: colors.ghMuted, fontSize: 10, marginTop: 8 }} numberOfLines={1}>
+                        Custom: {alarmSound.split('/').pop()}
+                      </Text>
+                    )}
+                  </View>
+                )}
               </View>
 
               {/* EXPORT / IMPORT */}
@@ -558,6 +636,12 @@ export default function Sidebar({
                           autoCorrect={false}
                         />
                       </View>
+                     <TouchableOpacity
+                       style={[styles.btn, { borderColor: colors.ghBorder, backgroundColor: colors.ghSurface2 }]}
+                       onPress={handlePickAlarmSound}
+                     >
+                       <Text style={{ color: colors.ghText, fontSize: 12 }}>Upload Custom</Text>
+                     </TouchableOpacity>
 
                       <TouchableOpacity
                         style={[styles.modalActionBtn, { backgroundColor: '#0061FE' }]}

@@ -68,11 +68,32 @@ class AlarmService : Service() {
         }
 
         val appIconResId = resources.getIdentifier("ic_launcher", "mipmap", packageName)
+        
+        // Safely decode the app icon into a Bitmap, handling Adaptive Icons (XML) which BitmapFactory cannot decode
+        var largeIconBitmap: android.graphics.Bitmap? = null
+        if (appIconResId != 0) {
+            try {
+                val drawable = androidx.core.content.ContextCompat.getDrawable(this, appIconResId)
+                if (drawable is android.graphics.drawable.BitmapDrawable) {
+                    largeIconBitmap = drawable.bitmap
+                } else if (drawable != null) {
+                    val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 192
+                    val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 192
+                    largeIconBitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+                    val canvas = android.graphics.Canvas(largeIconBitmap)
+                    drawable.setBounds(0, 0, canvas.width, canvas.height)
+                    drawable.draw(canvas)
+                }
+            } catch (e: Exception) {
+                Log.e("EidonAlarm", "Failed to decode large icon", e)
+            }
+        }
 
         val notification = notificationBuilder
             .setContentTitle("Task Reminder")
             .setContentText("Tap to view your reminder")
             .setSmallIcon(if (appIconResId != 0) appIconResId else android.R.drawable.ic_dialog_info)
+            .setLargeIcon(largeIconBitmap)
             .setCategory(Notification.CATEGORY_ALARM)
             .setFullScreenIntent(pendingIntent, true)
             .setContentIntent(pendingIntent) // Also allow tap-to-open
@@ -100,31 +121,47 @@ class AlarmService : Service() {
             Log.e("EidonAlarm", "Failed to directly launch activity", e)
         }
 
-        // 5. Play Sound
+        // 5. Play Sound (custom URI fallback)
         try {
-            val soundResId = resources.getIdentifier("notification_sound_1", "raw", packageName)
-            Log.d("EidonAlarm", "Sound resource ID: $soundResId")
-            if (soundResId != 0) {
-                val audioAttributes = AudioAttributes.Builder()
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .setUsage(AudioAttributes.USAGE_ALARM)
-                    .build()
-                // Create MediaPlayer manually so we set AudioAttributes BEFORE prepare
-                mediaPlayer = MediaPlayer().apply {
-                    setAudioAttributes(audioAttributes)
-                    val afd = resources.openRawResourceFd(soundResId)
-                    setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-                    afd.close()
-                    isLooping = true
-                    prepare()
-                    start()
+            // First try custom sound URI stored in SharedPreferences
+            val prefs = getSharedPreferences("eidon_alarm_prefs", Context.MODE_PRIVATE)
+            val customUri = prefs.getString("alarm_sound_path", null)
+            val audioAttributes = AudioAttributes.Builder()
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .build()
+            mediaPlayer = MediaPlayer().apply {
+                setAudioAttributes(audioAttributes)
+                var sourceSet = false
+                if (!customUri.isNullOrEmpty() && customUri != "notification_sound_1") {
+                    try {
+                        setDataSource(applicationContext, android.net.Uri.parse(customUri))
+                        Log.d("EidonAlarm", "Playing custom alarm sound from $customUri")
+                        sourceSet = true
+                    } catch (e: Exception) {
+                        Log.e("EidonAlarm", "Failed to set custom sound, falling back to default", e)
+                    }
                 }
-                Log.d("EidonAlarm", "Alarm sound started playing successfully")
-            } else {
-                Log.w("EidonAlarm", "notification_sound_1 not found in res/raw!")
+                if (!sourceSet) {
+                    // Fallback to default raw resource
+                    val soundResId = resources.getIdentifier("notification_sound_1", "raw", packageName)
+                    if (soundResId != 0) {
+                        val afd = resources.openRawResourceFd(soundResId)
+                        setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                        afd.close()
+                        Log.d("EidonAlarm", "Playing default alarm sound from raw resource")
+                    } else {
+                        Log.w("EidonAlarm", "Default alarm sound resource not found")
+                    }
+                }
+                isLooping = true
+                setOnCompletionListener { start() }
+                prepare()
+                start()
             }
+            Log.d("EidonAlarm", "Alarm sound started (custom or default)")
         } catch (e: Exception) {
-            Log.e("EidonAlarm", "Failed to play sound", e)
+            Log.e("EidonAlarm", "Failed to play alarm sound", e)
         }
 
         // 6. Vibrate
@@ -139,10 +176,11 @@ class AlarmService : Service() {
 
             val pattern = longArrayOf(0, 500, 500)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                // The '0' in createWaveform(pattern, 0) means loop from index 0 of the pattern indefinitely.
                 vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
             } else {
                 @Suppress("DEPRECATION")
-                vibrator?.vibrate(pattern, 0)
+                vibrator?.vibrate(pattern, 0) // '0' here also means repeat indefinitely
             }
         } catch (e: Exception) {
             Log.e("EidonAlarm", "Failed to vibrate", e)
@@ -189,8 +227,10 @@ class AlarmService : Service() {
             val importance = NotificationManager.IMPORTANCE_HIGH
             val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
                 description = descriptionText
+                // Keep channel silent; we handle sound via MediaPlayer
                 setSound(null, null)
-                enableVibration(false)
+                // Enable vibration for the alarm
+                enableVibration(true)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
             val notificationManager: NotificationManager =

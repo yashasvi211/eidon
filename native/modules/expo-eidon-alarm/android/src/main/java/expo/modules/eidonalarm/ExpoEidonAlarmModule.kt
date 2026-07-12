@@ -89,6 +89,8 @@ class ExpoEidonAlarmModule : Module() {
         if (intent?.getBooleanExtra("expo.modules.eidonalarm.isAlarm", false) == true) {
           taskId = intent.getStringExtra("expo.modules.eidonalarm.taskId")
           intent.removeExtra("expo.modules.eidonalarm.isAlarm")
+          intent.removeExtra("expo.modules.eidonalarm.taskId")
+          activity.intent = intent
           Log.d("EidonAlarm", "getEnqueuedAlarm: found via intent extras: $taskId")
         }
       }
@@ -111,6 +113,27 @@ class ExpoEidonAlarmModule : Module() {
     }
 
     // ── Overlay Permission (Draw Over Other Apps) ──
+
+    Function("setAlarmSound") { soundUri: String ->
+      val context = appContext.reactContext
+      if (context != null) {
+        val prefs = context.getSharedPreferences("eidon_alarm_prefs", Context.MODE_PRIVATE)
+        prefs.edit().putString("alarm_sound_path", soundUri).apply()
+        Log.d("EidonAlarm", "Alarm sound URI set to $soundUri")
+      }
+    }
+
+    Function("getAlarmSound") { ->
+      val context = appContext.reactContext
+      if (context != null) {
+        val prefs = context.getSharedPreferences("eidon_alarm_prefs", Context.MODE_PRIVATE)
+        val uri = prefs.getString("alarm_sound_path", null)
+        Log.d("EidonAlarm", "Alarm sound URI retrieved: $uri")
+        uri
+      } else {
+        null
+      }
+    }
 
     Function("canDrawOverlays") { ->
       val context = appContext.reactContext

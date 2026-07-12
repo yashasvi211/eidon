@@ -37,3 +37,10 @@ export function canScheduleExactAlarms(): boolean {
 export function openExactAlarmSettings(): void {
   return ExpoEidonAlarmModule.openExactAlarmSettings();
 }
+export function setAlarmSound(soundUri: string): void {
+  return ExpoEidonAlarmModule.setAlarmSound(soundUri);
+}
+
+export function getAlarmSound(): string | null {
+  return ExpoEidonAlarmModule.getAlarmSound();
+}

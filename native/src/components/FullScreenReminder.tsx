@@ -130,14 +130,16 @@ export default function FullScreenReminder({
   }, []);
 
   const stopAlarmSound = useCallback(() => {
-    try {
-      if (Platform.OS === 'android') {
+    console.log("STOP ALARM TRIGGERED. phase=", phase, "visible=", visible);
+    console.log(new Error().stack);
+    if (Platform.OS === 'android') {
+      try {
         EidonAlarm.stopAlarm();
+      } catch (e) {
+        console.warn('Failed to stop EidonAlarm', e);
       }
-    } catch (e) {
-      console.log("Audio pause error caught:", e);
     }
-  }, []);
+  }, [phase, visible]);
 
   // ── Modal lifecycle ──
   useEffect(() => {
@@ -161,18 +163,13 @@ export default function FullScreenReminder({
       // Animate out
       overlayOpacity.value = withTiming(0, { duration: 300 });
       contentScale.value = withTiming(0.9, { duration: 300 });
-      stopAlarmSound();
     }
-
-    return () => {
-      stopAlarmSound();
-    };
   }, [visible, notification]);
 
   // ── Phase transitions stop alarm ──
   useEffect(() => {
-    if (phase !== "locked" && phase !== "details") {
-      // Stop alarm when user starts interacting
+    if (phase === "final_confirm") {
+      // Stop alarm when user has finished reflecting
       stopAlarmSound();
     }
   }, [phase]);
@@ -192,7 +189,6 @@ export default function FullScreenReminder({
         });
         if (result.success) {
           setAuthSuccess(true);
-          stopAlarmSound();
           authSuccessProgress.value = withSpring(1, {
             damping: 18,
             stiffness: 45,
@@ -207,7 +203,6 @@ export default function FullScreenReminder({
       } else {
         // No biometric — skip auth
         setAuthSuccess(true);
-        stopAlarmSound();
         authSuccessProgress.value = withSpring(1, {
           damping: 18,
           stiffness: 45,
@@ -226,7 +221,6 @@ export default function FullScreenReminder({
   };
 
   const handleAcknowledge = () => {
-    stopAlarmSound();
     setPhase("reflect");
   };
 
@@ -459,7 +453,6 @@ export default function FullScreenReminder({
                   <TouchableOpacity
                     style={styles.continueButton}
                     onPress={() => {
-                      stopAlarmSound();
                       setPhase("acknowledge");
                     }}
                     activeOpacity={0.7}

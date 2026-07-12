@@ -212,11 +212,14 @@ export default function AppIndex() {
         const task = tasksRef.current.find(t => t.id === enqueuedTaskId);
         const currentSettings = await api.getSettings();
         
-        setFullScreenNotification({
-          taskId: enqueuedTaskId,
-          taskTitle: task?.title || 'Reminder',
-          message: 'Time to focus!',
-          dueDate: task?.due || '',
+        setFullScreenNotification(prev => {
+          if (prev?.taskId === enqueuedTaskId) return prev;
+          return {
+            taskId: enqueuedTaskId,
+            taskTitle: task?.title || 'Reminder',
+            message: 'Time to focus!',
+            dueDate: task?.due || '',
+          };
         });
         setReminderStyle('fullscreen');
         setReminderRequireAuth(currentSettings.reminderRequireAuth || false);
