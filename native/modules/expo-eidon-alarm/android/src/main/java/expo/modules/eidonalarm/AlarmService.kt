@@ -89,10 +89,20 @@ class AlarmService : Service() {
             }
         }
 
+        var notificationIconResId = 0
+        try {
+            val rClass = Class.forName("$packageName.R\$drawable")
+            notificationIconResId = rClass.getField("notification_icon").getInt(null)
+            Log.d("EidonAlarm", "Found notification_icon via reflection: $notificationIconResId")
+        } catch (e: Exception) {
+            Log.e("EidonAlarm", "Failed to find notification_icon via reflection", e)
+            notificationIconResId = resources.getIdentifier("notification_icon", "drawable", packageName)
+        }
+
         val notification = notificationBuilder
             .setContentTitle("Task Reminder")
             .setContentText("Tap to view your reminder")
-            .setSmallIcon(if (appIconResId != 0) appIconResId else android.R.drawable.ic_dialog_info)
+            .setSmallIcon(if (notificationIconResId != 0) notificationIconResId else android.R.drawable.ic_dialog_info)
             .setLargeIcon(largeIconBitmap)
             .setCategory(Notification.CATEGORY_ALARM)
             .setFullScreenIntent(pendingIntent, true)

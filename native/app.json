@@ -12,8 +12,7 @@
       "bundleIdentifier": "com.eidon.app"
     },
     "notification": {
-      "icon": "./assets/images/notification-icon.png",
-      "color": "#5cb8d7"
+      "icon": "./assets/images/notification-icon.png"
     },
     "android": {
       "package": "com.eidon.app",
@@ -44,8 +43,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/notification-icon.png",
-          "color": "#5cb8d7"
+          "icon": "./assets/images/notification-icon.png"
         }
       ],
       [
