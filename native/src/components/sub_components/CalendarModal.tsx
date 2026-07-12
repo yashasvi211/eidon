@@ -181,6 +181,11 @@ export default function CalendarModal({ visible, onClose, onSelectDate, initialD
                   day.date.getMonth() === selectedDate.getMonth() &&
                   day.date.getFullYear() === selectedDate.getFullYear()
                 ) : false;
+                
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const isPast = day.date.getTime() < today.getTime();
+
                 return (
                   <TouchableOpacity
                     key={dIdx}
@@ -189,11 +194,12 @@ export default function CalendarModal({ visible, onClose, onSelectDate, initialD
                       isSelected && { backgroundColor: colors.ghBlue, borderRadius: 18 },
                     ]}
                     onPress={() => handleSelectDay(day.date)}
+                    disabled={isPast}
                   >
                     <Text
                       style={[
                         styles.dayText,
-                        { color: isSelected ? "#ffffff" : day.isCurrentMonth ? colors.ghText : colors.ghMuted },
+                        { color: isSelected ? "#ffffff" : isPast ? colors.ghBorder : day.isCurrentMonth ? colors.ghText : colors.ghMuted },
                       ]}
                     >
                       {day.date.getDate()}

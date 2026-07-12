@@ -20,9 +20,10 @@ interface ConfirmationModalProps {
   title: string;
   description: string;
   colors: any;
+  successText?: string;
 }
 
-export default function ConfirmationModal({ visible, onClose, onConfirm, title, description, colors }: ConfirmationModalProps) {
+export default function ConfirmationModal({ visible, onClose, onConfirm, title, description, colors, successText = "Time Logged Successfully!" }: ConfirmationModalProps) {
   const scaleAnim = useRef(new RNAnimated.Value(0.9)).current;
   const opacityAnim = useRef(new RNAnimated.Value(0)).current;
 
@@ -233,7 +234,7 @@ export default function ConfirmationModal({ visible, onClose, onConfirm, title, 
                 </View>
 
                 <Animated.Text style={[styles.successLabel, { color: colors.ghText }, successLabelStyle]}>
-                  Time Logged Successfully!
+                  {successText}
                 </Animated.Text>
               </Animated.View>
             )}

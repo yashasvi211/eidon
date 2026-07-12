@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { countTotalReminders } from "../services/reminderUtils";
 import {
   View,
   Text,
@@ -147,6 +148,13 @@ const fmtDateDisplay = (iso?: string) => {
     "Dec",
   ];
   return `${months[parseInt(m) - 1]} ${parseInt(d)}, ${y}`;
+};
+
+const formatTime12h = (time24: string) => {
+  const [h, m] = time24.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
 };
 
 const fmtSeconds = (s: number) => {
@@ -402,6 +410,22 @@ export default function DetailPanel({
   >("details");
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [sessionNote, setSessionNote] = useState("");
+
+  const totalReminders = useMemo(() => {
+    if (!task.due || !task.reminder || task.reminder.remindBefore === null) return 0;
+    
+    const [y, m, d] = task.due.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    
+    if (task.dueTime) {
+      const [h, min] = task.dueTime.split(':').map(Number);
+      dateObj.setHours(h, min, 0, 0);
+    } else {
+      dateObj.setHours(0, 0, 0, 0);
+    }
+    
+    return countTotalReminders(dateObj.getTime(), task.reminder.remindBefore, task.reminder.repeatEvery || 0);
+  }, [task]);
 
   const [isAddSessionOpen, setIsAddSessionOpen] = useState(false);
   const [manualDate, setManualDate] = useState("");
@@ -997,7 +1021,7 @@ export default function DetailPanel({
                     }}
                   >
                     {fmtDateDisplay(task.due)}
-                    {task.dueTime ? ` at ${task.dueTime}` : ""}
+                    {task.dueTime ? ` at ${formatTime12h(task.dueTime)}` : ""}
                     {" "}
                     {dlInfo.label && `(${dlInfo.label})`}
                   </Text>
@@ -1019,7 +1043,7 @@ export default function DetailPanel({
                 </View>
 
                 {task.reminder.repeatEvery ? (
-                  <View style={[styles.dueRow, { marginBottom: task.reminder.lastNotificationStatus ? 8 : 0 }]}>
+                  <View style={[styles.dueRow, { marginBottom: 0 }]}>
                     <Feather name="repeat" size={14} color={colors.ghPurple} style={{ marginRight: 6 }} />
                     <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: "500" }}>
                       Repeat every {formatDuration(task.reminder.repeatEvery)}
@@ -1027,54 +1051,14 @@ export default function DetailPanel({
                   </View>
                 ) : null}
 
-                {task.reminder.lastNotificationStatus ? (
-                  <View style={[styles.dueRow, { marginTop: 8, alignItems: 'flex-start' }]}>
-                    {task.reminder.lastNotificationStatus === 'success' ? (
-                      <>
-                        <Feather name="check-circle" size={14} color={colors.ghGreen} style={{ marginTop: 2, marginRight: 6 }} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ color: colors.ghGreen, fontSize: 13, fontWeight: "600" }}>
-                            Last reminder sent successfully
-                          </Text>
-                          {task.reminder.lastNotificationTime && (
-                            <Text style={{ color: colors.ghMuted, fontSize: 11, marginTop: 2 }}>
-                              {new Date(task.reminder.lastNotificationTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                            </Text>
-                          )}
-                        </View>
-                      </>
-                    ) : (
-                      <>
-                        <Feather name="alert-circle" size={14} color={colors.ghRed} style={{ marginTop: 2, marginRight: 6 }} />
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ color: colors.ghRed, fontSize: 13, fontWeight: "600" }}>
-                            Last reminder failed to schedule/send
-                          </Text>
-                          {task.reminder.lastNotificationError ? (
-                            <Text style={{ 
-                              color: colors.ghText, 
-                              fontSize: 11, 
-                              marginTop: 4, 
-                              fontFamily: 'monospace', 
-                              backgroundColor: 'rgba(248, 81, 73, 0.08)', 
-                              padding: 6, 
-                              borderRadius: 4, 
-                              borderWidth: 1, 
-                              borderColor: 'rgba(248, 81, 73, 0.2)' 
-                            }}>
-                              {task.reminder.lastNotificationError}
-                            </Text>
-                          ) : null}
-                          {task.reminder.lastNotificationTime && (
-                            <Text style={{ color: colors.ghMuted, fontSize: 11, marginTop: 2 }}>
-                              {new Date(task.reminder.lastNotificationTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                            </Text>
-                          )}
-                        </View>
-                      </>
-                    )}
+                {totalReminders > 0 && (
+                  <View style={[styles.dueRow, { marginTop: 8 }]}>
+                    <Feather name="bell" size={14} color={colors.ghBlue} style={{ marginRight: 6 }} />
+                    <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: "500" }}>
+                      Total Reminders: {totalReminders}
+                    </Text>
                   </View>
-                ) : null}
+                )}
               </View>
             ) : null}
 

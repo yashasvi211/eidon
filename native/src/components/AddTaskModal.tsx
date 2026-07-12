@@ -1,11 +1,13 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Modal, StyleSheet,
   useColorScheme, KeyboardAvoidingView, Platform, ScrollView,
+  Animated as RNAnimated
 } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { Feather } from '@expo/vector-icons';
 import { validateReminder } from '@/services/notifications';
+import { getValidOffsets, getValidRepeats, generateSchedulePreview, countTotalReminders, Preset } from '@/services/reminderUtils';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -36,23 +38,6 @@ const MONTH_NAMES = [
 ];
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
-/** Remind-before presets (label + ms value) */
-const REMIND_PRESETS = [
-  { label: '1 hour',  value: 60 * 60 * 1000 },
-  { label: '1 day',   value: 24 * 60 * 60 * 1000 },
-  { label: '1 week',  value: 7 * 24 * 60 * 60 * 1000 },
-];
-
-/** All possible repeat-every options (filtered dynamically) */
-const REPEAT_OPTIONS = [
-  { label: '5s ⚡',    value: 5 * 1000,                 },
-  { label: '2 min',      value: 2 * 60 * 1000,            },
-  { label: '30 min',   value: 30 * 60 * 1000,           },
-  { label: '1 hour',   value: 60 * 60 * 1000,           },
-  { label: '2 hours',  value: 2 * 60 * 60 * 1000,       },
-  { label: '1 day',    value: 24 * 60 * 60 * 1000,      },
-];
-
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
 function pad2(n: number) { return String(n).padStart(2, '0'); }
@@ -63,106 +48,20 @@ function fmtDate(y: number, m: number, d: number) {
 
 function fmtDateDisplay(dateStr: string) {
   const [y, m, d] = dateStr.split('-').map(Number);
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return `${months[m - 1]} ${d}, ${y}`;
+  return `${pad2(d)}/${pad2(m)}/${y}`;
 }
 
-// ─── Mini Calendar ─────────────────────────────────────────────────────────────
-
-function MiniCalendar({ selectedDate, onSelect, colors }: {
-  selectedDate: string | null;
-  onSelect: (date: string) => void;
-  colors: any;
-}) {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const [viewYear, setViewYear] = useState(today.getFullYear());
-  const [viewMonth, setViewMonth] = useState(today.getMonth());
-
-  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
-  const firstDow = new Date(viewYear, viewMonth, 1).getDay();
-
-  // Build cells: leading blanks + actual days
-  const cells: (number | null)[] = [];
-  for (let i = 0; i < firstDow; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
-
-  const canGoPrev = !(viewYear === today.getFullYear() && viewMonth <= today.getMonth());
-
-  const goToPrev = () => {
-    if (viewMonth === 0) { setViewYear(viewYear - 1); setViewMonth(11); }
-    else setViewMonth(viewMonth - 1);
-  };
-  const goToNext = () => {
-    if (viewMonth === 11) { setViewYear(viewYear + 1); setViewMonth(0); }
-    else setViewMonth(viewMonth + 1);
-  };
-
-  return (
-    <View style={[calStyles.container, { backgroundColor: colors.ghBg, borderColor: colors.ghBorder }]}>
-      {/* Month navigation */}
-      <View style={calStyles.header}>
-        <TouchableOpacity onPress={goToPrev} disabled={!canGoPrev} style={calStyles.navBtn}>
-          <Feather name="chevron-left" size={16} color={canGoPrev ? colors.ghText : colors.ghBorder} />
-        </TouchableOpacity>
-        <Text style={[calStyles.monthLabel, { color: colors.ghText }]}>
-          {MONTH_NAMES[viewMonth]} {viewYear}
-        </Text>
-        <TouchableOpacity onPress={goToNext} style={calStyles.navBtn}>
-          <Feather name="chevron-right" size={16} color={colors.ghText} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Weekday headers */}
-      <View style={calStyles.weekRow}>
-        {DAY_LABELS.map(d => (
-          <View key={d} style={calStyles.cell}>
-            <Text style={[calStyles.weekLabel, { color: colors.ghMuted }]}>{d}</Text>
-          </View>
-        ))}
-      </View>
-
-      {/* Day grid */}
-      <View style={calStyles.grid}>
-        {cells.map((day, i) => {
-          if (day === null) return <View key={`e${i}`} style={calStyles.cell} />;
-
-          const dateObj = new Date(viewYear, viewMonth, day);
-          dateObj.setHours(0, 0, 0, 0);
-          const isPast = dateObj < today;
-          const dateStr = fmtDate(viewYear, viewMonth, day);
-          const isSelected = dateStr === selectedDate;
-          const isToday = viewYear === today.getFullYear()
-            && viewMonth === today.getMonth()
-            && day === today.getDate();
-
-          return (
-            <TouchableOpacity
-              key={day}
-              style={[
-                calStyles.cell,
-                isSelected && [calStyles.selectedCell, { backgroundColor: colors.ghBlue }],
-                isToday && !isSelected && { borderWidth: 1.5, borderColor: colors.ghBlue, borderRadius: 18 },
-              ]}
-              disabled={isPast}
-              onPress={() => onSelect(dateStr)}
-              activeOpacity={0.6}
-            >
-              <Text style={[
-                calStyles.dayText,
-                { color: isPast ? colors.ghBorder : colors.ghText },
-                isSelected && { color: '#fff', fontWeight: '700' },
-              ]}>
-                {day}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-    </View>
-  );
+function formatTime12h(time24: string) {
+  const [h, m] = time24.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
 }
+
+import AnalogClockModal from './sub_components/AnalogClockModal';
+import CalendarModal from './sub_components/CalendarModal';
+import ConfirmationModal from './sub_components/ConfirmationModal';
+import SelectModal from './sub_components/SelectModal';
 
 // ─── Main Modal ────────────────────────────────────────────────────────────────
 
@@ -175,15 +74,17 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
   const [project, setProject] = useState('Inbox');
   const [due, setDue] = useState<string | null>(null);
   const [dueTime, setDueTime] = useState<string | null>(null);
-  const [timeHour, setTimeHour] = useState('');
-  const [timeMinute, setTimeMinute] = useState('');
   const [showCalendar, setShowCalendar] = useState(false);
+  const [showClock, setShowClock] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   // Reminder state
   const [remindBefore, setRemindBefore] = useState<number | null>(null);   // ms
-  const [customHours, setCustomHours] = useState('');
-  const [isCustom, setIsCustom] = useState(false);
   const [repeatEvery, setRepeatEvery] = useState<number | null>(null);     // ms
+  
+  // Dropdown states
+  const [showOffsetDropdown, setShowOffsetDropdown] = useState(false);
+  const [showRepeatDropdown, setShowRepeatDropdown] = useState(false);
 
   // ── Derived ──
 
@@ -193,17 +94,77 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
     return hasInbox ? projects : [INBOX_PROJECT, ...projects];
   }, [projects]);
 
-  // Validation
-  const reminderValidation = useMemo(() => {
-    if (!due || remindBefore === null) return null;
-    return validateReminder(due, dueTime || undefined, remindBefore);
-  }, [due, dueTime, remindBefore]);
+  const dueDateTimeMs = useMemo(() => {
+    if (!due) return null;
+    const [y, m, d] = due.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    if (dueTime) {
+      const [h, min] = dueTime.split(':').map(Number);
+      dateObj.setHours(h, min, 0, 0);
+    } else {
+      dateObj.setHours(0, 0, 0, 0);
+    }
+    return dateObj.getTime();
+  }, [due, dueTime]);
 
-  // Filter repeat options: interval must be ≤ remindBefore
+  const availableOffsets = useMemo(() => {
+    if (!dueDateTimeMs) return [];
+    return getValidOffsets(dueDateTimeMs);
+  }, [dueDateTimeMs]);
+
   const availableRepeatOptions = useMemo(() => {
     if (remindBefore === null) return [];
-    return REPEAT_OPTIONS.filter(opt => opt.value <= remindBefore);
+    return getValidRepeats(remindBefore);
   }, [remindBefore]);
+
+  const schedulePreview = useMemo(() => {
+    if (!dueDateTimeMs || remindBefore === null) return [];
+    return generateSchedulePreview(dueDateTimeMs, remindBefore, repeatEvery || 0);
+  }, [dueDateTimeMs, remindBefore, repeatEvery]);
+
+  const totalReminders = useMemo(() => {
+    if (!dueDateTimeMs || remindBefore === null) return 0;
+    return countTotalReminders(dueDateTimeMs, remindBefore, repeatEvery || 0);
+  }, [dueDateTimeMs, remindBefore, repeatEvery]);
+
+  // ── Animations ──
+  const scaleAnim = useRef(new RNAnimated.Value(0.9)).current;
+  const opacityAnim = useRef(new RNAnimated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      scaleAnim.setValue(0.9);
+      opacityAnim.setValue(0);
+      RNAnimated.parallel([
+        RNAnimated.spring(scaleAnim, {
+          toValue: 1,
+          tension: 20,
+          friction: 10,
+          useNativeDriver: true,
+        }),
+        RNAnimated.timing(opacityAnim, {
+          toValue: 1,
+          duration: 350,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
+  const animateClose = (callback: () => void) => {
+    RNAnimated.parallel([
+      RNAnimated.timing(scaleAnim, {
+        toValue: 0.9,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      RNAnimated.timing(opacityAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start(callback);
+  };
 
   // ── Handlers ──
 
@@ -212,20 +173,25 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
     setProject('Inbox');
     setDue(null);
     setDueTime(null);
-    setTimeHour('');
-    setTimeMinute('');
+    setDueTime(null);
     setShowCalendar(false);
+    setShowClock(false);
+    setShowConfirm(false);
     setRemindBefore(null);
-    setCustomHours('');
-    setIsCustom(false);
     setRepeatEvery(null);
+    setShowOffsetDropdown(false);
+    setShowRepeatDropdown(false);
   };
 
-  const handleClose = () => { reset(); onClose(); };
+  const handleClose = () => {
+    animateClose(() => {
+      reset();
+      onClose();
+    });
+  };
 
   const handleSubmit = () => {
     if (!title.trim()) return;
-    if (reminderValidation) return;  // block if validation error
 
     let reminder: ReminderConfig | undefined;
     if (due && remindBefore !== null) {
@@ -235,82 +201,71 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
       }
     }
 
-    onAdd(title.trim(), project, due || undefined, reminder, dueTime || undefined);
-    reset();
-    onClose();
+    animateClose(() => {
+      onAdd(title.trim(), project, due || undefined, reminder, dueTime || undefined);
+      reset();
+      onClose();
+    });
   };
 
   const handleSelectPreset = (val: number) => {
-    setIsCustom(false);
-    setCustomHours('');
     if (remindBefore === val) {
       setRemindBefore(null);
       setRepeatEvery(null);
     } else {
       setRemindBefore(val);
-      // Clear repeat if it's now invalid
-      if (repeatEvery !== null && repeatEvery > val) setRepeatEvery(null);
-    }
-  };
-
-  const handleCustomToggle = () => {
-    if (isCustom) {
-      setIsCustom(false);
-      setCustomHours('');
-      setRemindBefore(null);
-      setRepeatEvery(null);
-    } else {
-      setIsCustom(true);
-      setRemindBefore(null);
-      setRepeatEvery(null);
-    }
-  };
-
-  const handleCustomHoursChange = (text: string) => {
-    setCustomHours(text);
-    const hours = parseFloat(text);
-    if (!isNaN(hours) && hours > 0) {
-      const ms = Math.round(hours * 60 * 60 * 1000);
-      setRemindBefore(ms);
-      if (repeatEvery !== null && repeatEvery > ms) setRepeatEvery(null);
-    } else {
-      setRemindBefore(null);
-      setRepeatEvery(null);
+      if (repeatEvery !== null && repeatEvery >= val) setRepeatEvery(null);
     }
   };
 
   const handleSelectDate = (dateStr: string) => {
-    setDue(dateStr);
-    // If the new date invalidates the reminder, clear it
-    if (remindBefore !== null) {
-      const err = validateReminder(dateStr, dueTime || undefined, remindBefore);
-      if (err) {
-        setRemindBefore(null);
-        setRepeatEvery(null);
-        setIsCustom(false);
-        setCustomHours('');
+    // dateStr comes from CalendarModal as DD/MM/YYYY, but validateReminder/backend expect YYYY-MM-DD
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      const formattedDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      setDue(formattedDate);
+      
+      // Check if current remindBefore is still valid
+      if (remindBefore !== null) {
+        const dueMs = new Date(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}T${dueTime || '00:00'}:00`).getTime();
+        const maxOffset = dueMs - Date.now();
+        if (remindBefore > maxOffset) {
+          setRemindBefore(null);
+          setRepeatEvery(null);
+        }
       }
+    }
+  };
+
+  const handleSelectTime = (timeStr: string) => {
+    // timeStr comes as HH:MM AM/PM
+    // convert to HH:MM 24h format
+    const match = timeStr.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    if (match) {
+      let h = parseInt(match[1], 10);
+      const m = match[2];
+      const ampm = match[3].toUpperCase();
+      if (ampm === 'PM' && h < 12) h += 12;
+      if (ampm === 'AM' && h === 12) h = 0;
+      setDueTime(`${h.toString().padStart(2, '0')}:${m}`);
     }
   };
 
   const handleClearDate = () => {
     setDue(null);
     setDueTime(null);
-    setTimeHour('');
-    setTimeMinute('');
     setRemindBefore(null);
     setRepeatEvery(null);
-    setIsCustom(false);
-    setCustomHours('');
     setShowCalendar(false);
+    setShowClock(false);
   };
 
-  const canSubmit = title.trim().length > 0 && !reminderValidation;
+  const canSubmit = title.trim().length > 0 && (!due || (due && dueTime !== null));
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleClose}>
+    <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.overlay}>
-        <View style={[styles.modal, { backgroundColor: colors.ghSurface, borderColor: colors.ghBorder }]}>
+        <RNAnimated.View style={[styles.modal, { backgroundColor: colors.ghSurface, borderColor: colors.ghBorder, transform: [{ scale: scaleAnim }], opacity: opacityAnim }]}>
           <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
             <Text style={[styles.modalTitle, { color: colors.ghText }]}>New Task</Text>
 
@@ -362,7 +317,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
               >
                 <Feather name="calendar" size={14} color={due ? colors.ghBlue : colors.ghMuted} />
                 <Text style={{ color: due ? colors.ghText : colors.ghMuted, fontSize: 13, flex: 1 }}>
-                  {due ? `${fmtDateDisplay(due)}${dueTime ? ` @ ${dueTime}` : ''}` : 'Select date & time…'}
+                  {due ? fmtDateDisplay(due) : 'Select date…'}
                 </Text>
               </TouchableOpacity>
               {due && (
@@ -375,295 +330,169 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
               )}
             </View>
 
-            {/* Calendar Modal */}
-            <Modal visible={showCalendar} transparent animationType="fade" onRequestClose={() => setShowCalendar(false)}>
-              <View style={styles.overlay}>
-                <View style={[styles.calendarModal, { backgroundColor: colors.ghSurface, borderColor: colors.ghBorder }]}>
-                  <Text style={[styles.modalTitle, { color: colors.ghText, marginBottom: 12 }]}>Select Due Date & Time</Text>
+            {/* Calendar & Clock Modals */}
+            <CalendarModal
+              visible={showCalendar}
+              onClose={() => setShowCalendar(false)}
+              onSelectDate={handleSelectDate}
+              initialDateStr={due ? due.split('-').reverse().join('/') : ''}
+              colors={colors}
+            />
 
-                  <MiniCalendar
-                    selectedDate={due}
-                    onSelect={handleSelectDate}
-                    colors={colors}
-                  />
-
-                  {due && (
-                    <View style={{ marginTop: 12 }}>
-                      <Text style={[styles.label, { color: colors.ghMuted, marginTop: 4, marginBottom: 6 }]}>Due Time (Optional)</Text>
-                      
-                      <View style={[styles.chipRow, { marginBottom: 8 }]}>
-                        {['09:00', '12:00', '15:00', '18:00', '21:00'].map((time) => {
-                          const active = dueTime === time;
-                          return (
-                            <TouchableOpacity
-                              key={time}
-                              style={[
-                                styles.chip,
-                                {
-                                  borderColor: active ? colors.ghBlue : colors.ghBorder,
-                                  backgroundColor: active ? colors.ghBlue + '18' : 'transparent',
-                                  paddingVertical: 4,
-                                  paddingHorizontal: 8,
-                                },
-                              ]}
-                              onPress={() => {
-                                if (active) {
-                                  setDueTime(null);
-                                  setTimeHour('');
-                                  setTimeMinute('');
-                                } else {
-                                  setDueTime(time);
-                                  const [h, m] = time.split(':');
-                                  setTimeHour(h);
-                                  setTimeMinute(m);
-                                }
-                              }}
-                            >
-                              <Text style={{ color: active ? colors.ghBlue : colors.ghMuted, fontSize: 11, fontWeight: '500' }}>
-                                {time}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-
-                      {/* Custom Time Inputs */}
-                      <View style={[styles.customRow, { marginTop: 4, alignItems: 'center', gap: 6 }]}>
-                        <TextInput
-                          style={[
-                            styles.customInput,
-                            { color: colors.ghText, backgroundColor: colors.ghBg, borderColor: colors.ghBorder, width: 44, height: 32, paddingHorizontal: 4, fontSize: 13 },
-                          ]}
-                          placeholder="HH"
-                          placeholderTextColor={colors.ghMuted}
-                          value={timeHour}
-                          onChangeText={(val) => {
-                            const clean = val.replace(/[^0-9]/g, '').slice(0, 2);
-                            setTimeHour(clean);
-                            const h = parseInt(clean, 10);
-                            const m = parseInt(timeMinute || '0', 10);
-                            if (clean.length > 0 && !isNaN(h) && h >= 0 && h <= 23) {
-                              setDueTime(`${clean.padStart(2, '0')}:${(timeMinute || '00').padStart(2, '0')}`);
-                            } else if (clean === '') {
-                              setDueTime(null);
-                            }
-                          }}
-                          keyboardType="number-pad"
-                        />
-                        <Text style={{ color: colors.ghText, fontWeight: 'bold' }}>:</Text>
-                        <TextInput
-                          style={[
-                            styles.customInput,
-                            { color: colors.ghText, backgroundColor: colors.ghBg, borderColor: colors.ghBorder, width: 44, height: 32, paddingHorizontal: 4, fontSize: 13 },
-                          ]}
-                          placeholder="MM"
-                          placeholderTextColor={colors.ghMuted}
-                          value={timeMinute}
-                          onChangeText={(val) => {
-                            const clean = val.replace(/[^0-9]/g, '').slice(0, 2);
-                            setTimeMinute(clean);
-                            const h = parseInt(timeHour || '12', 10);
-                            const m = parseInt(clean, 10);
-                            if (clean.length > 0 && !isNaN(m) && m >= 0 && m <= 59) {
-                              setDueTime(`${(timeHour || '12').padStart(2, '0')}:${clean.padStart(2, '0')}`);
-                            } else if (clean === '') {
-                              setDueTime(timeHour ? `${timeHour.padStart(2, '0')}:00` : null);
-                            }
-                          }}
-                          keyboardType="number-pad"
-                        />
-                        <Text style={[styles.customLabel, { color: colors.ghMuted, fontSize: 11 }]}>Custom 24h Time</Text>
-                      </View>
-                    </View>
-                  )}
-
-                  <View style={[styles.actions, { marginTop: 16 }]}>
-                    {due && (
-                      <TouchableOpacity
-                        style={[styles.btn, { borderColor: colors.ghRed, paddingVertical: 8, paddingHorizontal: 12 }]}
-                        onPress={() => { handleClearDate(); }}
-                      >
-                        <Text style={{ color: colors.ghRed, fontSize: 12, fontWeight: '500' }}>Clear</Text>
-                      </TouchableOpacity>
-                    )}
-                    <View style={{ flex: 1 }} />
-                    <TouchableOpacity
-                      style={[styles.btn, { borderColor: colors.ghBorder, paddingVertical: 8, paddingHorizontal: 12 }]}
-                      onPress={() => setShowCalendar(false)}
-                    >
-                      <Text style={{ color: colors.ghMuted, fontSize: 12, fontWeight: '500' }}>
-                        {due ? 'Done' : 'Cancel'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-            </Modal>
-
-            {/* ── Remind Me (only when due date is set) ── */}
+            <AnalogClockModal
+              visible={showClock}
+              onClose={() => setShowClock(false)}
+              onSelectTime={handleSelectTime}
+              // Basic conversion for initialTimeStr
+              initialTimeStr={
+                dueTime 
+                  ? (() => {
+                      const [h, m] = dueTime.split(':').map(Number);
+                      const ampm = h >= 12 ? 'PM' : 'AM';
+                      const hour12 = h % 12 || 12;
+                      return `${hour12}:${m.toString().padStart(2, '0')} ${ampm}`;
+                    })()
+                  : '09:00 AM'
+              }
+              colors={colors}
+              title="Select Due Time"
+            />
+            
+            {/* Time selection when date is selected */}
             {due && (
-              <>
-                <View style={styles.sectionHeader}>
-                  <Feather name="bell" size={13} color={colors.ghMuted} />
-                  <Text style={[styles.label, { color: colors.ghMuted, marginTop: 0, marginBottom: 0 }]}>
-                    Remind Me
-                  </Text>
-                </View>
-
-                <View style={styles.chipRow}>
-                  {REMIND_PRESETS.map((preset) => {
-                    const active = !isCustom && remindBefore === preset.value;
-                    // Check if this preset is feasible
-                    const err = validateReminder(due, dueTime || undefined, preset.value);
-                    const disabled = !!err;
-                    return (
-                      <TouchableOpacity
-                        key={preset.value}
-                        style={[
-                          styles.chip,
-                          {
-                            borderColor: active ? colors.ghBlue : colors.ghBorder,
-                            backgroundColor: active ? colors.ghBlue + '18' : 'transparent',
-                            opacity: disabled ? 0.4 : 1,
-                          },
-                        ]}
-                        onPress={() => handleSelectPreset(preset.value)}
-                        disabled={disabled}
-                      >
-                        <Text style={{
-                          color: active ? colors.ghBlue : colors.ghMuted,
-                          fontSize: 12, fontWeight: '500',
-                        }}>
-                          {preset.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-
-                  {/* Custom chip */}
+              <View style={{ marginTop: 12 }}>
+                <Text style={[styles.label, { color: colors.ghMuted, marginTop: 4, marginBottom: 6 }]}>Due Time (Required)</Text>
+                
+                <View style={[styles.chipRow, { marginBottom: 8 }]}>
                   <TouchableOpacity
                     style={[
                       styles.chip,
                       {
-                        borderColor: isCustom ? colors.ghPurple : colors.ghBorder,
-                        backgroundColor: isCustom ? colors.ghPurple + '18' : 'transparent',
+                        borderColor: dueTime ? colors.ghBlue : colors.ghPurple,
+                        backgroundColor: (dueTime ? colors.ghBlue : colors.ghPurple) + '18',
+                        paddingVertical: 6,
+                        paddingHorizontal: 12,
                       },
                     ]}
-                    onPress={handleCustomToggle}
+                    onPress={() => setShowClock(true)}
                   >
-                    <Text style={{
-                      color: isCustom ? colors.ghPurple : colors.ghMuted,
-                      fontSize: 12, fontWeight: '500',
-                    }}>
-                      Custom
+                    <Text style={{ color: dueTime ? colors.ghBlue : colors.ghPurple, fontSize: 12, fontWeight: '600' }}>
+                      {dueTime ? `Time: ${formatTime12h(dueTime)}` : 'Select Time'}
                     </Text>
                   </TouchableOpacity>
-                </View>
 
-                {/* Custom hours input */}
-                {isCustom && (
-                  <View style={styles.customRow}>
-                    <TextInput
+                  {dueTime && (
+                    <TouchableOpacity
                       style={[
-                        styles.customInput,
-                        { color: colors.ghText, backgroundColor: colors.ghBg, borderColor: colors.ghBorder },
+                        styles.chip,
+                        {
+                          borderColor: colors.ghBorder,
+                          backgroundColor: 'transparent',
+                          paddingVertical: 6,
+                          paddingHorizontal: 12,
+                        },
                       ]}
-                      placeholder="e.g. 3"
-                      placeholderTextColor={colors.ghMuted}
-                      value={customHours}
-                      onChangeText={handleCustomHoursChange}
-                      keyboardType="decimal-pad"
-                    />
-                    <Text style={[styles.customLabel, { color: colors.ghMuted }]}>hours before</Text>
-                  </View>
-                )}
-
-                {/* Validation error */}
-                {reminderValidation && (
-                  <View style={styles.validationRow}>
-                    <Feather name="alert-circle" size={12} color={colors.ghAmber} />
-                    <Text style={[styles.validationText, { color: colors.ghAmber }]}>
-                      {reminderValidation}
-                    </Text>
-                  </View>
-                )}
-              </>
+                      onPress={() => setDueTime(null)}
+                    >
+                      <Text style={{ color: colors.ghMuted, fontSize: 12, fontWeight: '600' }}>
+                        Clear Time
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
             )}
 
-            {/* ── Repeat Every (only when remind-before is set and valid) ── */}
-            {due && remindBefore !== null && !reminderValidation && (
-              <>
-                <View style={styles.sectionHeader}>
-                  <Feather name="repeat" size={13} color={colors.ghMuted} />
-                  <Text style={[styles.label, { color: colors.ghMuted, marginTop: 0, marginBottom: 0 }]}>
-                    Repeat Every
-                  </Text>
+            {/* ── Reminders (Side by Side layout) ── */}
+            {due && (
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+                {/* Start Reminding */}
+                <View style={{ flex: 1 }}>
+                  <View style={[styles.sectionHeader, { marginTop: 0 }]}>
+                    <Feather name="bell" size={13} color={colors.ghMuted} />
+                    <Text style={[styles.label, { color: colors.ghMuted, marginTop: 0, marginBottom: 0 }]}>
+                      Start Reminding
+                    </Text>
+                  </View>
+
+                  {availableOffsets.length > 0 ? (
+                    <TouchableOpacity
+                      style={[
+                        styles.chip,
+                        {
+                          borderColor: colors.ghBorder,
+                          backgroundColor: colors.ghBg,
+                          paddingVertical: 10,
+                          paddingHorizontal: 12,
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          borderRadius: 8,
+                        },
+                      ]}
+                      onPress={() => setShowOffsetDropdown(true)}
+                    >
+                      <Text style={{ color: remindBefore !== null ? colors.ghText : colors.ghMuted, fontSize: 13, fontWeight: '500' }}>
+                        {remindBefore !== null ? availableOffsets.find(p => p.value === remindBefore)?.label : 'Select...'}
+                      </Text>
+                      <Feather name="chevron-down" size={16} color={colors.ghMuted} />
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={[styles.hintText, { color: colors.ghMuted }]}>
+                      Due too soon.
+                    </Text>
+                  )}
                 </View>
 
-                {availableRepeatOptions.length > 0 ? (
-                  <View style={styles.chipRow}>
-                    {availableRepeatOptions.map((opt) => {
-                      const active = repeatEvery === opt.value;
-                      return (
-                        <TouchableOpacity
-                          key={opt.value}
-                          style={[
-                            styles.chip,
-                            {
-                              borderColor: active ? colors.ghGreen : colors.ghBorder,
-                              backgroundColor: active ? colors.ghGreen + '18' : 'transparent',
-                            },
-                          ]}
-                          onPress={() => setRepeatEvery(active ? null : opt.value)}
-                        >
-                          <Text style={{
-                            color: active ? colors.ghGreen : colors.ghMuted,
-                            fontSize: 12, fontWeight: '500',
-                          }}>
-                            {opt.label}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                ) : (
-                  <Text style={[styles.hintText, { color: colors.ghMuted }]}>
-                    Remind-before window is too short for repeat intervals.
-                  </Text>
-                )}
+                {/* Repeat Every */}
+                {remindBefore !== null && (
+                  <View style={{ flex: 1 }}>
+                    <View style={[styles.sectionHeader, { marginTop: 0 }]}>
+                      <Feather name="repeat" size={13} color={colors.ghMuted} />
+                      <Text style={[styles.label, { color: colors.ghMuted, marginTop: 0, marginBottom: 0 }]}>
+                        Repeat Every
+                      </Text>
+                    </View>
 
-                {repeatEvery !== null && repeatEvery <= 5000 && (
-                  <View style={styles.validationRow}>
-                    <Feather name="zap" size={12} color={colors.ghAmber} />
-                    <Text style={[styles.validationText, { color: colors.ghAmber }]}>
-                      Testing mode — fires every 5 seconds
-                    </Text>
+                    {availableRepeatOptions.length > 0 ? (
+                      <TouchableOpacity
+                        style={[
+                          styles.chip,
+                          {
+                            borderColor: colors.ghBorder,
+                            backgroundColor: colors.ghBg,
+                            paddingVertical: 10,
+                            paddingHorizontal: 12,
+                            flexDirection: 'row',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            borderRadius: 8,
+                          },
+                        ]}
+                        onPress={() => setShowRepeatDropdown(true)}
+                      >
+                        <Text style={{ color: repeatEvery !== null ? colors.ghText : colors.ghMuted, fontSize: 13, fontWeight: '500' }}>
+                          {repeatEvery !== null ? availableRepeatOptions.find(p => p.value === repeatEvery)?.label : 'Once'}
+                        </Text>
+                        <Feather name="chevron-down" size={16} color={colors.ghMuted} />
+                      </TouchableOpacity>
+                    ) : (
+                      <Text style={[styles.hintText, { color: colors.ghMuted }]}>
+                        No repeats fit.
+                      </Text>
+                    )}
                   </View>
                 )}
-              </>
+              </View>
             )}
 
-            {/* ── Summary ── */}
-            {due && remindBefore !== null && !reminderValidation && (
-              <View style={[styles.summaryBox, { backgroundColor: colors.ghBg, borderColor: colors.ghBorder }]}>
-                <Feather name="info" size={12} color={colors.ghBlue} />
-                <Text style={[styles.summaryText, { color: colors.ghMuted }]}>
-                  {'Reminder starts '}
-                  <Text style={{ fontWeight: '600', color: colors.ghText }}>
-                    {REMIND_PRESETS.find(p => p.value === remindBefore)?.label
-                      || `${customHours}h`}
-                  </Text>
-                  {' before due'}
-                  {repeatEvery ? (
-                    <>
-                      {', repeating '}
-                      <Text style={{ fontWeight: '600', color: colors.ghText }}>
-                        every {REPEAT_OPTIONS.find(o => o.value === repeatEvery)?.label || '?'}
-                      </Text>
-                    </>
-                  ) : (
-                    ' (once)'
-                  )}
+
+            {/* ── Total Reminders ── */}
+            {due && remindBefore !== null && schedulePreview.length > 0 && (
+              <View style={[styles.summaryBox, { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.ghBg, borderColor: colors.ghBorder, marginTop: 16 }]}>
+                <Feather name="bell" size={14} color={colors.ghBlue} />
+                <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: '600', marginLeft: 8 }}>
+                  Total Reminders: {totalReminders}
                 </Text>
               </View>
             )}
@@ -681,68 +510,52 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
                     borderColor: canSubmit ? colors.ghBlue : colors.ghBorder,
                   },
                 ]}
-                onPress={handleSubmit}
+                onPress={() => setShowConfirm(true)}
                 disabled={!canSubmit}
               >
                 <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>Add Task</Text>
               </TouchableOpacity>
             </View>
           </ScrollView>
-        </View>
+        </RNAnimated.View>
       </KeyboardAvoidingView>
+      <ConfirmationModal
+        visible={showConfirm}
+        onClose={() => setShowConfirm(false)}
+        onConfirm={handleSubmit}
+        title="Create Task"
+        description={`Are you sure you want to add "${title}"?`}
+        successText="Task Created Successfully!"
+        colors={colors}
+      />
+
+      <SelectModal
+        visible={showOffsetDropdown}
+        onClose={() => setShowOffsetDropdown(false)}
+        title="Start Reminding"
+        options={availableOffsets}
+        selectedValue={remindBefore}
+        onSelect={handleSelectPreset}
+        colors={colors}
+      />
+
+      <SelectModal
+        visible={showRepeatDropdown}
+        onClose={() => setShowRepeatDropdown(false)}
+        title="Repeat Every"
+        options={availableRepeatOptions}
+        selectedValue={repeatEvery || 0}
+        onSelect={(val) => setRepeatEvery(val === 0 ? null : val)}
+        colors={colors}
+      />
+
     </Modal>
   );
 }
 
 // ─── Styles ────────────────────────────────────────────────────────────────────
 
-const calStyles = StyleSheet.create({
-  container: {
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 10,
-    marginTop: 8,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  navBtn: {
-    padding: 6,
-  },
-  monthLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  weekRow: {
-    flexDirection: 'row',
-    marginBottom: 4,
-  },
-  cell: {
-    width: `${100 / 7}%`,
-    aspectRatio: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  weekLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  selectedCell: {
-    borderRadius: 18,
-  },
-  dayText: {
-    fontSize: 13,
-    fontWeight: '400',
-  },
-});
+
 
 const styles = StyleSheet.create({
   overlay: {

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, useColorScheme, Modal, Switch, Platform } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, useColorScheme, Modal, Switch, Platform, Animated as RNAnimated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../constants/theme';
 import { Task } from './DetailPanel';
@@ -72,10 +72,6 @@ export default function Sidebar({
   const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
   const insets = useSafeAreaInsets();
 
-  const [isAdding, setIsAdding] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectColor, setNewProjectColor] = useState('#58a6ff');
-
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [modalNewProjectName, setModalNewProjectName] = useState('');
   const [modalNewProjectColor, setModalNewProjectColor] = useState('#58a6ff');
@@ -95,6 +91,43 @@ export default function Sidebar({
   const [reminderStyle, setReminderStyle] = useState<'banner' | 'fullscreen'>('banner');
   const [reminderRequireAuth, setReminderRequireAuth] = useState(false);
   const [alarmSound, setAlarmSound] = useState('notification_sound_1');
+
+  // Animation values
+  const scaleAnim = useRef(new RNAnimated.Value(0.9)).current;
+  const opacityAnim = useRef(new RNAnimated.Value(0)).current;
+
+  const animateClose = (callback: () => void) => {
+    RNAnimated.parallel([
+      RNAnimated.timing(scaleAnim, {
+        toValue: 0.9,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+      RNAnimated.timing(opacityAnim, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start(callback);
+  };
+
+  const animateOpen = () => {
+    scaleAnim.setValue(0.9);
+    opacityAnim.setValue(0);
+    RNAnimated.parallel([
+      RNAnimated.spring(scaleAnim, {
+        toValue: 1,
+        tension: 20,
+        friction: 10,
+        useNativeDriver: true,
+      }),
+      RNAnimated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
 
   // Load settings on mount / when settings opens
   useEffect(() => {
@@ -253,13 +286,6 @@ export default function Sidebar({
   const inboxBadgeCount = tasks.filter((t) => t.project === 'Inbox' && !t.done).length;
   const backlogBadgeCount = tasks.filter((t) => t.target === 'backlog' && !t.done).length;
 
-  const handleSaveProject = () => {
-    if (!newProjectName.trim()) return;
-    onAddProject(newProjectName.trim(), newProjectColor);
-    setNewProjectName('');
-    setIsAdding(false);
-  };
-
   const views = [
     { id: 'today', label: "Today's Tasks", icon: '☀️', badge: todayBadgeCount },
     { id: 'inbox', label: 'Inbox', icon: '📥', badge: inboxBadgeCount },
@@ -312,52 +338,7 @@ export default function Sidebar({
 
         <View style={styles.projectsHeaderRow}>
           <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>PROJECTS</Text>
-          <TouchableOpacity 
-            style={[styles.addProjBtn, { backgroundColor: isAdding ? colors.ghSurface2 : 'transparent' }]}
-            onPress={() => setIsAdding(!isAdding)}
-          >
-            <Text style={{ color: colors.ghMuted, fontSize: 13 }}>+</Text>
-          </TouchableOpacity>
         </View>
-
-        {isAdding && (
-          <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={[styles.addProjectBox, { backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder }]}>
-            <View style={styles.colorChipsRow}>
-              {CURATED_COLORS.map((c) => (
-                <TouchableOpacity
-                  key={c}
-                  style={[
-                    styles.colorChip,
-                    { backgroundColor: c },
-                    newProjectColor === c && { borderColor: '#fff', borderWidth: 2 }
-                  ]}
-                  onPress={() => setNewProjectColor(c)}
-                />
-              ))}
-            </View>
-            
-            <View style={[styles.addInputWrapper, { backgroundColor: colors.ghSurface, borderColor: colors.ghBorder }]}>
-              <View style={[styles.projectDot, { backgroundColor: newProjectColor }]} />
-              <TextInput
-                style={[styles.addInput, { color: colors.ghText }]}
-                value={newProjectName}
-                onChangeText={setNewProjectName}
-                placeholder="Project name..."
-                placeholderTextColor={colors.ghMuted}
-                autoFocus
-              />
-            </View>
-
-            <View style={styles.addActionsRow}>
-              <TouchableOpacity style={[styles.btnSmall, { borderColor: colors.ghBorder }]} onPress={() => setIsAdding(false)}>
-                <Text style={{ color: colors.ghText, fontSize: 11 }}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.btnSmall, styles.btnPrimary]} onPress={handleSaveProject}>
-                <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>Create</Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
-        )}
         
         {projects.map((proj) => {
           const isActive = currentProject === proj.name;
@@ -406,14 +387,15 @@ export default function Sidebar({
       <Modal
         visible={isSettingsOpen}
         transparent
-        animationType="fade"
-        onRequestClose={() => setIsSettingsOpen(false)}
+        animationType="none"
+        onRequestClose={() => animateClose(() => setIsSettingsOpen(false))}
+        onShow={animateOpen}
       >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.ghSurface, borderColor: colors.ghBorder }]}>
+        <RNAnimated.View style={[styles.modalOverlay, { opacity: opacityAnim }]}>
+          <RNAnimated.View style={[styles.modalContent, { backgroundColor: colors.ghSurface, borderColor: colors.ghBorder, transform: [{ scale: scaleAnim }] }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.ghBorder }]}>
               <Text style={[styles.modalTitle, { color: colors.ghText }]}>Settings</Text>
-              <TouchableOpacity onPress={() => setIsSettingsOpen(false)} style={styles.closeBtn}>
+              <TouchableOpacity onPress={() => animateClose(() => setIsSettingsOpen(false))} style={styles.closeBtn}>
                 <Feather name="x" size={20} color={colors.ghText} />
               </TouchableOpacity>
             </View>
@@ -636,12 +618,6 @@ export default function Sidebar({
                           autoCorrect={false}
                         />
                       </View>
-                     <TouchableOpacity
-                       style={[styles.btn, { borderColor: colors.ghBorder, backgroundColor: colors.ghSurface2 }]}
-                       onPress={handlePickAlarmSound}
-                     >
-                       <Text style={{ color: colors.ghText, fontSize: 12 }}>Upload Custom</Text>
-                     </TouchableOpacity>
 
                       <TouchableOpacity
                         style={[styles.modalActionBtn, { backgroundColor: '#0061FE' }]}
@@ -656,18 +632,7 @@ export default function Sidebar({
                     </View>
                   )}
 
-                  <View style={styles.inputGroup}>
-                    <Text style={[styles.inputLabel, { color: colors.ghMuted }]}>Dropbox File Path</Text>
-                    <TextInput
-                      style={[styles.settingsInput, { color: colors.ghText, backgroundColor: colors.ghBg, borderColor: colors.ghBorder }]}
-                      value={dropboxPath}
-                      onChangeText={setDropboxPath}
-                      placeholder="/eidon_db.json"
-                      placeholderTextColor={colors.ghMuted}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                    />
-                  </View>
+                  {/* Dropbox File Path is managed internally */}
 
                   {connectionStatus && (
                     <Text style={[styles.statusText, { color: connectionStatus.includes('Connected') ? colors.ghGreen : colors.ghRed, marginBottom: 8 }]}>
@@ -820,8 +785,8 @@ export default function Sidebar({
                 )}
               </View>
             </ScrollView>
-          </View>
-        </View>
+          </RNAnimated.View>
+        </RNAnimated.View>
       </Modal>
     </View>
   );
@@ -1026,43 +991,42 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: '100%',
-    maxWidth: 480,
+    maxWidth: 320,
     maxHeight: '90%',
     borderRadius: 12,
     borderWidth: 1,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 8,
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
     borderBottomWidth: 1,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.5,
   },
   closeBtn: {
-    padding: 4,
+    padding: 6,
+    borderRadius: 12,
+    backgroundColor: 'rgba(128,128,128,0.1)',
   },
   modalBody: {
-    padding: 20,
+    padding: 24,
   },
   settingsSection: {
-    marginBottom: 24,
+    marginBottom: 32,
   },
   settingsSectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    marginBottom: 12,
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1,
+    marginBottom: 16,
+    textTransform: 'uppercase',
   },
   settingsRow: {
     flexDirection: 'row',
@@ -1088,32 +1052,32 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   settingsInput: {
-    height: 38,
+    height: 44,
     borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    fontSize: 13,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    fontSize: 14,
   },
   modalAddProjectBox: {
-    padding: 12,
+    padding: 16,
     borderWidth: 1,
-    borderRadius: 8,
-    gap: 10,
+    borderRadius: 12,
+    gap: 12,
   },
   modalAddBtn: {
-    height: 32,
-    borderRadius: 6,
+    height: 40,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalAddBtnText: {
     color: '#fff',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
   },
   modalActionBtn: {
-    height: 34,
-    borderRadius: 6,
+    height: 40,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
@@ -1123,8 +1087,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   saveBtn: {
-    height: 36,
-    borderRadius: 6,
+    height: 40,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 12,
