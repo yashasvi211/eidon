@@ -114,6 +114,9 @@ export interface Task {
   completedAt?: number | null;
   auditLog?: AuditEntry[];
   reminder?: TaskReminder;
+  priority?: 'High' | 'Moderate' | 'Low';
+  execStartDate?: string;
+  execStartTime?: string;
 }
 
 interface DetailPanelProps {
@@ -1004,71 +1007,81 @@ export default function DetailPanel({
               </View>
             </View>
 
-            {task.due ? (
-              <View style={styles.detailSection}>
-                <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
-                  DUE DATE & TIME
-                </Text>
-                <View style={styles.dueRow}>
-                  <View
-                    style={[
-                      styles.dueDot,
-                      { backgroundColor: dlInfo.dotColor },
-                    ]}
-                  />
-                  <Text
-                    style={{
-                      color: dlInfo.color,
-                      fontSize: 13,
-                      fontWeight: "500",
-                    }}
-                  >
-                    {fmtDateDisplay(task.due)}
-                    {task.dueTime ? ` at ${formatTime12h(task.dueTime)}` : ""}
-                    {" "}
-                    {dlInfo.label && `(${dlInfo.label})`}
-                  </Text>
-                </View>
-              </View>
-            ) : null}
-
-            {task.reminder ? (
-              <View style={styles.detailSection}>
-                <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
-                  REMINDER SETTINGS
-                </Text>
+            <View style={styles.detailSection}>
+              <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
+                ATTRIBUTES
+              </Text>
+              
+              {(() => {
+                const now = new Date();
+                const createdAtStr = new Date(task.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
                 
-                <View style={[styles.dueRow, { marginBottom: 8 }]}>
-                  <Feather name="bell" size={14} color={colors.ghBlue} style={{ marginRight: 6 }} />
-                  <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: "500" }}>
-                    Remind me {formatDuration(task.reminder.remindBefore)} before
-                  </Text>
-                </View>
+                let execStartStr = "-";
+                if (task.execStartDate) {
+                  execStartStr = fmtDateDisplay(task.execStartDate) + (task.execStartTime ? ` at ${formatTime12h(task.execStartTime)}` : "");
+                }
+                
+                let dueStr = "-";
+                if (task.due) {
+                  dueStr = fmtDateDisplay(task.due) + (task.dueTime ? ` at ${formatTime12h(task.dueTime)}` : "");
+                }
 
-                {task.reminder.repeatEvery ? (
-                  <View style={[styles.dueRow, { marginBottom: 0 }]}>
-                    <Feather name="repeat" size={14} color={colors.ghPurple} style={{ marginRight: 6 }} />
-                    <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: "500" }}>
-                      Repeat every {formatDuration(task.reminder.repeatEvery)}
-                    </Text>
+                let activeTimeStr = "-";
+                let overdueTimeStr = "-";
+
+                if (task.due) {
+                  const dueObj = new Date(task.due + "T00:00:00");
+                  if (task.dueTime) {
+                    const [h, m] = task.dueTime.split(":").map(Number);
+                    dueObj.setHours(h, m, 0, 0);
+                  }
+                  
+                  const diffMs = dueObj.getTime() - now.getTime();
+                  
+                  if (diffMs < 0) {
+                    const overMs = Math.abs(diffMs);
+                    const overDays = Math.floor(overMs / (1000 * 60 * 60 * 24));
+                    const overHours = Math.floor((overMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                    overdueTimeStr = `${overDays}d ${overHours}h`;
+                  }
+
+                  if (task.execStartDate) {
+                    const execObj = new Date(task.execStartDate + "T00:00:00");
+                    if (task.execStartTime) {
+                      const [h, m] = task.execStartTime.split(":").map(Number);
+                      execObj.setHours(h, m, 0, 0);
+                    }
+                    if (now.getTime() >= execObj.getTime() && diffMs >= 0) {
+                      const activeMs = now.getTime() - execObj.getTime();
+                      const actDays = Math.floor(activeMs / (1000 * 60 * 60 * 24));
+                      const actHours = Math.floor((activeMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                      activeTimeStr = `${actDays}d ${actHours}h`;
+                    }
+                  }
+                }
+
+                const renderAttr = (label: string, value: string, color: string = colors.ghText) => (
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.ghBorder2 }}>
+                    <Text style={{ color: colors.ghMuted, fontSize: 13 }}>{label}</Text>
+                    <Text style={{ color, fontSize: 13, fontWeight: "500", textAlign: "right", flex: 1, marginLeft: 16 }}>{value}</Text>
                   </View>
-                ) : null}
+                );
 
-                {totalReminders > 0 && (
-                  <View style={[styles.dueRow, { marginTop: 8 }]}>
-                    <Feather name="bell" size={14} color={colors.ghBlue} style={{ marginRight: 6 }} />
-                    <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: "500" }}>
-                      Total Reminders: {totalReminders}
-                    </Text>
+                return (
+                  <View style={{ backgroundColor: colors.ghSurface2, borderRadius: 8, paddingHorizontal: 12 }}>
+                    {renderAttr("Created", createdAtStr)}
+                    {renderAttr("Priority", task.priority || "Low", task.priority === 'High' ? (colors.ghRed || '#f85149') : task.priority === 'Moderate' ? (colors.ghAmber || '#d29922') : (colors.ghGreen || '#3fb950'))}
+                    {renderAttr("Execution Start", execStartStr)}
+                    {renderAttr("Due", dueStr)}
+                    {activeTimeStr !== "-" && renderAttr("Active Time", activeTimeStr, "#56d4dd")}
+                    {overdueTimeStr !== "-" && renderAttr("Overdue Time", overdueTimeStr, colors.ghRed || '#f85149')}
                   </View>
-                )}
-              </View>
-            ) : null}
-
-            <ReminderCountdown task={task} colors={colors} />
+                );
+              })()}
+            </View>
 
             {task.notes ? (
-              <View style={styles.detailSection}>
+              <View style={[styles.detailSection, { marginTop: 16 }]}>
                 <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
                   NOTES
                 </Text>
@@ -1078,73 +1091,6 @@ export default function DetailPanel({
               </View>
             ) : null}
 
-            {/* Timer Tracking Block */}
-            <View
-              style={[
-                styles.timerBlock,
-                {
-                  backgroundColor: colors.ghSurface,
-                  borderColor: colors.ghBorder,
-                },
-              ]}
-            >
-              {isThisTaskTimerRunning ? (
-                <View style={styles.timerRunningRow}>
-                  <View style={styles.timerTimerLabel}>
-                    <View
-                      style={[
-                        styles.pulseDot,
-                        { backgroundColor: colors.ghGreen },
-                      ]}
-                    />
-                    <Text
-                      style={[styles.timerClockText, { color: colors.ghText }]}
-                    >
-                      {fmtTimer(timerSeconds)}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1, minWidth: 100 }}>
-                    <TextInput
-                      style={[
-                        styles.sessionNoteInput,
-                        {
-                          color: colors.ghText,
-                          borderColor: colors.ghBorder,
-                          backgroundColor: colors.ghSurface2,
-                        },
-                      ]}
-                      placeholder="Note for session..."
-                      placeholderTextColor={colors.ghMuted}
-                      value={sessionNote}
-                      onChangeText={setSessionNote}
-                    />
-                  </View>
-                  <TouchableOpacity
-                    style={[styles.timerBtn, { backgroundColor: colors.ghRed }]}
-                    onPress={() => onStopTimer(sessionNote)}
-                  >
-                    <Text style={styles.timerBtnText}>Stop</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={{ gap: 12 }}>
-                  <Text style={{ color: colors.ghMuted, fontSize: 13 }}>
-                    No active session.
-                  </Text>
-                  <SwipeButton
-                    text="Swipe to start timer"
-                    onSwipeSuccess={handleStartTimerAuthentication}
-                    colors={colors}
-                    disabled={isTimerRunning && activeTimerTaskId !== task.id}
-                  />
-                </View>
-              )}
-              {isTimerRunning && activeTimerTaskId !== task.id && (
-                <Text style={[styles.timerWarning, { color: colors.ghAmber }]}>
-                  Another task timer is currently active.
-                </Text>
-              )}
-            </View>
           </TabPage>
 
         <TabPage

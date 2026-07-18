@@ -17,6 +17,8 @@ interface AnalogClockModalProps {
   initialTimeStr: string;
   colors: any;
   title: string;
+  minTime?: string;
+  maxTime?: string;
 }
 
 interface ScrollWheelProps {
@@ -152,7 +154,7 @@ function ScrollWheel({ items, selectedValue, onValueChange, colors, visible }: S
   );
 }
 
-export default function AnalogClockModal({ visible, onClose, onSelectTime, initialTimeStr, colors, title }: AnalogClockModalProps) {
+export default function AnalogClockModal({ visible, onClose, onSelectTime, initialTimeStr, colors, title, minTime, maxTime }: AnalogClockModalProps) {
   const [hour, setHour] = useState(9);
   const [minute, setMinute] = useState(0);
   const [ampm, setAmPm] = useState<"AM" | "PM">("AM");
@@ -201,6 +203,32 @@ export default function AnalogClockModal({ visible, onClose, onSelectTime, initi
       }),
     ]).start(callback);
   };
+
+  const isValidTime = useMemo(() => {
+    let currentH = hour;
+    if (ampm === "PM" && currentH < 12) currentH += 12;
+    if (ampm === "AM" && currentH === 12) currentH = 0;
+    
+    if (minTime) {
+      const parts = minTime.split(":");
+      if (parts.length === 2) {
+        const minH = Number(parts[0]);
+        const minM = Number(parts[1]);
+        if (currentH < minH || (currentH === minH && minute < minM)) return false;
+      }
+    }
+    
+    if (maxTime) {
+      const parts = maxTime.split(":");
+      if (parts.length === 2) {
+        const maxH = Number(parts[0]);
+        const maxM = Number(parts[1]);
+        if (currentH > maxH || (currentH === maxH && minute > maxM)) return false;
+      }
+    }
+    
+    return true;
+  }, [hour, minute, ampm, minTime, maxTime]);
 
   const handleSave = () => {
     const hrStr = String(hour).padStart(2, "0");
@@ -295,8 +323,18 @@ export default function AnalogClockModal({ visible, onClose, onSelectTime, initi
             <TouchableOpacity style={[styles.btnTime, { borderColor: colors.ghBorder }]} onPress={() => animateClose(onClose)}>
               <Text style={{ color: colors.ghMuted, fontSize: 13, fontWeight: '500' }}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.btnTime, { backgroundColor: colors.ghBlue, borderColor: colors.ghBlue }]} onPress={handleSave}>
-              <Text style={{ color: "#ffffff", fontSize: 13, fontWeight: '600' }}>OK</Text>
+            <TouchableOpacity 
+              style={[
+                styles.btnTime, 
+                { 
+                  backgroundColor: isValidTime ? colors.ghBlue : 'transparent', 
+                  borderColor: isValidTime ? colors.ghBlue : colors.ghBorder 
+                }
+              ]} 
+              onPress={handleSave}
+              disabled={!isValidTime}
+            >
+              <Text style={{ color: isValidTime ? "#ffffff" : colors.ghMuted, fontSize: 13, fontWeight: '600' }}>OK</Text>
             </TouchableOpacity>
           </View>
         </RNAnimated.View>

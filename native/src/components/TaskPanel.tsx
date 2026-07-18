@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
   useColorScheme,
 } from "react-native";
 import { Colors } from "../constants/theme";
@@ -15,6 +14,8 @@ import Animated, {
   LinearTransition,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Feather } from "@expo/vector-icons";
+import DraggableFlatList, { ScaleDecorator, RenderItemParams } from "react-native-draggable-flatlist";
 
 interface Project {
   name: string;
@@ -31,6 +32,7 @@ interface TaskPanelProps {
   selectedTaskId: string | null;
   showCompleted: boolean;
   setShowCompleted: (val: boolean) => void;
+  setTasks?: (updater: (prev: Task[]) => Task[]) => void;
 }
 
 const fmtSeconds = (s: number) => {
@@ -40,62 +42,63 @@ const fmtSeconds = (s: number) => {
   return `${m}m`;
 };
 
-const getDeadlineColorAndLabel = (dueDate?: string, colors?: any) => {
-  if (!dueDate) return null;
+const getExecutionStatus = (task: Task, colors: any) => {
+  if (!task.due) return null;
+
   const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const due = new Date(dueDate + "T00:00:00");
-  const diffMs = due.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
-  let label = "";
-  let color = colors.ghAmber;
-  let bg = "rgba(210, 153, 34, 0.08)";
-  let border = "rgba(210, 153, 34, 0.3)";
+  const due = new Date(task.due + "T00:00:00");
+  const today = new Date(todayStr + "T00:00:00");
+  const diffDueDays = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
-  if (diffDays < 0) {
-    label = `· ${Math.abs(diffDays)}d overdue`;
-    color = colors.ghRed;
-    bg = "rgba(248, 81, 73, 0.08)";
-    border = "rgba(248, 81, 73, 0.3)";
-  } else if (diffDays === 0) {
-    label = "· Today";
-    color = "#e3b341";
-    bg = "rgba(227, 179, 65, 0.1)";
-    border = "rgba(227, 179, 65, 0.4)";
-  } else if (diffDays === 1) {
-    label = "· Tomorrow";
-    color = "#f0883e";
-    bg = "rgba(240, 136, 62, 0.08)";
-    border = "rgba(240, 136, 62, 0.3)";
-  } else if (diffDays <= 7) {
-    label = `· ${diffDays}d left`;
-    color = "#d29922";
-    bg = "rgba(210, 153, 34, 0.08)";
-    border = "rgba(210, 153, 34, 0.35)";
-  } else {
-    const [y, m, d] = dueDate.split("-");
-    const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
-    label = `· ${months[parseInt(m) - 1]} ${parseInt(d)}`;
-    color = "#3fb950";
-    bg = "rgba(63, 185, 80, 0.08)";
-    border = "rgba(63, 185, 80, 0.3)";
+  if (diffDueDays < 0) {
+    return {
+      label: `· Overdue by ${Math.abs(diffDueDays)}d`,
+      color: colors.ghRed || '#f85149',
+      bg: "rgba(248, 81, 73, 0.08)",
+      border: "rgba(248, 81, 73, 0.3)",
+    };
   }
 
-  return { label, color, bg, border };
+  if (task.execStartDate) {
+    const execStart = new Date(task.execStartDate + "T00:00:00");
+    const diffExecDays = Math.round((execStart.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffExecDays > 0) {
+      return {
+        label: `· Starts in ${diffExecDays}d`,
+        color: colors.ghMuted,
+        bg: "rgba(128,128,128,0.05)",
+        border: "rgba(128,128,128,0.2)",
+      };
+    } else {
+      return {
+        label: `· Active (${diffDueDays}d left)`,
+        color: "#56d4dd",
+        bg: "rgba(86, 212, 221, 0.08)",
+        border: "rgba(86, 212, 221, 0.3)",
+      };
+    }
+  }
+
+  if (diffDueDays <= 2) {
+    return {
+      label: diffDueDays === 0 ? "· Due Today" : `· Due in ${diffDueDays}d`,
+      color: "#d29922",
+      bg: "rgba(210, 153, 34, 0.08)",
+      border: "rgba(210, 153, 34, 0.35)",
+    };
+  }
+
+  const [y, m, d] = task.due.split("-");
+  const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  return {
+    label: `· ${months[parseInt(m) - 1]} ${parseInt(d)}`,
+    color: "#3fb950",
+    bg: "rgba(63, 185, 80, 0.08)",
+    border: "rgba(63, 185, 80, 0.3)"
+  };
 };
 
 const getSubtaskProgressStyles = (done: number, total: number, colors: any) => {
@@ -130,6 +133,11 @@ const getSubtaskProgressStyles = (done: number, total: number, colors: any) => {
   return { color, bg, border };
 };
 
+type ListItem = 
+  | { type: 'header'; id: string; title: string }
+  | { type: 'task'; id: string; task: Task }
+  | { type: 'empty'; id: string; message: string };
+
 export default function TaskPanel({
   tasks,
   projects,
@@ -140,6 +148,7 @@ export default function TaskPanel({
   selectedTaskId,
   showCompleted,
   setShowCompleted,
+  setTasks
 }: TaskPanelProps) {
   const scheme = useColorScheme();
   const colors = Colors[scheme === "unspecified" ? "light" : scheme];
@@ -148,15 +157,9 @@ export default function TaskPanel({
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
-  const isTaskBacklog = (t: Task) =>
-    t.target === "backlog" || (t.due && t.due < todayStr);
-  const isTaskCurrent = (t: Task) =>
-    !isTaskBacklog(t) &&
-    (t.target === "today" ||
-      t.due === todayStr ||
-      (!t.due && t.target === "today"));
+  const isTaskBacklog = (t: Task) => t.target === "backlog" || (t.due && t.due < todayStr);
+  const isTaskCurrent = (t: Task) => !isTaskBacklog(t) && (t.target === "today" || t.due === todayStr || (!t.due && t.target === "today"));
 
-  // Filtering based on view & project & completed state
   const baseFiltered = tasks
     .filter((t) => {
       if (currentProject) return t.project === currentProject;
@@ -169,6 +172,15 @@ export default function TaskPanel({
     .filter((t) => {
       if (!showCompleted && t.done) return false;
       return true;
+    })
+    .sort((a, b) => {
+      const getPriorityWeight = (priority?: string) => {
+        if (priority === 'High') return 3;
+        if (priority === 'Moderate') return 2;
+        if (priority === 'Low') return 1;
+        return 0;
+      };
+      return getPriorityWeight(b.priority) - getPriorityWeight(a.priority);
     });
 
   const getProjectColor = (pName: string) => {
@@ -176,250 +188,284 @@ export default function TaskPanel({
     return found ? found.color : "#bc8cff";
   };
 
-  const renderTaskItem = (task: Task) => {
+  const renderTaskItem = (task: Task, drag: () => void, isActiveDrag: boolean) => {
     const pColor = getProjectColor(task.project);
     const isHex = pColor.startsWith("#");
-    const projectBorderColor = isHex
-      ? `${pColor}4d`
-      : "rgba(188, 140, 255, 0.3)";
+    const projectBorderColor = isHex ? `${pColor}4d` : "rgba(188, 140, 255, 0.3)";
     const projectBgColor = isHex ? `${pColor}14` : "rgba(188, 140, 255, 0.08)";
 
-    const totalSeconds = (task.sessions || []).reduce(
-      (acc, sess) => acc + (sess.end - sess.start) / 1000,
-      0,
-    );
+    const totalSeconds = (task.sessions || []).reduce((acc, sess) => acc + (sess.end - sess.start) / 1000, 0);
     const subtasksDone = (task.subtasks || []).filter((s) => s.done).length;
     const totalSubtasks = (task.subtasks || []).length;
 
     const isActive = selectedTaskId === task.id;
-    const dlInfo = getDeadlineColorAndLabel(task.due, colors);
-    const subtaskStyles = getSubtaskProgressStyles(
-      subtasksDone,
-      totalSubtasks,
-      colors,
-    );
+    const dlInfo = getExecutionStatus(task, colors);
+    const subtaskStyles = getSubtaskProgressStyles(subtasksDone, totalSubtasks, colors);
 
     return (
-      <Animated.View
-        key={task.id}
-        layout={LinearTransition}
-        entering={FadeIn.duration(200)}
-        exiting={FadeOut.duration(150)}
-      >
-        <View
-          style={[
-            styles.taskItem,
-            { borderBottomColor: colors.ghBorder },
-            isActive && { backgroundColor: "rgba(31,111,235,0.06)" },
-          ]}
+      <ScaleDecorator>
+        <Animated.View
+          key={task.id}
+          layout={LinearTransition}
+          entering={FadeIn.duration(200)}
+          exiting={FadeOut.duration(150)}
         >
-          {/* Custom Checkbox */}
-          <TouchableOpacity
-            style={styles.checkboxTouchArea}
-            onPress={() => toggleDone(task.id)}
+          <View
+            style={[
+              styles.taskItem,
+              { borderBottomColor: colors.ghBorder },
+              isActive && { backgroundColor: "rgba(31,111,235,0.06)" },
+              isActiveDrag && { backgroundColor: colors.ghSurface2, opacity: 0.9, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 3.84 },
+            ]}
           >
-            <View
-              style={[
-                styles.checkbox,
-                { borderColor: task.done ? colors.ghGreen : colors.ghBorder2 },
-                task.done && { backgroundColor: colors.ghGreen },
-              ]}
+            {/* Drag Handle */}
+            <TouchableOpacity
+              style={styles.checkboxTouchArea}
+              onLongPress={drag}
+              delayLongPress={200}
             >
-              {task.done && <Text style={styles.checkmark}>✓</Text>}
-            </View>
-          </TouchableOpacity>
+              <Feather name="menu" size={16} color={isActiveDrag ? colors.ghBlue : colors.ghMuted} />
+            </TouchableOpacity>
 
-          {/* Task Details Area */}
-          <TouchableOpacity
-            style={styles.taskBodyTouchArea}
-            onPress={() => onOpenDetail(task)}
-          >
-            <View style={styles.taskBody}>
-              <Text
-                style={[
-                  styles.taskTitle,
-                  { color: task.done ? colors.ghMuted : colors.ghText },
-                  task.done && styles.lineThrough,
-                ]}
-                numberOfLines={2}
-              >
-                {task.title}
-              </Text>
-
-              <View style={styles.taskMeta}>
-                {/* Project Tag */}
+            {/* Task Details Area */}
+            <View style={styles.taskBodyTouchArea}>
+              <View style={styles.taskBody}>
                 <Text
                   style={[
-                    styles.taskTag,
+                    styles.taskTitle,
+                    { color: task.done ? colors.ghMuted : colors.ghText },
+                    task.done && styles.lineThrough,
+                  ]}
+                  numberOfLines={2}
+                >
+                  {task.title}
+                </Text>
+
+                <View style={styles.taskMeta}>
+                  {/* Project Tag */}
+                  <Text
+                    style={[
+                      styles.taskTag,
+                      {
+                        color: pColor,
+                        borderColor: projectBorderColor,
+                        backgroundColor: projectBgColor,
+                      },
+                    ]}
+                  >
+                    {task.project}
+                  </Text>
+
+                  {/* Priority Tag */}
+                  {task.priority && (
+                    <Text
+                      style={[
+                        styles.taskTag,
+                        {
+                          color: task.priority === 'High' ? (colors.ghRed || '#f85149') : task.priority === 'Moderate' ? (colors.ghAmber || '#d29922') : (colors.ghGreen || '#3fb950'),
+                          borderColor: task.priority === 'High' ? 'rgba(248, 81, 73, 0.3)' : task.priority === 'Moderate' ? 'rgba(210, 153, 34, 0.3)' : 'rgba(63, 185, 80, 0.3)',
+                          backgroundColor: task.priority === 'High' ? 'rgba(248, 81, 73, 0.08)' : task.priority === 'Moderate' ? 'rgba(210, 153, 34, 0.08)' : 'rgba(63, 185, 80, 0.08)',
+                        },
+                      ]}
+                    >
+                      {task.priority === 'High' ? '↑ High' : task.priority === 'Moderate' ? '• Moderate' : '↓ Low'}
+                    </Text>
+                  )}
+
+                  {/* Deadline / Status Tag */}
+                  {dlInfo && (
+                    <Text
+                      style={[
+                        styles.taskTag,
+                        {
+                          color: dlInfo.color,
+                          borderColor: dlInfo.border,
+                          backgroundColor: dlInfo.bg,
+                        },
+                      ]}
+                    >
+                      {dlInfo.label}
+                    </Text>
+                  )}
+
+                  {/* Subtask count */}
+                  {subtaskStyles && (
+                    <Text
+                      style={[
+                        styles.taskTag,
+                        {
+                          color: subtaskStyles.color,
+                          borderColor: subtaskStyles.border,
+                          backgroundColor: subtaskStyles.bg,
+                        },
+                      ]}
+                    >
+                      ✓ {subtasksDone}/{totalSubtasks}
+                    </Text>
+                  )}
+                </View>
+              </View>
+
+              {/* Logged Timer Value */}
+              {totalSeconds > 0 && (
+                <View
+                  style={[
+                    styles.timeLogBadge,
                     {
-                      color: pColor,
-                      borderColor: projectBorderColor,
-                      backgroundColor: projectBgColor,
+                      backgroundColor: colors.ghSurface2,
+                      borderColor: colors.ghBorder,
+                      marginRight: 8,
                     },
                   ]}
                 >
-                  {task.project}
-                </Text>
-
-                {/* Deadline Tag */}
-                {dlInfo && (
-                  <Text
-                    style={[
-                      styles.taskTag,
-                      {
-                        color: dlInfo.color,
-                        borderColor: dlInfo.border,
-                        backgroundColor: dlInfo.bg,
-                      },
-                    ]}
-                  >
-                    {dlInfo.label}
+                  <Text style={[styles.timeLogBadgeText, { color: colors.ghMuted }]}>
+                    {fmtSeconds(totalSeconds)}
                   </Text>
-                )}
+                </View>
+              )}
 
-                {/* Subtask count */}
-                {subtaskStyles && (
-                  <Text
-                    style={[
-                      styles.taskTag,
-                      {
-                        color: subtaskStyles.color,
-                        borderColor: subtaskStyles.border,
-                        backgroundColor: subtaskStyles.bg,
-                      },
-                    ]}
-                  >
-                    ✓ {subtasksDone}/{totalSubtasks}
-                  </Text>
-                )}
-              </View>
-            </View>
-
-            {/* Logged Timer Value */}
-            {totalSeconds > 0 && (
-              <View
+              {/* View Details Button */}
+              <TouchableOpacity
+                onPress={() => onOpenDetail(task)}
                 style={[
                   styles.timeLogBadge,
-                  {
-                    backgroundColor: colors.ghSurface2,
-                    borderColor: colors.ghBorder,
-                  },
+                  { backgroundColor: colors.ghSurface, borderColor: colors.ghBorder },
                 ]}
               >
-                <Text
-                  style={[styles.timeLogBadgeText, { color: colors.ghMuted }]}
-                >
-                  {fmtSeconds(totalSeconds)}
+                <Text style={[styles.timeLogBadgeText, { color: colors.ghText }]}>
+                  View
                 </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-      </Animated.View>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Animated.View>
+      </ScaleDecorator>
     );
   };
 
-  const renderContent = () => {
-    if (!currentProject && currentView === "backlog") {
-      const byProject = baseFiltered.reduce((acc, t) => {
-        if (!acc[t.project]) acc[t.project] = [];
-        acc[t.project].push(t);
-        return acc;
-      }, {} as Record<string, Task[]>);
-
-      const projectNames = Object.keys(byProject).sort();
-
+  const renderItem = ({ item, drag, isActive }: RenderItemParams<ListItem>) => {
+    if (item.type === 'header') {
       return (
-        <ScrollView style={styles.taskList} contentContainerStyle={{ paddingBottom: insets.bottom + 20 }} {...{ delaysContentTouches: false }}>
-          {projectNames.map((pName) => (
-            <View key={pName} style={styles.projectSection}>
-              <Text style={[styles.projectSectionTitle, { color: colors.ghMuted }]}>
-                {pName}
-              </Text>
-              {byProject[pName].map(renderTaskItem)}
-            </View>
-          ))}
-          {baseFiltered.length === 0 && (
-            <View style={styles.emptyState}>
-              <Text style={{ color: colors.ghMuted, fontSize: 13 }}>
-                No backlog tasks found.
-              </Text>
-            </View>
-          )}
-        </ScrollView>
+        <View style={styles.projectSection}>
+          <Text style={[styles.projectSectionTitle, { color: colors.ghMuted }]}>
+            {item.title}
+          </Text>
+        </View>
       );
     }
-
-    if (currentProject) {
-      const backlogTasks = baseFiltered.filter(isTaskBacklog);
-      const currentTasks = baseFiltered.filter(isTaskCurrent);
-      const futureTasks = baseFiltered.filter(
-        (t) => !isTaskBacklog(t) && !isTaskCurrent(t),
+    if (item.type === 'empty') {
+      return (
+        <View style={styles.emptyState}>
+          <Text style={{ color: colors.ghMuted, fontSize: 13 }}>
+            {item.message}
+          </Text>
+        </View>
       );
+    }
+    return renderTaskItem(item.task, drag, isActive);
+  };
 
-      if (baseFiltered.length === 0) {
-        return (
-          <View style={styles.emptyState}>
-            <Text style={{ color: colors.ghMuted, fontSize: 13 }}>
-              No tasks in this project.
-            </Text>
-          </View>
-        );
+  let listData: ListItem[] = [];
+
+  if (!currentProject && currentView === "backlog") {
+    const byProject = baseFiltered.reduce((acc, t) => {
+      if (!acc[t.project]) acc[t.project] = [];
+      acc[t.project].push(t);
+      return acc;
+    }, {} as Record<string, Task[]>);
+
+    const projectNames = Object.keys(byProject).sort();
+
+    projectNames.forEach(pName => {
+      listData.push({ type: 'header', id: `header-${pName}`, title: pName });
+      byProject[pName].forEach(t => {
+        listData.push({ type: 'task', id: t.id, task: t });
+      });
+    });
+
+    if (baseFiltered.length === 0) {
+      listData.push({ type: 'empty', id: 'empty-backlog', message: 'No backlog tasks found.' });
+    }
+  } else if (currentProject) {
+    const backlogTasks = baseFiltered.filter(isTaskBacklog);
+    const currentTasks = baseFiltered.filter(isTaskCurrent);
+    const futureTasks = baseFiltered.filter(t => !isTaskBacklog(t) && !isTaskCurrent(t));
+
+    if (baseFiltered.length === 0) {
+      listData.push({ type: 'empty', id: 'empty-project', message: 'No tasks in this project.' });
+    } else {
+      if (backlogTasks.length > 0) {
+        listData.push({ type: 'header', id: 'header-backlog', title: 'Backlog' });
+        backlogTasks.forEach(t => listData.push({ type: 'task', id: t.id, task: t }));
       }
-
-      return (
-        <ScrollView style={styles.taskList} contentContainerStyle={{ paddingBottom: insets.bottom + 20 }} {...{ delaysContentTouches: false }}>
-          {backlogTasks.length > 0 && (
-            <View style={styles.projectSection}>
-              <Text
-                style={[styles.projectSectionTitle, { color: colors.ghMuted }]}
-              >
-                Backlog
-              </Text>
-              {backlogTasks.map(renderTaskItem)}
-            </View>
-          )}
-          {currentTasks.length > 0 && (
-            <View style={styles.projectSection}>
-              <Text
-                style={[styles.projectSectionTitle, { color: colors.ghMuted }]}
-              >
-                Current
-              </Text>
-              {currentTasks.map(renderTaskItem)}
-            </View>
-          )}
-          {futureTasks.length > 0 && (
-            <View style={styles.projectSection}>
-              <Text
-                style={[styles.projectSectionTitle, { color: colors.ghMuted }]}
-              >
-                Future Date
-              </Text>
-              {futureTasks.map(renderTaskItem)}
-            </View>
-          )}
-        </ScrollView>
-      );
+      if (currentTasks.length > 0) {
+        listData.push({ type: 'header', id: 'header-current', title: 'Current' });
+        currentTasks.forEach(t => listData.push({ type: 'task', id: t.id, task: t }));
+      }
+      if (futureTasks.length > 0) {
+        listData.push({ type: 'header', id: 'header-future', title: 'Future Date' });
+        futureTasks.forEach(t => listData.push({ type: 'task', id: t.id, task: t }));
+      }
     }
+  } else {
+    baseFiltered.forEach(t => listData.push({ type: 'task', id: t.id, task: t }));
+    if (baseFiltered.length === 0) {
+      listData.push({ type: 'empty', id: 'empty-view', message: 'No tasks found here.' });
+    }
+  }
 
-    return (
-      <ScrollView style={styles.taskList} contentContainerStyle={{ paddingBottom: insets.bottom + 20 }} {...{ delaysContentTouches: false }}>
-        {baseFiltered.map(renderTaskItem)}
-        {baseFiltered.length === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={{ color: colors.ghMuted, fontSize: 13 }}>
-              No tasks found here.
-            </Text>
-          </View>
-        )}
-      </ScrollView>
-    );
+  const handleDragEnd = ({ data }: { data: ListItem[] }) => {
+    if (!setTasks) return;
+    
+    // Create an array of tasks in their new order
+    const reorderedTasks = data.filter(i => i.type === 'task').map(i => (i as any).task as Task);
+    const reorderedIds = new Set(reorderedTasks.map(t => t.id));
+
+    setTasks(prev => {
+      // Create a map for quick lookup of the new order
+      const newOrderMap = new Map<string, number>();
+      reorderedTasks.forEach((t, i) => newOrderMap.set(t.id, i));
+
+      // Build the final array
+      // First, all tasks that were NOT dragged maintain their original positions relative to the entire list?
+      // Actually, since we only see a filtered subset, dragging changes their relative order.
+      // Easiest is to just sort the previous list: if a and b are both in reorderedTasks, sort by newOrderMap.
+      const newPrev = [...prev];
+      newPrev.sort((a, b) => {
+        if (newOrderMap.has(a.id) && newOrderMap.has(b.id)) {
+          return newOrderMap.get(a.id)! - newOrderMap.get(b.id)!;
+        }
+        return 0; // maintain relative order for un-reordered items? 
+        // Wait, if a is reordered and b is not, sorting like this is unstable and doesn't inject correctly.
+        // A better approach is to take the filtered tasks out, and then place them back in the new order at the exact indices they occupied.
+      });
+
+      // Let's do the index replacement approach:
+      // Find all indices of the tasks that were involved in the filtered list
+      const indices = [];
+      for (let i = 0; i < prev.length; i++) {
+        if (reorderedIds.has(prev[i].id)) {
+          indices.push(i);
+        }
+      }
+      // Re-insert them at the same indices in the new order
+      const result = [...prev];
+      for (let i = 0; i < indices.length; i++) {
+        result[indices[i]] = reorderedTasks[i];
+      }
+      return result;
+    });
   };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.ghBg }]}>
-      {renderContent()}
+      <DraggableFlatList
+        data={listData}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        onDragEnd={handleDragEnd}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+      />
     </View>
   );
 }
@@ -428,9 +474,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     flexDirection: "column",
-  },
-  taskList: {
-    flex: 1,
   },
   projectSection: {
     marginTop: 8,
@@ -450,13 +493,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     position: "relative",
   },
-  activeBar: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 3,
-  },
   checkboxTouchArea: {
     paddingVertical: 12,
     marginRight: 12,
@@ -468,20 +504,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 12,
-  },
-  checkbox: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1.5,
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: 0,
-  },
-  checkmark: {
-    color: "#fff",
-    fontSize: 11,
-    fontWeight: "bold",
   },
   taskBody: {
     flex: 1,

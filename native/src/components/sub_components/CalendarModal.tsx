@@ -15,9 +15,11 @@ interface CalendarModalProps {
   onSelectDate: (dateStr: string) => void;
   initialDateStr: string;
   colors: any;
+  minDate?: string;
+  maxDate?: string;
 }
 
-export default function CalendarModal({ visible, onClose, onSelectDate, initialDateStr, colors }: CalendarModalProps) {
+export default function CalendarModal({ visible, onClose, onSelectDate, initialDateStr, colors, minDate, maxDate }: CalendarModalProps) {
   const [viewDate, setViewDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
@@ -184,7 +186,27 @@ export default function CalendarModal({ visible, onClose, onSelectDate, initialD
                 
                 const today = new Date();
                 today.setHours(0, 0, 0, 0);
-                const isPast = day.date.getTime() < today.getTime();
+                
+                let isOutOfRange = false;
+                const time = day.date.getTime();
+
+                if (minDate) {
+                  const parts = minDate.split("-").map(Number);
+                  if (parts.length === 3) {
+                    const minD = new Date(parts[0], parts[1] - 1, parts[2]).getTime();
+                    if (time < minD) isOutOfRange = true;
+                  }
+                } else {
+                  if (time < today.getTime()) isOutOfRange = true;
+                }
+
+                if (maxDate && !isOutOfRange) {
+                  const parts = maxDate.split("-").map(Number);
+                  if (parts.length === 3) {
+                    const maxD = new Date(parts[0], parts[1] - 1, parts[2]).getTime();
+                    if (time > maxD) isOutOfRange = true;
+                  }
+                }
 
                 return (
                   <TouchableOpacity
@@ -194,12 +216,12 @@ export default function CalendarModal({ visible, onClose, onSelectDate, initialD
                       isSelected && { backgroundColor: colors.ghBlue, borderRadius: 18 },
                     ]}
                     onPress={() => handleSelectDay(day.date)}
-                    disabled={isPast}
+                    disabled={isOutOfRange}
                   >
                     <Text
                       style={[
                         styles.dayText,
-                        { color: isSelected ? "#ffffff" : isPast ? colors.ghBorder : day.isCurrentMonth ? colors.ghText : colors.ghMuted },
+                        { color: isSelected ? "#ffffff" : isOutOfRange ? colors.ghBorder : day.isCurrentMonth ? colors.ghText : colors.ghMuted },
                       ]}
                     >
                       {day.date.getDate()}

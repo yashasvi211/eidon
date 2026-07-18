@@ -24,7 +24,7 @@ export interface ReminderConfig {
 interface AddTaskModalProps {
   visible: boolean;
   onClose: () => void;
-  onAdd: (title: string, project: string, due?: string, reminder?: ReminderConfig, dueTime?: string) => void;
+  onAdd: (title: string, project: string, due?: string, reminder?: ReminderConfig, dueTime?: string, priority?: 'High' | 'Moderate' | 'Low', execStartDate?: string, execStartTime?: string) => void;
   projects: Project[];
 }
 
@@ -74,9 +74,15 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
   const [project, setProject] = useState('Inbox');
   const [due, setDue] = useState<string | null>(null);
   const [dueTime, setDueTime] = useState<string | null>(null);
-  const [showCalendar, setShowCalendar] = useState(false);
-  const [showClock, setShowClock] = useState(false);
+  
+  const [execStartDate, setExecStartDate] = useState<string | null>(null);
+  const [execStartTime, setExecStartTime] = useState<string | null>(null);
+
+  const [calendarMode, setCalendarMode] = useState<'due' | 'execStart' | null>(null);
+  const [clockMode, setClockMode] = useState<'due' | 'execStart' | null>(null);
+  
   const [showConfirm, setShowConfirm] = useState(false);
+  const [priority, setPriority] = useState<'High' | 'Moderate' | 'Low'>('Low');
 
   // Reminder state
   const [remindBefore, setRemindBefore] = useState<number | null>(null);   // ms
@@ -173,10 +179,12 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
     setProject('Inbox');
     setDue(null);
     setDueTime(null);
-    setDueTime(null);
-    setShowCalendar(false);
-    setShowClock(false);
+    setExecStartDate(null);
+    setExecStartTime(null);
+    setCalendarMode(null);
+    setClockMode(null);
     setShowConfirm(false);
+    setPriority('Low');
     setRemindBefore(null);
     setRepeatEvery(null);
     setShowOffsetDropdown(false);
@@ -202,7 +210,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
     }
 
     animateClose(() => {
-      onAdd(title.trim(), project, due || undefined, reminder, dueTime || undefined);
+      onAdd(title.trim(), project, due || undefined, reminder, dueTime || undefined, priority, execStartDate || undefined, execStartTime || undefined);
       reset();
       onClose();
     });
@@ -223,9 +231,11 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
     const parts = dateStr.split('/');
     if (parts.length === 3) {
       const formattedDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-      setDue(formattedDate);
       
-      // Check if current remindBefore is still valid
+      if (calendarMode === 'due') {
+        setDue(formattedDate);
+        
+        // Check if current remindBefore is still valid
       if (remindBefore !== null) {
         const dueMs = new Date(`${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}T${dueTime || '00:00'}:00`).getTime();
         const maxOffset = dueMs - Date.now();
@@ -233,6 +243,9 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
           setRemindBefore(null);
           setRepeatEvery(null);
         }
+      }
+      } else if (calendarMode === 'execStart') {
+        setExecStartDate(formattedDate);
       }
     }
   };
@@ -247,23 +260,54 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
       const ampm = match[3].toUpperCase();
       if (ampm === 'PM' && h < 12) h += 12;
       if (ampm === 'AM' && h === 12) h = 0;
-      setDueTime(`${h.toString().padStart(2, '0')}:${m}`);
+      const formattedTime = `${h.toString().padStart(2, '0')}:${m}`;
+      
+      if (clockMode === 'due') {
+        setDueTime(formattedTime);
+      } else if (clockMode === 'execStart') {
+        setExecStartTime(formattedTime);
+      }
     }
   };
 
   const handleClearDate = () => {
     setDue(null);
     setDueTime(null);
+    setExecStartDate(null);
+    setExecStartTime(null);
     setRemindBefore(null);
     setRepeatEvery(null);
-    setShowCalendar(false);
-    setShowClock(false);
+    setCalendarMode(null);
+    setClockMode(null);
   };
 
   const isPastDue = due !== null && dueTime !== null && dueDateTimeMs !== null && dueDateTimeMs <= Date.now();
   const hasDateButNoTime = due !== null && dueTime === null;
   const hasTimeButNoDate = due === null && dueTime !== null;
-  const canSubmit = title.trim().length > 0 && due !== null && !hasDateButNoTime && !hasTimeButNoDate && !isPastDue;
+  
+  const hasPartialExec = (execStartDate !== null || execStartTime !== null) && 
+                         (execStartDate === null || execStartTime === null);
+                         
+  let isExecInvalid = false;
+  let execError = "";
+  if (execStartDate && execStartTime) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const [y, m, d] = execStartDate.split('-').map(Number);
+    const execStart = new Date(y, m - 1, d);
+    const [sh, sm] = execStartTime.split(':').map(Number);
+    execStart.setHours(sh, sm, 0, 0);
+    
+    if (execStart.getTime() < Date.now()) {
+       isExecInvalid = true;
+       execError = "Execution start cannot be in the past";
+    } else if (dueDateTimeMs && execStart.getTime() >= dueDateTimeMs) {
+       isExecInvalid = true;
+       execError = "Execution start cannot be after or at due time";
+    }
+  }
+
+  const canSubmit = title.trim().length > 0 && due !== null && !hasDateButNoTime && !hasTimeButNoDate && !isPastDue && !hasPartialExec && !isExecInvalid;
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
@@ -305,6 +349,32 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
                 ))}
               </View>
 
+              {/* ── Priority ── */}
+              <Text style={[styles.label, { color: colors.ghMuted, marginTop: 16 }]}>Priority</Text>
+              <View style={styles.chipRow}>
+                {[
+                  { label: 'High', color: colors.ghRed || '#f85149' },
+                  { label: 'Moderate', color: colors.ghAmber || '#d29922' },
+                  { label: 'Low', color: colors.ghGreen || '#3fb950' }
+                ].map((p) => (
+                  <TouchableOpacity
+                    key={p.label}
+                    style={[
+                      styles.chip,
+                      {
+                        borderColor: priority === p.label ? p.color : colors.ghBorder,
+                        backgroundColor: priority === p.label ? p.color + '18' : 'transparent',
+                      },
+                    ]}
+                    onPress={() => setPriority(p.label as 'High' | 'Moderate' | 'Low')}
+                  >
+                    <Text style={{ color: priority === p.label ? p.color : colors.ghMuted, fontSize: 12, fontWeight: '500' }}>
+                      {p.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
               {/* ── Due Date & Time ── */}
               <View>
                 <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -324,7 +394,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
                         borderColor: due ? colors.ghBlue : colors.ghBorder,
                       },
                     ]}
-                    onPress={() => setShowCalendar(true)}
+                    onPress={() => setCalendarMode('due')}
                   >
                     <Feather name="calendar" size={14} color={due ? colors.ghBlue : colors.ghMuted} />
                     <Text style={{ color: due ? colors.ghText : colors.ghMuted, fontSize: 13, flex: 1 }} numberOfLines={1}>
@@ -340,7 +410,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
                         borderColor: dueTime ? colors.ghBlue : colors.ghBorder,
                       },
                     ]}
-                    onPress={() => setShowClock(true)}
+                    onPress={() => setClockMode('due')}
                   >
                     <Feather name="clock" size={14} color={dueTime ? colors.ghBlue : colors.ghMuted} />
                     <Text style={{ color: dueTime ? colors.ghText : colors.ghMuted, fontSize: 13, flex: 1 }} numberOfLines={1}>
@@ -356,31 +426,110 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
               </View>
 
               {/* Calendar & Clock Modals */}
+              {/* ── Execution Plan ── */}
+              <View style={{ marginTop: 16 }}>
+                <Text style={[styles.label, { color: colors.ghMuted }]}>Execution Plan</Text>
+                
+                <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center', marginBottom: 8 }}>
+                  <TouchableOpacity
+                    style={[
+                      styles.dateBtn,
+                      {
+                        backgroundColor: colors.ghBg,
+                        borderColor: execStartDate ? colors.ghBlue : colors.ghBorder,
+                      },
+                    ]}
+                    onPress={() => setCalendarMode('execStart')}
+                  >
+                    <Feather name="calendar" size={14} color={execStartDate ? colors.ghBlue : colors.ghMuted} />
+                    <Text style={{ color: execStartDate ? colors.ghText : colors.ghMuted, fontSize: 13, flex: 1 }} numberOfLines={1}>
+                      {execStartDate ? fmtDateDisplay(execStartDate) : 'Start Date…'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.dateBtn,
+                      {
+                        backgroundColor: colors.ghBg,
+                        borderColor: execStartTime ? colors.ghBlue : colors.ghBorder,
+                      },
+                    ]}
+                    onPress={() => setClockMode('execStart')}
+                  >
+                    <Feather name="clock" size={14} color={execStartTime ? colors.ghBlue : colors.ghMuted} />
+                    <Text style={{ color: execStartTime ? colors.ghText : colors.ghMuted, fontSize: 13, flex: 1 }} numberOfLines={1}>
+                      {execStartTime ? formatTime12h(execStartTime) : 'Start Time…'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                
+                {hasPartialExec && (
+                  <Text style={{ color: colors.ghRed || '#f85149', fontSize: 12, marginTop: 8, fontStyle: 'italic' }}>
+                    * All execution fields must be filled if one is set
+                  </Text>
+                )}
+                {isExecInvalid && (
+                  <Text style={{ color: colors.ghRed || '#f85149', fontSize: 12, marginTop: 8, fontStyle: 'italic' }}>
+                    * {execError}
+                  </Text>
+                )}
+              </View>
+
+              {/* Calendar & Clock Modals */}
               <CalendarModal
-                visible={showCalendar}
-                onClose={() => setShowCalendar(false)}
+                visible={calendarMode !== null}
+                onClose={() => setCalendarMode(null)}
                 onSelectDate={handleSelectDate}
-                initialDateStr={due ? due.split('-').reverse().join('/') : ''}
+                initialDateStr={
+                  calendarMode === 'due' && due 
+                    ? due.split('-').reverse().join('/') 
+                    : calendarMode === 'execStart' && execStartDate
+                      ? execStartDate.split('-').reverse().join('/')
+                      : ''
+                }
                 colors={colors}
+                minDate={calendarMode === 'execStart' ? new Date().toISOString().split('T')[0] : undefined}
+                maxDate={calendarMode === 'execStart' && due ? due : undefined}
               />
 
               <AnalogClockModal
-                visible={showClock}
-                onClose={() => setShowClock(false)}
+                visible={clockMode !== null}
+                onClose={() => setClockMode(null)}
                 onSelectTime={handleSelectTime}
-                // Basic conversion for initialTimeStr
                 initialTimeStr={
-                  dueTime 
-                    ? (() => {
-                        const [h, m] = dueTime.split(':').map(Number);
-                        const ampm = h >= 12 ? 'PM' : 'AM';
-                        const hour12 = h % 12 || 12;
-                        return `${hour12}:${m.toString().padStart(2, '0')} ${ampm}`;
-                      })()
-                    : '09:00 AM'
+                  (() => {
+                    let t = null;
+                    if (clockMode === 'due') t = dueTime;
+                    else if (clockMode === 'execStart') t = execStartTime;
+
+                    if (t) {
+                      const [h, m] = t.split(':').map(Number);
+                      const ampm = h >= 12 ? 'PM' : 'AM';
+                      const hour12 = h % 12 || 12;
+                      return `${hour12}:${m.toString().padStart(2, '0')} ${ampm}`;
+                    }
+                    return '09:00 AM';
+                  })()
                 }
                 colors={colors}
-                title="Select Due Time"
+                title={clockMode === 'due' ? "Select Due Time" : "Select Start Time"}
+                minTime={(() => {
+                  if (clockMode === 'execStart' && execStartDate) {
+                    const today = new Date();
+                    const [y, m, d] = execStartDate.split('-').map(Number);
+                    if (today.getFullYear() === y && today.getMonth() === m - 1 && today.getDate() === d) {
+                       return `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`;
+                    }
+                  }
+                  return undefined;
+                })()}
+                maxTime={(() => {
+                  if (clockMode === 'execStart' && due && execStartDate === due && dueTime) {
+                    return dueTime;
+                  }
+                  return undefined;
+                })()}
               />
 
               {/* ── Reminders (Side by Side layout) ── */}

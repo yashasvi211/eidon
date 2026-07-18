@@ -683,6 +683,9 @@ export default function AppIndex() {
     due?: string,
     reminderConfig?: ReminderConfig,
     dueTime?: string,
+    priority?: 'High' | 'Moderate' | 'Low',
+    execStartDate?: string,
+    execStartTime?: string,
   ) => {
     const newTask: Task = {
       id: "t" + Date.now(),
@@ -709,6 +712,9 @@ export default function AppIndex() {
       reminder: reminderConfig
         ? { ...reminderConfig, lastNotifiedAt: 0, dismissed: false }
         : undefined,
+      priority,
+      execStartDate,
+      execStartTime,
     };
 
     api.createTask(newTask)
@@ -918,6 +924,7 @@ export default function AppIndex() {
         selectedTaskId={selectedTaskId}
         showCompleted={showCompleted}
         setShowCompleted={setShowCompleted}
+        setTasks={setTasks}
       />
     );
   };
