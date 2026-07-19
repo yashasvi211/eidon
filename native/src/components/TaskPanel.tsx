@@ -33,6 +33,7 @@ interface TaskPanelProps {
   showCompleted: boolean;
   setShowCompleted: (val: boolean) => void;
   setTasks?: (updater: (prev: Task[]) => Task[]) => void;
+  onDeleteTask?: (id: string) => void;
 }
 
 const fmtSeconds = (s: number) => {
@@ -148,7 +149,8 @@ export default function TaskPanel({
   selectedTaskId,
   showCompleted,
   setShowCompleted,
-  setTasks
+  setTasks,
+  onDeleteTask
 }: TaskPanelProps) {
   const scheme = useColorScheme();
   const colors = Colors[scheme === "unspecified" ? "light" : scheme];
@@ -228,7 +230,11 @@ export default function TaskPanel({
             </TouchableOpacity>
 
             {/* Task Details Area */}
-            <View style={styles.taskBodyTouchArea}>
+            <TouchableOpacity 
+              style={styles.taskBodyTouchArea}
+              onPress={() => onOpenDetail(task)}
+              activeOpacity={0.7}
+            >
               <View style={styles.taskBody}>
                 <Text
                   style={[
@@ -324,19 +330,21 @@ export default function TaskPanel({
                 </View>
               )}
 
-              {/* View Details Button */}
-              <TouchableOpacity
-                onPress={() => onOpenDetail(task)}
-                style={[
-                  styles.timeLogBadge,
-                  { backgroundColor: colors.ghSurface, borderColor: colors.ghBorder },
-                ]}
-              >
-                <Text style={[styles.timeLogBadgeText, { color: colors.ghText }]}>
-                  View
-                </Text>
-              </TouchableOpacity>
-            </View>
+              {/* Delete Button */}
+              {onDeleteTask && (
+                <TouchableOpacity
+                  onPress={() => onDeleteTask(task.id)}
+                  style={[
+                    styles.timeLogBadge,
+                    { backgroundColor: 'rgba(248, 81, 73, 0.08)', borderColor: 'rgba(248, 81, 73, 0.3)' },
+                  ]}
+                >
+                  <Text style={[styles.timeLogBadgeText, { color: colors.ghRed || '#f85149' }]}>
+                    Delete
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </TouchableOpacity>
           </View>
         </Animated.View>
       </ScaleDecorator>

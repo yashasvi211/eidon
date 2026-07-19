@@ -677,6 +677,28 @@ export default function AppIndex() {
     handleSyncNotifications(updatedTask);
   };
 
+  const handleDeleteTask = (taskId: string) => {
+    Alert.alert("Delete Task", "Are you sure you want to delete this task?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: () => {
+          const previousTasks = tasks;
+          setTasks(tasks.filter(t => t.id !== taskId));
+          if (selectedTaskId === taskId) {
+            setSelectedTaskId(null);
+          }
+          api.deleteTask(taskId).catch((err: any) => {
+            console.error("Failed to delete task:", err);
+            setTasks(previousTasks);
+            showErrorAlert("Delete Failed", `Could not delete.\n\n${err?.message || err}`);
+          });
+        }
+      }
+    ]);
+  };
+
   const handleAddTask = (
     title: string,
     project: string = "Inbox",
@@ -925,6 +947,7 @@ export default function AppIndex() {
         showCompleted={showCompleted}
         setShowCompleted={setShowCompleted}
         setTasks={setTasks}
+        onDeleteTask={handleDeleteTask}
       />
     );
   };
@@ -965,7 +988,7 @@ export default function AppIndex() {
     if (isLargeScreen) return;
     const dx = e.nativeEvent.pageX - touchStartX.current;
 
-    if (!selectedTaskId && dx > 60 && currentView !== "scheduled") {
+    if (!selectedTaskId && touchStartX.current < 40 && dx > 60 && currentView !== "scheduled") {
       openSidebar();
     }
   };
