@@ -444,6 +444,7 @@ export default function DetailPanel({
   const [isClockModalOpen, setIsClockModalOpen] = useState(false);
   const [clockField, setClockField] = useState<"start" | "end">("start");
   const [isConfirmationModalOpen, setIsConfirmationModalOpen] = useState(false);
+  const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   const getTodayLocalDateString = () => {
@@ -914,8 +915,11 @@ export default function DetailPanel({
                 STATUS
               </Text>
               <TouchableOpacity
-                onPress={() => onToggleDone(task.id)}
+                onPress={() => {
+                  if (!task.done) setIsCompleteModalOpen(true);
+                }}
                 style={styles.statusToggle}
+                disabled={task.done}
               >
                 <View
                   style={[
@@ -941,7 +945,7 @@ export default function DetailPanel({
                     fontSize: 13,
                   }}
                 >
-                  {task.done ? "Completed" : "In Progress"}
+                  {task.done ? "Completed" : "Mark this complete"}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -1070,6 +1074,7 @@ export default function DetailPanel({
                 return (
                   <View style={{ backgroundColor: colors.ghSurface2, borderRadius: 8, paddingHorizontal: 12 }}>
                     {renderAttr("Created", createdAtStr)}
+                    {task.completedAt ? renderAttr("Completed", new Date(task.completedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }), colors.ghGreen || "#3fb950") : null}
                     {renderAttr("Priority", task.priority || "Low", task.priority === 'High' ? (colors.ghRed || '#f85149') : task.priority === 'Moderate' ? (colors.ghAmber || '#d29922') : (colors.ghGreen || '#3fb950'))}
                     {renderAttr("Execution Start", execStartStr)}
                     {renderAttr("Due", dueStr)}
@@ -1454,6 +1459,17 @@ export default function DetailPanel({
         title="Confirm Entry"
         description={`Log time from ${manualStartTime} to ${manualEndTime}?`}
         colors={colors}
+      />
+
+      <ConfirmationModal
+        visible={isCompleteModalOpen}
+        onClose={() => setIsCompleteModalOpen(false)}
+        onConfirm={() => onToggleDone(task.id)}
+        title="Task Completed"
+        description="Are you sure you want to mark this task as complete?"
+        warningNote="Note: This change is irreversible."
+        colors={colors}
+        successText="Task Completed!"
       />
 
     </Animated.View>

@@ -21,9 +21,10 @@ interface ConfirmationModalProps {
   description: string;
   colors: any;
   successText?: string;
+  warningNote?: string;
 }
 
-export default function ConfirmationModal({ visible, onClose, onConfirm, title, description, colors, successText = "Time Logged Successfully!" }: ConfirmationModalProps) {
+export default function ConfirmationModal({ visible, onClose, onConfirm, title, description, colors, successText = "Time Logged Successfully!", warningNote }: ConfirmationModalProps) {
   const scaleAnim = useRef(new RNAnimated.Value(0.9)).current;
   const opacityAnim = useRef(new RNAnimated.Value(0)).current;
 
@@ -194,7 +195,14 @@ export default function ConfirmationModal({ visible, onClose, onConfirm, title, 
           >
             <Animated.View style={contentStyle}>
               <Text style={[styles.title, { color: colors.ghText }]}>{title}</Text>
-              <Text style={[styles.description, { color: colors.ghMuted }]}>{description}</Text>
+              <Text style={[styles.description, { color: colors.ghMuted, marginBottom: warningNote ? 16 : 24 }]}>{description}</Text>
+              
+              {warningNote && (
+                <View style={styles.warningContainer}>
+                  <Feather name="alert-triangle" size={14} color="#f85149" style={{ marginRight: 6 }} />
+                  <Text style={[styles.warningText, { color: "#f85149" }]}>{warningNote}</Text>
+                </View>
+              )}
 
               <View style={styles.actionContainer}>
                 <SwipeButton
@@ -274,6 +282,21 @@ const styles = StyleSheet.create({
   },
   actionContainer: {
     marginBottom: 16,
+  },
+  warningContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(248, 81, 73, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(248, 81, 73, 0.3)",
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  warningText: {
+    fontSize: 12,
+    fontWeight: "600",
   },
   cancelBtn: {
     height: 44,

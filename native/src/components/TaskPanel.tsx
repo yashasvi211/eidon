@@ -135,8 +135,8 @@ const getSubtaskProgressStyles = (done: number, total: number, colors: any) => {
 };
 
 type ListItem = 
-  | { type: 'header'; id: string; title: string }
-  | { type: 'task'; id: string; task: Task }
+  | { type: 'header'; id: string; title: string; isCompletedHeader?: boolean }
+  | { type: 'task'; id: string; task: Task; index: number }
   | { type: 'empty'; id: string; message: string };
 
 export default function TaskPanel({
@@ -171,10 +171,6 @@ export default function TaskPanel({
       if (currentView === "today") return !backlog && isTaskCurrent(t);
       return t.target === currentView && !backlog;
     })
-    .filter((t) => {
-      if (!showCompleted && t.done) return false;
-      return true;
-    })
     .sort((a, b) => {
       const getPriorityWeight = (priority?: string) => {
         if (priority === 'High') return 3;
@@ -190,7 +186,7 @@ export default function TaskPanel({
     return found ? found.color : "#bc8cff";
   };
 
-  const renderTaskItem = (task: Task, drag: () => void, isActiveDrag: boolean) => {
+  const renderTaskItem = (task: Task, index: number, drag: () => void, isActiveDrag: boolean) => {
     const pColor = getProjectColor(task.project);
     const isHex = pColor.startsWith("#");
     const projectBorderColor = isHex ? `${pColor}4d` : "rgba(188, 140, 255, 0.3)";
@@ -220,21 +216,19 @@ export default function TaskPanel({
               isActiveDrag && { backgroundColor: colors.ghSurface2, opacity: 0.9, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 3.84 },
             ]}
           >
-            {/* Drag Handle */}
-            <TouchableOpacity
-              style={styles.checkboxTouchArea}
-              onLongPress={drag}
-              delayLongPress={200}
-            >
-              <Feather name="menu" size={16} color={isActiveDrag ? colors.ghBlue : colors.ghMuted} />
-            </TouchableOpacity>
+
 
             {/* Task Details Area */}
             <TouchableOpacity 
               style={styles.taskBodyTouchArea}
               onPress={() => onOpenDetail(task)}
+              onLongPress={drag}
+              delayLongPress={200}
               activeOpacity={0.7}
             >
+              <Text style={[styles.taskNumber, { color: colors.ghMuted }]}>
+                {index}.
+              </Text>
               <View style={styles.taskBody}>
                 <Text
                   style={[
@@ -330,20 +324,6 @@ export default function TaskPanel({
                 </View>
               )}
 
-              {/* Delete Button */}
-              {onDeleteTask && (
-                <TouchableOpacity
-                  onPress={() => onDeleteTask(task.id)}
-                  style={[
-                    styles.timeLogBadge,
-                    { backgroundColor: 'rgba(248, 81, 73, 0.08)', borderColor: 'rgba(248, 81, 73, 0.3)' },
-                  ]}
-                >
-                  <Text style={[styles.timeLogBadgeText, { color: colors.ghRed || '#f85149' }]}>
-                    Delete
-                  </Text>
-                </TouchableOpacity>
-              )}
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -353,6 +333,20 @@ export default function TaskPanel({
 
   const renderItem = ({ item, drag, isActive }: RenderItemParams<ListItem>) => {
     if (item.type === 'header') {
+      if (item.isCompletedHeader) {
+        return (
+          <TouchableOpacity 
+            style={[styles.projectSection, { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 }]} 
+            onPress={() => setShowCompleted(!showCompleted)}
+            activeOpacity={0.7}
+          >
+            <Feather name={showCompleted ? "chevron-down" : "chevron-right"} size={14} color={colors.ghMuted} style={{ marginRight: 4 }} />
+            <Text style={[styles.projectSectionTitle, { color: colors.ghMuted, paddingHorizontal: 0 }]}>
+              {item.title}
+            </Text>
+          </TouchableOpacity>
+        );
+      }
       return (
         <View style={styles.projectSection}>
           <Text style={[styles.projectSectionTitle, { color: colors.ghMuted }]}>
@@ -370,13 +364,17 @@ export default function TaskPanel({
         </View>
       );
     }
-    return renderTaskItem(item.task, drag, isActive);
+    return renderTaskItem(item.task, item.index, drag, isActive);
   };
 
   let listData: ListItem[] = [];
+  let taskCounter = 1;
+
+  const activeTasks = baseFiltered.filter(t => !t.done);
+  const completedTasks = baseFiltered.filter(t => t.done);
 
   if (!currentProject && currentView === "backlog") {
-    const byProject = baseFiltered.reduce((acc, t) => {
+    const byProject = activeTasks.reduce((acc, t) => {
       if (!acc[t.project]) acc[t.project] = [];
       acc[t.project].push(t);
       return acc;
@@ -387,38 +385,50 @@ export default function TaskPanel({
     projectNames.forEach(pName => {
       listData.push({ type: 'header', id: `header-${pName}`, title: pName });
       byProject[pName].forEach(t => {
-        listData.push({ type: 'task', id: t.id, task: t });
+        listData.push({ type: 'task', id: t.id, task: t, index: taskCounter++ });
       });
     });
 
-    if (baseFiltered.length === 0) {
+    if (activeTasks.length === 0 && completedTasks.length === 0) {
       listData.push({ type: 'empty', id: 'empty-backlog', message: 'No backlog tasks found.' });
     }
   } else if (currentProject) {
-    const backlogTasks = baseFiltered.filter(isTaskBacklog);
-    const currentTasks = baseFiltered.filter(isTaskCurrent);
-    const futureTasks = baseFiltered.filter(t => !isTaskBacklog(t) && !isTaskCurrent(t));
+    const backlogTasks = activeTasks.filter(isTaskBacklog);
+    const currentTasks = activeTasks.filter(isTaskCurrent);
+    const futureTasks = activeTasks.filter(t => !isTaskBacklog(t) && !isTaskCurrent(t));
 
-    if (baseFiltered.length === 0) {
+    if (activeTasks.length === 0 && completedTasks.length === 0) {
       listData.push({ type: 'empty', id: 'empty-project', message: 'No tasks in this project.' });
     } else {
       if (backlogTasks.length > 0) {
         listData.push({ type: 'header', id: 'header-backlog', title: 'Backlog' });
-        backlogTasks.forEach(t => listData.push({ type: 'task', id: t.id, task: t }));
+        backlogTasks.forEach(t => listData.push({ type: 'task', id: t.id, task: t, index: taskCounter++ }));
       }
       if (currentTasks.length > 0) {
         listData.push({ type: 'header', id: 'header-current', title: 'Current' });
-        currentTasks.forEach(t => listData.push({ type: 'task', id: t.id, task: t }));
+        currentTasks.forEach(t => listData.push({ type: 'task', id: t.id, task: t, index: taskCounter++ }));
       }
       if (futureTasks.length > 0) {
         listData.push({ type: 'header', id: 'header-future', title: 'Future Date' });
-        futureTasks.forEach(t => listData.push({ type: 'task', id: t.id, task: t }));
+        futureTasks.forEach(t => listData.push({ type: 'task', id: t.id, task: t, index: taskCounter++ }));
       }
     }
   } else {
-    baseFiltered.forEach(t => listData.push({ type: 'task', id: t.id, task: t }));
-    if (baseFiltered.length === 0) {
+    activeTasks.forEach(t => listData.push({ type: 'task', id: t.id, task: t, index: taskCounter++ }));
+    if (activeTasks.length === 0 && completedTasks.length === 0) {
       listData.push({ type: 'empty', id: 'empty-view', message: 'No tasks found here.' });
+    }
+  }
+
+  if (completedTasks.length > 0) {
+    listData.push({ 
+      type: 'header', 
+      id: 'header-completed', 
+      title: `Completed (${completedTasks.length})`,
+      isCompletedHeader: true
+    });
+    if (showCompleted) {
+      completedTasks.forEach(t => listData.push({ type: 'task', id: t.id, task: t, index: taskCounter++ }));
     }
   }
 
@@ -496,7 +506,8 @@ const styles = StyleSheet.create({
   },
   taskItem: {
     flexDirection: "row",
-    paddingHorizontal: 16,
+    paddingLeft: 8,
+    paddingRight: 16,
     borderBottomWidth: 1,
     alignItems: "center",
     position: "relative",
@@ -512,6 +523,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 12,
+  },
+  taskNumber: {
+    marginRight: 14,
+    fontSize: 14,
+    fontWeight: "600",
+    fontFamily: "monospace",
+    width: 26,
+    textAlign: "right",
   },
   taskBody: {
     flex: 1,
