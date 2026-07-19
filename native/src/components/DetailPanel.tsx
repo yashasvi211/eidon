@@ -447,6 +447,26 @@ export default function DetailPanel({
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  const [nowTime, setNowTime] = useState(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNowTime(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatCustomDate = (date: Date) => {
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const m = months[date.getMonth()];
+    const d = date.getDate();
+    const yy = String(date.getFullYear()).slice(-2);
+    let h = date.getHours();
+    const min = String(date.getMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12;
+    h = h ? h : 12;
+    const hStr = String(h).padStart(2, '0');
+    return `${d} ${m} ${yy}, ${hStr}:${min}${ampm}`;
+  };
+
   const getTodayLocalDateString = () => {
     const d = new Date();
     const y = d.getFullYear();
@@ -910,16 +930,45 @@ export default function DetailPanel({
           tabName="details"
           tabBarWidth={tabBarWidth}
         >
+            {(() => {
+              if (!task.done && task.due) {
+                const dueObj = new Date(task.due + "T00:00:00");
+                if (task.dueTime) {
+                  const [h, m] = task.dueTime.split(":").map(Number);
+                  dueObj.setHours(h, m, 0, 0);
+                }
+                const diffMs = dueObj.getTime() - nowTime;
+                if (diffMs > 0) {
+                  const d = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                  const h = Math.floor((diffMs / (1000 * 60 * 60)) % 24);
+                  const m = Math.floor((diffMs / 1000 / 60) % 60);
+                  const s = Math.floor((diffMs / 1000) % 60);
+                  return (
+                    <View style={{ backgroundColor: "rgba(31, 111, 235, 0.1)", padding: 12, borderRadius: 8, marginBottom: 24, flexDirection: "row", alignItems: "center" }}>
+                      <Feather name="clock" size={16} color={colors.ghBlue || "#58a6ff"} style={{ marginRight: 8 }} />
+                      <Text style={{ color: colors.ghBlue || "#58a6ff", fontSize: 13, fontWeight: "600" }}>
+                        {d}d {h}h {m}m {s}s pending
+                      </Text>
+                    </View>
+                  );
+                }
+              }
+              return null;
+            })()}
+
             <View style={styles.detailSection}>
               <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
                 STATUS
               </Text>
               <TouchableOpacity
                 onPress={() => {
-                  if (!task.done) setIsCompleteModalOpen(true);
+                  if (!task.done) {
+                    setIsCompleteModalOpen(true);
+                  } else {
+                    onToggleDone(task.id);
+                  }
                 }}
                 style={styles.statusToggle}
-                disabled={task.done}
               >
                 <View
                   style={[
@@ -1017,17 +1066,31 @@ export default function DetailPanel({
               </Text>
               
               {(() => {
-                const now = new Date();
-                const createdAtStr = new Date(task.createdAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                const createdAtStr = formatCustomDate(new Date(task.createdAt));
                 
                 let execStartStr = "-";
                 if (task.execStartDate) {
-                  execStartStr = fmtDateDisplay(task.execStartDate) + (task.execStartTime ? ` at ${formatTime12h(task.execStartTime)}` : "");
+                  const execDate = new Date(task.execStartDate + "T00:00:00");
+                  if (task.execStartTime) {
+                    const [hh, mm] = task.execStartTime.split(":").map(Number);
+                    execDate.setHours(hh, mm, 0, 0);
+                  }
+                  execStartStr = formatCustomDate(execDate);
                 }
                 
                 let dueStr = "-";
                 if (task.due) {
-                  dueStr = fmtDateDisplay(task.due) + (task.dueTime ? ` at ${formatTime12h(task.dueTime)}` : "");
+                  const dueDate = new Date(task.due + "T00:00:00");
+                  if (task.dueTime) {
+                    const [hh, mm] = task.dueTime.split(":").map(Number);
+                    dueDate.setHours(hh, mm, 0, 0);
+                  }
+                  dueStr = formatCustomDate(dueDate);
+                }
+
+                let completedAtStr = null;
+                if (task.completedAt) {
+                  completedAtStr = formatCustomDate(new Date(task.completedAt));
                 }
 
                 let activeTimeStr = "-";
@@ -1040,7 +1103,7 @@ export default function DetailPanel({
                     dueObj.setHours(h, m, 0, 0);
                   }
                   
-                  const diffMs = dueObj.getTime() - now.getTime();
+                  const diffMs = dueObj.getTime() - nowTime;
                   
                   if (diffMs < 0) {
                     const overMs = Math.abs(diffMs);
@@ -1055,8 +1118,8 @@ export default function DetailPanel({
                       const [h, m] = task.execStartTime.split(":").map(Number);
                       execObj.setHours(h, m, 0, 0);
                     }
-                    if (now.getTime() >= execObj.getTime() && diffMs >= 0) {
-                      const activeMs = now.getTime() - execObj.getTime();
+                    if (nowTime >= execObj.getTime() && diffMs >= 0) {
+                      const activeMs = nowTime - execObj.getTime();
                       const actDays = Math.floor(activeMs / (1000 * 60 * 60 * 24));
                       const actHours = Math.floor((activeMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                       activeTimeStr = `${actDays}d ${actHours}h`;
@@ -1074,7 +1137,7 @@ export default function DetailPanel({
                 return (
                   <View style={{ backgroundColor: colors.ghSurface2, borderRadius: 8, paddingHorizontal: 12 }}>
                     {renderAttr("Created", createdAtStr)}
-                    {task.completedAt ? renderAttr("Completed", new Date(task.completedAt).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }), colors.ghGreen || "#3fb950") : null}
+                    {completedAtStr ? renderAttr("Completed", completedAtStr, colors.ghGreen || "#3fb950") : null}
                     {renderAttr("Priority", task.priority || "Low", task.priority === 'High' ? (colors.ghRed || '#f85149') : task.priority === 'Moderate' ? (colors.ghAmber || '#d29922') : (colors.ghGreen || '#3fb950'))}
                     {renderAttr("Execution Start", execStartStr)}
                     {renderAttr("Due", dueStr)}

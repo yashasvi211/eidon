@@ -222,7 +222,7 @@ export default function TaskPanel({
             <TouchableOpacity 
               style={styles.taskBodyTouchArea}
               onPress={() => onOpenDetail(task)}
-              onLongPress={drag}
+              onLongPress={!task.done ? drag : undefined}
               delayLongPress={200}
               activeOpacity={0.7}
             >
