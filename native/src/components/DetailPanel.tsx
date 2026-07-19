@@ -944,11 +944,18 @@ export default function DetailPanel({
                   const m = Math.floor((diffMs / 1000 / 60) % 60);
                   const s = Math.floor((diffMs / 1000) % 60);
                   return (
-                    <View style={{ backgroundColor: "rgba(31, 111, 235, 0.1)", padding: 12, borderRadius: 8, marginBottom: 24, flexDirection: "row", alignItems: "center" }}>
-                      <Feather name="clock" size={16} color={colors.ghBlue || "#58a6ff"} style={{ marginRight: 8 }} />
-                      <Text style={{ color: colors.ghBlue || "#58a6ff", fontSize: 13, fontWeight: "600" }}>
-                        {d}d {h}h {m}m {s}s pending
-                      </Text>
+                    <View style={{ backgroundColor: "rgba(31, 111, 235, 0.06)", borderWidth: 1, borderColor: "rgba(31, 111, 235, 0.15)", padding: 14, borderRadius: 12, marginBottom: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                      <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        <View style={{ backgroundColor: "rgba(31, 111, 235, 0.12)", width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center", marginRight: 10 }}>
+                          <Feather name="clock" size={15} color={colors.ghBlue || "#58a6ff"} />
+                        </View>
+                        <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: "600" }}>Time Left</Text>
+                      </View>
+                      <View style={{ backgroundColor: colors.ghSurface2, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 }}>
+                        <Text style={{ color: colors.ghBlue || "#58a6ff", fontSize: 13, fontWeight: "700", fontFamily: "monospace" }}>
+                          {d}d {h}h {m}m {s}s
+                        </Text>
+                      </View>
                     </View>
                   );
                 }
@@ -956,114 +963,172 @@ export default function DetailPanel({
               return null;
             })()}
 
-            <View style={styles.detailSection}>
-              <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
-                STATUS
-              </Text>
-              <TouchableOpacity
-                onPress={() => {
-                  if (!task.done) {
-                    setIsCompleteModalOpen(true);
-                  } else {
-                    onToggleDone(task.id);
-                  }
-                }}
-                style={styles.statusToggle}
-              >
-                <View
+            {/* Status & Priority Row */}
+            <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
+              {/* Status Card */}
+              <View style={{ flex: 1, backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 14 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+                  <View style={{ backgroundColor: task.done ? "rgba(63, 185, 80, 0.12)" : "rgba(139, 148, 158, 0.12)", width: 28, height: 28, borderRadius: 7, alignItems: "center", justifyContent: "center", marginRight: 8 }}>
+                    <Feather name={task.done ? "check-circle" : "circle"} size={14} color={task.done ? colors.ghGreen : colors.ghMuted} />
+                  </View>
+                  <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 0 }]}>
+                    STATUS
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (!task.done) {
+                      setIsCompleteModalOpen(true);
+                    } else {
+                      onToggleDone(task.id);
+                    }
+                  }}
+                  style={[styles.statusToggle, { backgroundColor: task.done ? "rgba(63, 185, 80, 0.08)" : colors.ghSurface2, padding: 10, borderRadius: 8 }]}
+                >
+                  <View
+                    style={[
+                      styles.statusCircle,
+                      {
+                        borderColor: task.done
+                          ? colors.ghGreen
+                          : colors.ghBorder2,
+                        backgroundColor: task.done
+                          ? colors.ghGreen
+                          : "transparent",
+                      },
+                    ]}
+                  >
+                    {task.done && (
+                      <Text style={{ color: "#fff", fontSize: 10 }}>✓</Text>
+                    )}
+                  </View>
+                  <Text
+                    style={{
+                      color: task.done ? colors.ghGreen : colors.ghText,
+                      fontWeight: "600",
+                      fontSize: 13,
+                    }}
+                  >
+                    {task.done ? "Completed" : "Mark complete"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Priority Card */}
+              {(() => {
+                const p = task.priority || "Low";
+                const pColor = p === 'High' ? (colors.ghRed || '#f85149') : p === 'Moderate' ? (colors.ghAmber || '#d29922') : (colors.ghGreen || '#3fb950');
+                const pBg = p === 'High' ? 'rgba(248, 81, 73, 0.12)' : p === 'Moderate' ? 'rgba(210, 153, 34, 0.12)' : 'rgba(63, 185, 80, 0.12)';
+                const pIcon = p === 'High' ? 'alert-circle' : p === 'Moderate' ? 'alert-triangle' : 'chevrons-down';
+                return (
+                  <View style={{ flex: 1, backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 14 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+                      <View style={{ backgroundColor: pBg, width: 28, height: 28, borderRadius: 7, alignItems: "center", justifyContent: "center", marginRight: 8 }}>
+                        <Feather name={pIcon as any} size={14} color={pColor} />
+                      </View>
+                      <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 0 }]}>
+                        PRIORITY
+                      </Text>
+                    </View>
+                    <View style={{ backgroundColor: `${pColor}14`, paddingHorizontal: 10, paddingVertical: 8, borderRadius: 8, alignSelf: "flex-start" }}>
+                      <Text style={{ color: pColor, fontWeight: "700", fontSize: 13 }}>
+                        {p}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })()}
+            </View>
+
+            {/* Project & Estimate Row */}
+            <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
+              <View style={{ flex: 1, backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 14 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                  <View style={{ backgroundColor: "rgba(188, 140, 255, 0.12)", width: 28, height: 28, borderRadius: 7, alignItems: "center", justifyContent: "center", marginRight: 8 }}>
+                    <Feather name="folder" size={13} color={colors.ghPurple} />
+                  </View>
+                  <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 0 }]}>
+                    PROJECT
+                  </Text>
+                </View>
+                <Text
                   style={[
-                    styles.statusCircle,
+                    styles.tag,
                     {
-                      borderColor: task.done
-                        ? colors.ghGreen
-                        : colors.ghBorder2,
-                      backgroundColor: task.done
-                        ? colors.ghGreen
-                        : "transparent",
+                      color: colors.ghPurple,
+                      backgroundColor: "rgba(188, 140, 255, 0.08)",
+                      borderColor: "rgba(188, 140, 255, 0.25)",
+                      alignSelf: "flex-start",
                     },
                   ]}
                 >
-                  {task.done && (
-                    <Text style={{ color: "#fff", fontSize: 10 }}>✓</Text>
-                  )}
-                </View>
-                <Text
-                  style={{
-                    color: task.done ? colors.ghGreen : colors.ghText,
-                    fontWeight: "600",
-                    fontSize: 13,
-                  }}
-                >
-                  {task.done ? "Completed" : "Mark this complete"}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.detailSection}>
-              <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
-                PROJECT
-              </Text>
-              <Text
-                style={[
-                  styles.tag,
-                  {
-                    color: colors.ghPurple,
-                    backgroundColor: "rgba(188, 140, 255, 0.08)",
-                    borderColor: "rgba(188, 140, 255, 0.3)",
-                    alignSelf: "flex-start",
-                  },
-                ]}
-              >
-                {task.project}
-              </Text>
-            </View>
-
-            {task.est ? (
-              <View style={styles.detailSection}>
-                <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
-                  ESTIMATE
-                </Text>
-                <Text
-                  style={{
-                    color: colors.ghText,
-                    fontFamily: "monospace",
-                    fontSize: 13,
-                  }}
-                >
-                  {task.est}
+                  {task.project}
                 </Text>
               </View>
-            ) : null}
-
-            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 24, paddingRight: 16 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
-                  SUBTASKS
-                </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Octicons name="tasklist" size={14} color={colors.ghMuted} style={{ marginRight: 6 }} />
-                  <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: "500" }}>
-                    {subtasksDone} / {totalSubtasks}
+              {task.est ? (
+                <View style={{ flex: 1, backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 14 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                    <View style={{ backgroundColor: "rgba(210, 153, 34, 0.12)", width: 28, height: 28, borderRadius: 7, alignItems: "center", justifyContent: "center", marginRight: 8 }}>
+                      <Feather name="target" size={13} color={colors.ghAmber} />
+                    </View>
+                    <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 0 }]}>
+                      ESTIMATE
+                    </Text>
+                  </View>
+                  <Text
+                    style={{
+                      color: colors.ghText,
+                      fontFamily: "monospace",
+                      fontSize: 14,
+                      fontWeight: "600",
+                    }}
+                  >
+                    {task.est}
                   </Text>
                 </View>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
-                  TIME SPENT
-                </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Feather name="clock" size={14} color={colors.ghMuted} style={{ marginRight: 6 }} />
-                  <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: "500" }}>
-                    {timeSpentStr}
+              ) : null}
+            </View>
+
+            {/* Subtasks & Time Spent Row */}
+            <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
+              <View style={{ flex: 1, backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 14 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                  <View style={{ backgroundColor: "rgba(86, 212, 221, 0.12)", width: 28, height: 28, borderRadius: 7, alignItems: "center", justifyContent: "center", marginRight: 8 }}>
+                    <Octicons name="tasklist" size={13} color={"#56d4dd"} />
+                  </View>
+                  <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 0 }]}>
+                    SUBTASKS
                   </Text>
                 </View>
+                <Text style={{ color: colors.ghText, fontSize: 16, fontWeight: "700", fontFamily: "monospace" }}>
+                  {subtasksDone}<Text style={{ color: colors.ghMuted, fontWeight: "400" }}> / {totalSubtasks}</Text>
+                </Text>
+              </View>
+              <View style={{ flex: 1, backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 14 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                  <View style={{ backgroundColor: "rgba(88, 166, 255, 0.12)", width: 28, height: 28, borderRadius: 7, alignItems: "center", justifyContent: "center", marginRight: 8 }}>
+                    <Feather name="clock" size={13} color={colors.ghBlue} />
+                  </View>
+                  <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 0 }]}>
+                    TIME SPENT
+                  </Text>
+                </View>
+                <Text style={{ color: colors.ghText, fontSize: 16, fontWeight: "700", fontFamily: "monospace" }}>
+                  {timeSpentStr}
+                </Text>
               </View>
             </View>
 
-            <View style={styles.detailSection}>
-              <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
-                ATTRIBUTES
-              </Text>
+            {/* Attributes Card */}
+            <View style={{ backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 14, marginBottom: 16 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
+                <View style={{ backgroundColor: "rgba(139, 148, 158, 0.12)", width: 28, height: 28, borderRadius: 7, alignItems: "center", justifyContent: "center", marginRight: 8 }}>
+                  <Feather name="list" size={13} color={colors.ghMuted} />
+                </View>
+                <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 0 }]}>
+                  ATTRIBUTES
+                </Text>
+              </View>
               
               {(() => {
                 const createdAtStr = formatCustomDate(new Date(task.createdAt));
@@ -1127,32 +1192,51 @@ export default function DetailPanel({
                   }
                 }
 
-                const renderAttr = (label: string, value: string, color: string = colors.ghText) => (
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.ghBorder2 }}>
-                    <Text style={{ color: colors.ghMuted, fontSize: 13 }}>{label}</Text>
-                    <Text style={{ color, fontSize: 13, fontWeight: "500", textAlign: "right", flex: 1, marginLeft: 16 }}>{value}</Text>
+                const attrIconMap: { [key: string]: { name: string; color: string } } = {
+                  "Created": { name: "plus-circle", color: colors.ghGreen },
+                  "Completed": { name: "check-circle", color: colors.ghGreen },
+                  "Execution Start": { name: "play-circle", color: colors.ghBlue },
+                  "Due": { name: "calendar", color: colors.ghBlue },
+                  "Active Time": { name: "activity", color: "#56d4dd" },
+                  "Overdue Time": { name: "alert-circle", color: colors.ghRed },
+                };
+
+                const renderAttr = (label: string, value: string, color: string = colors.ghText, isLast: boolean = false) => (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: isLast ? 0 : 1, borderBottomColor: colors.ghBorder }}>
+                    <View style={{ width: 24, height: 24, borderRadius: 6, backgroundColor: `${(attrIconMap[label]?.color || colors.ghMuted)}15`, alignItems: "center", justifyContent: "center", marginRight: 10 }}>
+                      <Feather name={(attrIconMap[label]?.name || "info") as any} size={12} color={attrIconMap[label]?.color || colors.ghMuted} />
+                    </View>
+                    <Text style={{ color: colors.ghMuted, fontSize: 13, flex: 1 }}>{label}</Text>
+                    <Text style={{ color, fontSize: 13, fontWeight: "600" }}>{value}</Text>
                   </View>
                 );
 
+                const rows: { label: string; value: string; color: string }[] = [];
+                rows.push({ label: "Created", value: createdAtStr, color: colors.ghText });
+                if (completedAtStr) rows.push({ label: "Completed", value: completedAtStr, color: colors.ghGreen || "#3fb950" });
+                rows.push({ label: "Execution Start", value: execStartStr, color: colors.ghText });
+                rows.push({ label: "Due", value: dueStr, color: colors.ghText });
+                if (activeTimeStr !== "-") rows.push({ label: "Active Time", value: activeTimeStr, color: "#56d4dd" });
+                if (overdueTimeStr !== "-") rows.push({ label: "Overdue Time", value: overdueTimeStr, color: colors.ghRed || '#f85149' });
+
                 return (
-                  <View style={{ backgroundColor: colors.ghSurface2, borderRadius: 8, paddingHorizontal: 12 }}>
-                    {renderAttr("Created", createdAtStr)}
-                    {completedAtStr ? renderAttr("Completed", completedAtStr, colors.ghGreen || "#3fb950") : null}
-                    {renderAttr("Priority", task.priority || "Low", task.priority === 'High' ? (colors.ghRed || '#f85149') : task.priority === 'Moderate' ? (colors.ghAmber || '#d29922') : (colors.ghGreen || '#3fb950'))}
-                    {renderAttr("Execution Start", execStartStr)}
-                    {renderAttr("Due", dueStr)}
-                    {activeTimeStr !== "-" && renderAttr("Active Time", activeTimeStr, "#56d4dd")}
-                    {overdueTimeStr !== "-" && renderAttr("Overdue Time", overdueTimeStr, colors.ghRed || '#f85149')}
+                  <View>
+                    {rows.map((row, idx) => renderAttr(row.label, row.value, row.color, idx === rows.length - 1))}
                   </View>
                 );
               })()}
             </View>
 
             {task.notes ? (
-              <View style={[styles.detailSection, { marginTop: 16 }]}>
-                <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
-                  NOTES
-                </Text>
+              <View style={{ backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 14, marginBottom: 16 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+                  <View style={{ backgroundColor: "rgba(139, 148, 158, 0.12)", width: 28, height: 28, borderRadius: 7, alignItems: "center", justifyContent: "center", marginRight: 8 }}>
+                    <Feather name="file-text" size={13} color={colors.ghMuted} />
+                  </View>
+                  <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 0 }]}>
+                    NOTES
+                  </Text>
+                </View>
                 <Text style={[styles.notesText, { color: colors.ghText }]}>
                   {task.notes}
                 </Text>
@@ -1167,10 +1251,13 @@ export default function DetailPanel({
           tabName="checklist"
           tabBarWidth={tabBarWidth}
         >
-            {/* Progress Bar */}
-            <View style={styles.progressContainer}>
-              <View style={styles.progressInfo}>
-                <Text style={[styles.progressLabel, { color: colors.ghMuted }]}>
+            {/* Progress Card */}
+            <View style={{ backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 14, marginBottom: 16 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
+                <View style={{ backgroundColor: `${progress.color}20`, width: 28, height: 28, borderRadius: 7, alignItems: "center", justifyContent: "center", marginRight: 8 }}>
+                  <Feather name="bar-chart-2" size={13} color={progress.color} />
+                </View>
+                <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 0, flex: 1 }]}>
                   SUBTASK COMPLETION
                 </Text>
                 <Text style={[styles.progressValue, { color: progress.color }]}>
@@ -1180,7 +1267,7 @@ export default function DetailPanel({
               <View
                 style={[
                   styles.progressBar,
-                  { backgroundColor: colors.ghBorder },
+                  { backgroundColor: colors.ghBorder, height: 6, borderRadius: 3 },
                 ]}
               >
                 <View
@@ -1189,21 +1276,39 @@ export default function DetailPanel({
                     {
                       backgroundColor: progress.color,
                       width: `${progress.pct}%`,
+                      borderRadius: 3,
                     },
                   ]}
                 />
               </View>
             </View>
 
-            {/* Checklist */}
-            <View style={styles.checklist}>
-              {subtasks.map((sub) => (
+            {/* Checklist Card */}
+            <View style={{ backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 14, marginBottom: 16 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: subtasks.length > 0 ? 8 : 0 }}>
+                <View style={{ backgroundColor: "rgba(86, 212, 221, 0.12)", width: 28, height: 28, borderRadius: 7, alignItems: "center", justifyContent: "center", marginRight: 8 }}>
+                  <Octicons name="tasklist" size={13} color={"#56d4dd"} />
+                </View>
+                <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 0, flex: 1 }]}>
+                  CHECKLIST
+                </Text>
+                <Text style={{ color: colors.ghMuted, fontSize: 11, fontWeight: "500" }}>
+                  {subtasksDone}/{totalSubtasks}
+                </Text>
+              </View>
+
+              {subtasks.map((sub, idx) => (
                 <TouchableOpacity
                   key={sub.id}
-                  style={[
-                    styles.checkItem,
-                    { borderBottomColor: colors.ghBorder },
-                  ]}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingVertical: 11,
+                    paddingHorizontal: 4,
+                    borderBottomWidth: idx < subtasks.length - 1 ? 1 : 0,
+                    borderBottomColor: colors.ghBorder,
+                    gap: 10,
+                  }}
                   onPress={() => handleToggleSubtask(sub.id)}
                 >
                   <View
@@ -1236,21 +1341,29 @@ export default function DetailPanel({
               ))}
 
               {subtasks.length === 0 && (
-                <Text style={[styles.emptyText, { color: colors.ghMuted }]}>
-                  No subtasks added yet.
-                </Text>
+                <View style={{ alignItems: "center", paddingVertical: 24 }}>
+                  <View style={{ backgroundColor: "rgba(139, 148, 158, 0.08)", width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", marginBottom: 8 }}>
+                    <Octicons name="tasklist" size={18} color={colors.ghMuted} />
+                  </View>
+                  <Text style={{ color: colors.ghMuted, fontSize: 13 }}>
+                    No subtasks added yet
+                  </Text>
+                </View>
               )}
             </View>
 
             {/* Add subtask */}
-            <View style={styles.addSubtaskBox}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <TextInput
                 style={[
                   styles.subtaskInput,
                   {
                     color: colors.ghText,
-                    backgroundColor: colors.ghSurface2,
+                    backgroundColor: colors.ghSurface,
                     borderColor: colors.ghBorder,
+                    borderWidth: 1,
+                    borderRadius: 10,
+                    height: 40,
                   },
                 ]}
                 placeholder="Add subtask..."
@@ -1265,9 +1378,12 @@ export default function DetailPanel({
                   {
                     backgroundColor: newSubtaskTitle.trim()
                       ? colors.ghBlue
-                      : colors.ghSurface2,
+                      : colors.ghSurface,
                     borderColor: colors.ghBorder,
                     borderWidth: 1,
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
                   },
                 ]}
                 onPress={handleAddSubtaskSubmit}
@@ -1288,35 +1404,48 @@ export default function DetailPanel({
           tabName="timetracking"
           tabBarWidth={tabBarWidth}
         >
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 0 }]}>
-                LOGGED SESSIONS
-              </Text>
+            {/* Header Card */}
+            <View style={{ backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 14, marginBottom: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View style={{ backgroundColor: "rgba(88, 166, 255, 0.12)", width: 28, height: 28, borderRadius: 7, alignItems: "center", justifyContent: "center", marginRight: 8 }}>
+                  <Feather name="clock" size={13} color={colors.ghBlue} />
+                </View>
+                <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 0 }]}>
+                  LOGGED SESSIONS
+                </Text>
+              </View>
               <TouchableOpacity
                 style={{
-                  backgroundColor: colors.ghSurface2,
-                  borderColor: colors.ghBorder,
-                  borderWidth: 1,
+                  backgroundColor: colors.ghBlue,
                   flexDirection: 'row',
                   alignItems: 'center',
-                  paddingHorizontal: 10,
-                  paddingVertical: 5,
-                  borderRadius: 6,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 8,
                 }}
                 onPress={openAddSessionModal}
               >
-                <Feather name="plus" size={12} color={colors.ghText} style={{ marginRight: 4 }} />
-                <Text style={{ color: colors.ghText, fontSize: 11, fontWeight: "600" }}>
+                <Feather name="plus" size={12} color={"#ffffff"} style={{ marginRight: 4 }} />
+                <Text style={{ color: "#ffffff", fontSize: 11, fontWeight: "600" }}>
                   Add Time
                 </Text>
               </TouchableOpacity>
             </View>
+
+            {/* Sessions List */}
             {!task.sessions || task.sessions.length === 0 ? (
-              <Text style={[styles.emptyText, { color: colors.ghMuted }]}>
-                No time has been logged on this task.
-              </Text>
+              <View style={{ backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 14 }}>
+                <View style={{ alignItems: "center", paddingVertical: 24 }}>
+                  <View style={{ backgroundColor: "rgba(139, 148, 158, 0.08)", width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", marginBottom: 8 }}>
+                    <Feather name="clock" size={18} color={colors.ghMuted} />
+                  </View>
+                  <Text style={{ color: colors.ghMuted, fontSize: 13 }}>
+                    No time has been logged on this task
+                  </Text>
+                </View>
+              </View>
             ) : (
-              <View style={styles.sessionsList}>
+              <View style={{ gap: 10 }}>
                 {task.sessions.map((sess) => {
                   const duration = (sess.end - sess.start) / 1000;
                   const startStr = new Date(sess.start).toLocaleTimeString([], {
@@ -1333,40 +1462,42 @@ export default function DetailPanel({
                   return (
                     <View
                       key={sess.id}
-                      style={[
-                        styles.sessionCard,
-                        {
-                          backgroundColor: colors.ghSurface,
-                          borderColor: colors.ghBorder,
-                        },
-                      ]}
+                      style={{
+                        backgroundColor: colors.ghSurface,
+                        borderWidth: 1,
+                        borderColor: colors.ghBorder,
+                        borderRadius: 12,
+                        padding: 14,
+                      }}
                     >
-                      <View style={styles.sessionHeaderRow}>
-                        <Text
-                          style={[styles.sessionDate, { color: colors.ghText }]}
-                        >
-                          {dateStr}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.sessionDuration,
-                            { color: colors.ghBlue },
-                          ]}
-                        >
-                          {fmtSeconds(duration)}
+                      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                        <View style={{ flexDirection: "row", alignItems: "center" }}>
+                          <View style={{ backgroundColor: "rgba(88, 166, 255, 0.12)", width: 24, height: 24, borderRadius: 6, alignItems: "center", justifyContent: "center", marginRight: 8 }}>
+                            <Feather name="play" size={11} color={colors.ghBlue} />
+                          </View>
+                          <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: "600" }}>
+                            {dateStr}
+                          </Text>
+                        </View>
+                        <View style={{ backgroundColor: `${colors.ghBlue}15`, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                          <Text style={{ color: colors.ghBlue, fontSize: 12, fontWeight: "700", fontFamily: "monospace" }}>
+                            {fmtSeconds(duration)}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={{ flexDirection: "row", alignItems: "center", marginLeft: 32 }}>
+                        <Text style={{ color: colors.ghMuted, fontSize: 11, fontFamily: "monospace" }}>
+                          {startStr} — {endStr}
                         </Text>
                       </View>
-                      <Text
-                        style={[styles.sessionTimes, { color: colors.ghMuted }]}
-                      >
-                        {startStr} — {endStr}
-                      </Text>
                       {sess.note ? (
-                        <Text
-                          style={[styles.sessionNote, { color: colors.ghText }]}
-                        >
-                          "{sess.note}"
-                        </Text>
+                        <View style={{ backgroundColor: `${colors.ghMuted}08`, padding: 8, borderRadius: 6, marginTop: 6, marginLeft: 32 }}>
+                          <Text
+                            style={{ color: colors.ghText, fontSize: 11, fontStyle: "italic" }}
+                          >
+                            "{sess.note}"
+                          </Text>
+                        </View>
                       ) : null}
                     </View>
                   );
