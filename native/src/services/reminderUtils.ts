@@ -9,6 +9,7 @@ const DAY = 24 * HOUR;
 const WEEK = 7 * DAY;
 
 export const REMINDER_OFFSETS: Preset[] = [
+  { label: '2 Minutes', value: 2 * MINUTE },
   { label: '15 Minutes', value: 15 * MINUTE },
   { label: '30 Minutes', value: 30 * MINUTE },
   { label: '1 Hour', value: HOUR },

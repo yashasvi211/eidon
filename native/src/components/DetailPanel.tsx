@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { countTotalReminders } from "../services/reminderUtils";
+import { countTotalReminders, generateSchedulePreview } from "../services/reminderUtils";
 import {
   View,
   Text,
@@ -25,6 +25,7 @@ import Animated, {
   runOnJS,
   interpolate,
   Extrapolation,
+  interpolateColor,
 } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { Feather, Octicons } from "@expo/vector-icons";
@@ -34,6 +35,7 @@ import AnalogClockModal from "./sub_components/AnalogClockModal";
 import LogTimeModal from "./sub_components/LogTimeModal";
 import SwipeButton from "./sub_components/SwipeButton";
 import ConfirmationModal from "./sub_components/ConfirmationModal";
+import AddSubtaskModal from "./sub_components/AddSubtaskModal";
 
 // Pull-down dismiss threshold: if user drags past this many pixels, we close
 const DISMISS_THRESHOLD = 120;
@@ -43,10 +45,13 @@ const SNAP_SPRING = { damping: 24, stiffness: 300, mass: 0.7 };
 const EXIT_DURATION = 250;
 const EXIT_EASING = Easing.bezierFn(0.4, 0, 1, 1);
 
+const AnimatedFeather = Animated.createAnimatedComponent(Feather);
+
 export interface Subtask {
   id: string;
   title: string;
   done: boolean;
+  description?: string;
 }
 
 export interface Session {
@@ -407,7 +412,7 @@ export default function DetailPanel({
 }: DetailPanelProps) {
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
-  const colors = Colors[scheme === "unspecified" ? "light" : scheme];
+  const colors = Colors[scheme === "dark" ? "dark" : "light"];
   const { width, height } = useWindowDimensions();
   const isLargeScreen = width >= 768;
 
@@ -417,8 +422,15 @@ export default function DetailPanel({
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [sessionNote, setSessionNote] = useState("");
 
+  const doneAnim = useSharedValue(task?.done ? 1 : 0);
+  useEffect(() => {
+    if (task) {
+      doneAnim.value = withTiming(task.done ? 1 : 0, { duration: 350 });
+    }
+  }, [task?.done]);
+
   const totalReminders = useMemo(() => {
-    if (!task.due || !task.reminder || task.reminder.remindBefore === null) return 0;
+    if (!task || !task.due || !task.reminder || task.reminder.remindBefore === null) return 0;
     
     const [y, m, d] = task.due.split('-').map(Number);
     const dateObj = new Date(y, m - 1, d);
@@ -447,11 +459,32 @@ export default function DetailPanel({
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  const [isAddSubtaskModalOpen, setIsAddSubtaskModalOpen] = useState(false);
+  const [subtaskToConfirm, setSubtaskToConfirm] = useState<string | null>(null);
+
   const [nowTime, setNowTime] = useState(Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNowTime(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  const nextReminder = useMemo(() => {
+    if (!task || !task.due || !task.reminder || task.reminder.remindBefore === null) return null;
+    const [y, m, d] = task.due.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    if (task.dueTime) {
+      const [h, min] = task.dueTime.split(':').map(Number);
+      dateObj.setHours(h, min, 0, 0);
+    } else {
+      dateObj.setHours(0, 0, 0, 0);
+    }
+    const schedule = generateSchedulePreview(dateObj.getTime(), task.reminder.remindBefore, task.reminder.repeatEvery || 0);
+    const futureReminders = schedule.filter(dt => dt.getTime() > nowTime);
+    if (futureReminders.length > 0) {
+      return futureReminders[0];
+    }
+    return null;
+  }, [task, nowTime]);
 
   const formatCustomDate = (date: Date) => {
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -740,6 +773,16 @@ export default function DetailPanel({
   const totalTimeSpentMs = (task.sessions || []).reduce((acc, sess) => acc + (sess.end - sess.start), 0) + (isThisTaskTimerRunning ? timerSeconds * 1000 : 0);
   const timeSpentStr = totalTimeSpentMs > 0 ? fmtSeconds(Math.floor(totalTimeSpentMs / 1000)) : "0m";
 
+  const handleToggleSubtaskPress = (subId: string) => {
+    const sub = subtasks.find(s => s.id === subId);
+    if (!sub) return;
+    if (sub.done) {
+      handleToggleSubtask(subId);
+    } else {
+      setSubtaskToConfirm(subId);
+    }
+  };
+
   const handleToggleSubtask = (subId: string) => {
     const updatedSubtasks = subtasks.map((s) => {
       if (s.id !== subId) return s;
@@ -799,12 +842,12 @@ export default function DetailPanel({
     }
   };
 
-  const handleAddSubtaskSubmit = () => {
-    if (!newSubtaskTitle.trim()) return;
+  const handleAddSubtask = (title: string, description: string) => {
     const newSub: Subtask = {
       id: "s" + Date.now(),
-      title: newSubtaskTitle.trim(),
+      title,
       done: false,
+      description: description || undefined,
     };
     const audit: AuditEntry = {
       timestamp: Date.now(),
@@ -817,7 +860,6 @@ export default function DetailPanel({
       subtasks: [...subtasks, newSub],
       auditLog: [...(task.auditLog || []), audit],
     });
-    setNewSubtaskTitle("");
   };
 
   // The drag-handle + header area that responds to pull-down gesture
@@ -966,11 +1008,27 @@ export default function DetailPanel({
             {/* Status & Priority Row */}
             <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
               {/* Status Card */}
-              <View style={{ flex: 1, backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 14 }}>
+              <Animated.View style={[
+                { flex: 1, borderWidth: 1, borderRadius: 12, padding: 14 },
+                useAnimatedStyle(() => ({
+                  backgroundColor: interpolateColor(doneAnim.value, [0, 1], [colors.ghSurface, "rgba(63, 185, 80, 0.08)"]),
+                  borderColor: interpolateColor(doneAnim.value, [0, 1], [colors.ghBorder, "rgba(63, 185, 80, 0.3)"])
+                }))
+              ]}>
                 <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
-                  <View style={{ backgroundColor: task.done ? "rgba(63, 185, 80, 0.12)" : "rgba(139, 148, 158, 0.12)", width: 28, height: 28, borderRadius: 7, alignItems: "center", justifyContent: "center", marginRight: 8 }}>
-                    <Feather name={task.done ? "check-circle" : "circle"} size={14} color={task.done ? colors.ghGreen : colors.ghMuted} />
-                  </View>
+                  <Animated.View style={[
+                    { width: 28, height: 28, borderRadius: 7, alignItems: "center", justifyContent: "center", marginRight: 8 },
+                    useAnimatedStyle(() => ({
+                      backgroundColor: interpolateColor(doneAnim.value, [0, 1], ["rgba(139, 148, 158, 0.12)", "rgba(63, 185, 80, 0.15)"]),
+                      transform: [{ scale: interpolate(doneAnim.value, [0, 0.5, 1], [1, 1.2, 1]) }]
+                    }))
+                  ]}>
+                    {task.done ? (
+                      <Feather name="check-circle" size={14} color={colors.ghGreen} />
+                    ) : (
+                      <Feather name="circle" size={14} color={colors.ghMuted} />
+                    )}
+                  </Animated.View>
                   <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 0 }]}>
                     STATUS
                   </Text>
@@ -983,36 +1041,40 @@ export default function DetailPanel({
                       onToggleDone(task.id);
                     }
                   }}
-                  style={[styles.statusToggle, { backgroundColor: task.done ? "rgba(63, 185, 80, 0.08)" : colors.ghSurface2, padding: 10, borderRadius: 8 }]}
                 >
-                  <View
-                    style={[
-                      styles.statusCircle,
-                      {
-                        borderColor: task.done
-                          ? colors.ghGreen
-                          : colors.ghBorder2,
-                        backgroundColor: task.done
-                          ? colors.ghGreen
-                          : "transparent",
-                      },
-                    ]}
-                  >
-                    {task.done && (
-                      <Text style={{ color: "#fff", fontSize: 10 }}>✓</Text>
-                    )}
-                  </View>
-                  <Text
-                    style={{
-                      color: task.done ? colors.ghGreen : colors.ghText,
-                      fontWeight: "600",
-                      fontSize: 13,
-                    }}
-                  >
-                    {task.done ? "Completed" : "Mark complete"}
-                  </Text>
+                  <Animated.View style={[
+                    styles.statusToggle,
+                    { padding: 10, borderRadius: 8 },
+                    useAnimatedStyle(() => ({
+                      backgroundColor: interpolateColor(doneAnim.value, [0, 1], [colors.ghSurface2, "rgba(63, 185, 80, 0.08)"])
+                    }))
+                  ]}>
+                    <Animated.View
+                      style={[
+                        styles.statusCircle,
+                        useAnimatedStyle(() => ({
+                          borderColor: interpolateColor(doneAnim.value, [0, 1], [colors.ghBorder2, colors.ghGreen]),
+                          backgroundColor: interpolateColor(doneAnim.value, [0, 1], ["transparent", colors.ghGreen])
+                        }))
+                      ]}
+                    >
+                      {task.done && (
+                        <Text style={{ color: "#fff", fontSize: 10 }}>✓</Text>
+                      )}
+                    </Animated.View>
+                    <Animated.Text
+                      style={[
+                        { fontWeight: "600", fontSize: 13 },
+                        useAnimatedStyle(() => ({
+                          color: interpolateColor(doneAnim.value, [0, 1], [colors.ghText, colors.ghGreen])
+                        }))
+                      ]}
+                    >
+                      {task.done ? "Completed" : "Mark complete"}
+                    </Animated.Text>
+                  </Animated.View>
                 </TouchableOpacity>
-              </View>
+              </Animated.View>
 
               {/* Priority Card */}
               {(() => {
@@ -1107,6 +1169,33 @@ export default function DetailPanel({
                   </Text>
                 </View>
 
+                {/* Next Reminder Countdown */}
+                <View style={{ width: "50%", padding: 5 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                    <View style={{ backgroundColor: "rgba(207, 34, 46, 0.12)", width: 28, height: 28, borderRadius: 7, alignItems: "center", justifyContent: "center", marginRight: 8 }}>
+                      <Feather name="bell" size={13} color={colors.ghRed} />
+                    </View>
+                    <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 0 }]}>
+                      NEXT REMINDER
+                    </Text>
+                  </View>
+                  {nextReminder ? (
+                    <Text style={{ color: colors.ghText, fontSize: 16, fontWeight: "700", fontFamily: "monospace" }}>
+                      {(() => {
+                        const diff = nextReminder.getTime() - nowTime;
+                        if (diff <= 0) return "Triggering...";
+                        const m = Math.floor(diff / 60000);
+                        const s = Math.floor((diff % 60000) / 1000);
+                        return `${m}m ${s}s`;
+                      })()}
+                    </Text>
+                  ) : (
+                    <Text style={{ color: colors.ghMuted, fontSize: 16, fontWeight: "500", fontFamily: "monospace" }}>
+                      None
+                    </Text>
+                  )}
+                </View>
+
                 {/* Time Spent */}
                 <View style={{ width: "50%", padding: 5 }}>
                   <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
@@ -1136,7 +1225,7 @@ export default function DetailPanel({
               </View>
               
               {(() => {
-                const createdAtStr = formatCustomDate(new Date(task.createdAt));
+                const createdAtStr = task.createdAt ? formatCustomDate(new Date(task.createdAt)) : "-";
                 
                 let execStartStr = "-";
                 if (task.execStartDate) {
@@ -1207,7 +1296,7 @@ export default function DetailPanel({
                 };
 
                 const renderAttr = (label: string, value: string, color: string = colors.ghText, isLast: boolean = false) => (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: isLast ? 0 : 1, borderBottomColor: colors.ghBorder }}>
+                  <View key={label} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: isLast ? 0 : 1, borderBottomColor: colors.ghBorder }}>
                     <View style={{ width: 24, height: 24, borderRadius: 6, backgroundColor: `${(attrIconMap[label]?.color || colors.ghMuted)}15`, alignItems: "center", justifyContent: "center", marginRight: 10 }}>
                       <Feather name={(attrIconMap[label]?.name || "info") as any} size={12} color={attrIconMap[label]?.color || colors.ghMuted} />
                     </View>
@@ -1256,96 +1345,37 @@ export default function DetailPanel({
           tabName="checklist"
           tabBarWidth={tabBarWidth}
         >
-            {/* Progress Card */}
-            <View style={{ backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 14, marginBottom: 16 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
-                <View style={{ backgroundColor: `${progress.color}20`, width: 28, height: 28, borderRadius: 7, alignItems: "center", justifyContent: "center", marginRight: 8 }}>
-                  <Feather name="bar-chart-2" size={13} color={progress.color} />
-                </View>
-                <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 0, flex: 1 }]}>
-                  SUBTASK COMPLETION
-                </Text>
-                <Text style={[styles.progressValue, { color: progress.color }]}>
-                  {progress.pct}%
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.progressBar,
-                  { backgroundColor: colors.ghBorder, height: 6, borderRadius: 3 },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.progressBarFill,
-                    {
-                      backgroundColor: progress.color,
-                      width: `${progress.pct}%`,
-                      borderRadius: 3,
-                    },
-                  ]}
-                />
-              </View>
-            </View>
-
-            {/* Checklist Card */}
-            <View style={{ backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 14, marginBottom: 16 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: subtasks.length > 0 ? 8 : 0 }}>
+            {/* Checklist Header Card */}
+            <View style={{ backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 14, marginBottom: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <View style={{ backgroundColor: "rgba(86, 212, 221, 0.12)", width: 28, height: 28, borderRadius: 7, alignItems: "center", justifyContent: "center", marginRight: 8 }}>
                   <Octicons name="tasklist" size={13} color={"#56d4dd"} />
                 </View>
-                <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 0, flex: 1 }]}>
-                  CHECKLIST
-                </Text>
-                <Text style={{ color: colors.ghMuted, fontSize: 11, fontWeight: "500" }}>
-                  {subtasksDone}/{totalSubtasks}
+                <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 0 }]}>
+                  CHECKLIST ({subtasksDone}/{totalSubtasks})
                 </Text>
               </View>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: colors.ghBlue,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 8,
+                }}
+                onPress={() => setIsAddSubtaskModalOpen(true)}
+              >
+                <Feather name="plus" size={12} color={"#ffffff"} style={{ marginRight: 4 }} />
+                <Text style={{ color: "#ffffff", fontSize: 11, fontWeight: "600" }}>
+                  Add Task
+                </Text>
+              </TouchableOpacity>
+            </View>
 
-              {subtasks.map((sub, idx) => (
-                <TouchableOpacity
-                  key={sub.id}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    paddingVertical: 11,
-                    paddingHorizontal: 4,
-                    borderBottomWidth: idx < subtasks.length - 1 ? 1 : 0,
-                    borderBottomColor: colors.ghBorder,
-                    gap: 10,
-                  }}
-                  onPress={() => handleToggleSubtask(sub.id)}
-                >
-                  <View
-                    style={[
-                      styles.checkCircle,
-                      {
-                        borderColor: sub.done
-                          ? colors.ghGreen
-                          : colors.ghBorder2,
-                        backgroundColor: sub.done
-                          ? colors.ghGreen
-                          : "transparent",
-                      },
-                    ]}
-                  >
-                    {sub.done && (
-                      <Octicons name="check" size={10} color="#ffffff" />
-                    )}
-                  </View>
-                  <Text
-                    style={[
-                      styles.checkText,
-                      { color: sub.done ? colors.ghMuted : colors.ghText },
-                      sub.done && styles.lineThrough,
-                    ]}
-                  >
-                    {sub.title}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-
-              {subtasks.length === 0 && (
+            {/* Subtasks List */}
+            {subtasks.length === 0 ? (
+              <View style={{ backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 14 }}>
                 <View style={{ alignItems: "center", paddingVertical: 24 }}>
                   <View style={{ backgroundColor: "rgba(139, 148, 158, 0.08)", width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", marginBottom: 8 }}>
                     <Octicons name="tasklist" size={18} color={colors.ghMuted} />
@@ -1354,53 +1384,61 @@ export default function DetailPanel({
                     No subtasks added yet
                   </Text>
                 </View>
-              )}
-            </View>
-
-            {/* Add subtask */}
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <TextInput
-                style={[
-                  styles.subtaskInput,
-                  {
-                    color: colors.ghText,
-                    backgroundColor: colors.ghSurface,
-                    borderColor: colors.ghBorder,
-                    borderWidth: 1,
-                    borderRadius: 10,
-                    height: 40,
-                  },
-                ]}
-                placeholder="Add subtask..."
-                placeholderTextColor={colors.ghMuted}
-                value={newSubtaskTitle}
-                onChangeText={setNewSubtaskTitle}
-                onSubmitEditing={handleAddSubtaskSubmit}
-              />
-              <TouchableOpacity
-                style={[
-                  styles.addSubtaskBtn,
-                  {
-                    backgroundColor: newSubtaskTitle.trim()
-                      ? colors.ghBlue
-                      : colors.ghSurface,
-                    borderColor: colors.ghBorder,
-                    borderWidth: 1,
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                  },
-                ]}
-                onPress={handleAddSubtaskSubmit}
-                disabled={!newSubtaskTitle.trim()}
-              >
-                <Octicons
-                  name="plus"
-                  size={14}
-                  color={newSubtaskTitle.trim() ? "#ffffff" : colors.ghMuted}
-                />
-              </TouchableOpacity>
-            </View>
+              </View>
+            ) : (
+              <View style={{ backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 14, marginBottom: 16 }}>
+                {subtasks.map((sub, idx) => (
+                  <TouchableOpacity
+                    key={sub.id}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "flex-start",
+                      paddingVertical: 11,
+                      paddingHorizontal: 4,
+                      borderBottomWidth: idx < subtasks.length - 1 ? 1 : 0,
+                      borderBottomColor: colors.ghBorder,
+                      gap: 10,
+                    }}
+                    onPress={() => handleToggleSubtaskPress(sub.id)}
+                  >
+                    <View
+                      style={[
+                        styles.checkCircle,
+                        {
+                          borderColor: sub.done
+                            ? colors.ghGreen
+                            : colors.ghBorder2,
+                          backgroundColor: sub.done
+                            ? colors.ghGreen
+                            : "transparent",
+                          marginTop: 2,
+                        },
+                      ]}
+                    >
+                      {sub.done && (
+                        <Octicons name="check" size={10} color="#ffffff" />
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[
+                          styles.checkText,
+                          { color: sub.done ? colors.ghMuted : colors.ghText },
+                          sub.done && styles.lineThrough,
+                        ]}
+                      >
+                        {sub.title}
+                      </Text>
+                      {sub.description ? (
+                        <Text style={{ color: colors.ghMuted, fontSize: 12, marginTop: 4 }}>
+                          {sub.description}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </TabPage>
 
         <TabPage
@@ -1669,6 +1707,26 @@ export default function DetailPanel({
         warningNote="Note: This change is irreversible."
         colors={colors}
         successText="Task Completed!"
+      />
+      
+      <ConfirmationModal
+        visible={!!subtaskToConfirm}
+        onClose={() => setSubtaskToConfirm(null)}
+        onConfirm={() => {
+          if (subtaskToConfirm) handleToggleSubtask(subtaskToConfirm);
+          setSubtaskToConfirm(null);
+        }}
+        title="Complete Subtask"
+        description={`Mark "${subtasks.find(s => s.id === subtaskToConfirm)?.title}" as completed?`}
+        colors={colors}
+        successText="Subtask Completed!"
+      />
+      
+      <AddSubtaskModal
+        visible={isAddSubtaskModalOpen}
+        onClose={() => setIsAddSubtaskModalOpen(false)}
+        onAdd={handleAddSubtask}
+        colors={colors}
       />
 
     </Animated.View>
