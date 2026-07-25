@@ -22,6 +22,8 @@ class AlarmService : Service() {
     private var mediaPlayer: MediaPlayer? = null
     private var vibrator: Vibrator? = null
     private var wakeLock: PowerManager.WakeLock? = null
+    private var phase2Handler: android.os.Handler? = null
+    private var phase2Runnable: Runnable? = null
 
     companion object {
         const val CHANNEL_ID = "eidon_alarm_channel"
@@ -131,45 +133,54 @@ class AlarmService : Service() {
             Log.e("EidonAlarm", "Failed to directly launch activity", e)
         }
 
-        // 5. Play Sound (custom URI fallback)
+        // 5. Play Sound natively (Phase 1: sound 3, Phase 2: sound 2 after 60s)
         try {
-            // First try custom sound URI stored in SharedPreferences
-            val prefs = getSharedPreferences("eidon_alarm_prefs", Context.MODE_PRIVATE)
-            val customUri = prefs.getString("alarm_sound_path", null)
             val audioAttributes = AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .setUsage(AudioAttributes.USAGE_ALARM)
                 .build()
+
+            // Phase 1: Play sound 3 once (no loop)
             mediaPlayer = MediaPlayer().apply {
                 setAudioAttributes(audioAttributes)
-                var sourceSet = false
-                if (!customUri.isNullOrEmpty() && customUri != "notification_sound_1") {
-                    try {
-                        setDataSource(applicationContext, android.net.Uri.parse(customUri))
-                        Log.d("EidonAlarm", "Playing custom alarm sound from $customUri")
-                        sourceSet = true
-                    } catch (e: Exception) {
-                        Log.e("EidonAlarm", "Failed to set custom sound, falling back to default", e)
-                    }
+                val sound3ResId = resources.getIdentifier("notification_sound_3", "raw", packageName)
+                if (sound3ResId != 0) {
+                    val afd = resources.openRawResourceFd(sound3ResId)
+                    setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                    afd.close()
                 }
-                if (!sourceSet) {
-                    // Fallback to default raw resource
-                    val soundResId = resources.getIdentifier("notification_sound_1", "raw", packageName)
-                    if (soundResId != 0) {
-                        val afd = resources.openRawResourceFd(soundResId)
-                        setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
-                        afd.close()
-                        Log.d("EidonAlarm", "Playing default alarm sound from raw resource")
-                    } else {
-                        Log.w("EidonAlarm", "Default alarm sound resource not found")
-                    }
-                }
-                isLooping = true
-                setOnCompletionListener { start() }
+                isLooping = false
                 prepare()
                 start()
             }
-            Log.d("EidonAlarm", "Alarm sound started (custom or default)")
+            Log.d("EidonAlarm", "Playing Phase 1 alarm sound (sound 3)")
+
+            // Phase 2: Schedule sound 2 to loop after 60 seconds
+            phase2Handler = android.os.Handler(android.os.Looper.getMainLooper())
+            phase2Runnable = Runnable {
+                try {
+                    mediaPlayer?.stop()
+                    mediaPlayer?.release()
+                    mediaPlayer = MediaPlayer().apply {
+                        setAudioAttributes(audioAttributes)
+                        val sound2ResId = resources.getIdentifier("notification_sound_2", "raw", packageName)
+                        if (sound2ResId != 0) {
+                            val afd = resources.openRawResourceFd(sound2ResId)
+                            setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                            afd.close()
+                        }
+                        isLooping = true
+                        setOnCompletionListener { start() }
+                        prepare()
+                        start()
+                    }
+                    Log.d("EidonAlarm", "Switched to Phase 2 alarm sound (sound 2 looped)")
+                } catch (e: Exception) {
+                    Log.e("EidonAlarm", "Failed to switch to Phase 2 sound", e)
+                }
+            }
+            phase2Handler?.postDelayed(phase2Runnable!!, 60000)
+            
         } catch (e: Exception) {
             Log.e("EidonAlarm", "Failed to play alarm sound", e)
         }
@@ -202,6 +213,12 @@ class AlarmService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         Log.d("EidonAlarm", "AlarmService onDestroy — stopping alarm")
+        try {
+            phase2Runnable?.let { phase2Handler?.removeCallbacks(it) }
+            phase2Handler = null
+            phase2Runnable = null
+        } catch (e: Exception) {}
+
         try {
             mediaPlayer?.stop()
             mediaPlayer?.release()

@@ -129,6 +129,7 @@ interface DetailPanelProps {
   onClose: () => void;
   onToggleDone: (id: string) => void;
   onUpdateTask: (updated: Task) => void;
+  onEditTask?: (task: Task) => void;
   isTimerRunning: boolean;
   timerSeconds: number;
   onStartTimer: (id: string) => void;
@@ -402,6 +403,7 @@ export default function DetailPanel({
   onClose,
   onToggleDone,
   onUpdateTask,
+  onEditTask,
   isTimerRunning,
   timerSeconds,
   onStartTimer,
@@ -879,9 +881,16 @@ export default function DetailPanel({
         >
           {task.title}
         </Text>
-        <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
-          <Text style={{ color: colors.ghMuted, fontSize: 20 }}>×</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          {onEditTask && (
+            <TouchableOpacity onPress={() => onEditTask(task)} style={{ padding: 4 }}>
+              <Feather name="edit-2" size={16} color={colors.ghMuted} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
+            <Text style={{ color: colors.ghMuted, fontSize: 20 }}>×</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </>
   );

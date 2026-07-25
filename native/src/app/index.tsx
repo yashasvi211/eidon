@@ -138,6 +138,7 @@ export default function AppIndex() {
 
   const [showCompleted, setShowCompleted] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [errorModalTitle, setErrorModalTitle] = useState("");
   const [errorModalMessage, setErrorModalMessage] = useState("");
@@ -301,8 +302,11 @@ export default function AppIndex() {
       };
 
       if (currentStyle === 'fullscreen') {
-        // Full-screen alarm mode
-        setFullScreenNotification(newNotification);
+        // Full-screen alarm mode — don't fire if one is already active
+        setFullScreenNotification(prev => {
+          if (prev) return prev; // Already showing a reminder, skip this one
+          return newNotification;
+        });
         // Also sync the local state
         setReminderStyle(currentSettings.reminderStyle || 'banner');
         setReminderRequireAuth(currentSettings.reminderRequireAuth || false);
@@ -346,11 +350,15 @@ export default function AppIndex() {
       if (currentStyle === 'fullscreen') {
         const { title, body } = request.content;
         const task = tasksRef.current.find(t => t.id === taskId);
-        setFullScreenNotification({
-          taskId,
-          taskTitle: title || task?.title || 'Reminder',
-          message: body || '',
-          dueDate: task?.due || '',
+        // Don't fire if an alarm is already active
+        setFullScreenNotification(prev => {
+          if (prev) return prev;
+          return {
+            taskId,
+            taskTitle: title || task?.title || 'Reminder',
+            message: body || '',
+            dueDate: task?.due || '',
+          };
         });
         setReminderStyle(currentSettings.reminderStyle || 'banner');
         setReminderRequireAuth(currentSettings.reminderRequireAuth || false);
@@ -754,6 +762,33 @@ export default function AppIndex() {
       });
   };
 
+  const handleSaveEditTask = (
+    taskToEdit: Task,
+    title: string,
+    project: string = "Inbox",
+    due?: string,
+    reminderConfig?: ReminderConfig,
+    dueTime?: string,
+    priority?: 'High' | 'Moderate' | 'Low',
+    execStartDate?: string,
+    execStartTime?: string,
+  ) => {
+    const updatedTask: Task = {
+      ...taskToEdit,
+      title,
+      project,
+      due,
+      dueTime,
+      priority,
+      execStartDate,
+      execStartTime,
+      reminder: reminderConfig
+        ? { ...reminderConfig, lastNotifiedAt: taskToEdit.reminder?.lastNotifiedAt || 0, dismissed: taskToEdit.reminder?.dismissed || false }
+        : undefined,
+    };
+    handleUpdateTask(updatedTask);
+  };
+
   const handleStartTimer = (taskId: string) => {
     setIsTimerRunning(true);
     setActiveTimerTaskId(taskId);
@@ -1042,6 +1077,7 @@ export default function AppIndex() {
                     onClose={() => setSelectedTaskId(null)}
                     onToggleDone={toggleDone}
                     onUpdateTask={handleUpdateTask}
+                    onEditTask={(task) => setEditingTask(task)}
                     isTimerRunning={isTimerRunning}
                     timerSeconds={timerSeconds}
                     onStartTimer={handleStartTimer}
@@ -1062,6 +1098,7 @@ export default function AppIndex() {
                   onClose={() => setSelectedTaskId(null)}
                   onToggleDone={toggleDone}
                   onUpdateTask={handleUpdateTask}
+                  onEditTask={(task) => setEditingTask(task)}
                   isTimerRunning={isTimerRunning}
                   timerSeconds={timerSeconds}
                   onStartTimer={handleStartTimer}
@@ -1126,6 +1163,18 @@ export default function AppIndex() {
         onClose={() => setShowAddModal(false)}
         onAdd={handleAddTask}
         projects={projects}
+      />
+
+      <AddTaskModal
+        visible={editingTask !== null}
+        onClose={() => setEditingTask(null)}
+        onAdd={(title, project, due, reminder, dueTime, priority, execStartDate, execStartTime) => {
+          if (editingTask) {
+            handleSaveEditTask(editingTask, title, project, due, reminder, dueTime, priority, execStartDate, execStartTime);
+          }
+        }}
+        projects={projects}
+        initialTask={editingTask}
       />
 
       <Modal

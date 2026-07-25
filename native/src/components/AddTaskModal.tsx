@@ -26,6 +26,7 @@ interface AddTaskModalProps {
   onClose: () => void;
   onAdd: (title: string, project: string, due?: string, reminder?: ReminderConfig, dueTime?: string, priority?: 'High' | 'Moderate' | 'Low', execStartDate?: string, execStartTime?: string) => void;
   projects: Project[];
+  initialTask?: any;
 }
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -65,7 +66,7 @@ import SelectModal from './sub_components/SelectModal';
 
 // ─── Main Modal ────────────────────────────────────────────────────────────────
 
-export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddTaskModalProps) {
+export default function AddTaskModal({ visible, onClose, onAdd, projects, initialTask }: AddTaskModalProps) {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
 
@@ -139,6 +140,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
 
   useEffect(() => {
     if (visible) {
+      reset();
       scaleAnim.setValue(0.9);
       opacityAnim.setValue(0);
       RNAnimated.parallel([
@@ -155,7 +157,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
         }),
       ]).start();
     }
-  }, [visible]);
+  }, [visible, initialTask]);
 
   const animateClose = (callback: () => void) => {
     RNAnimated.parallel([
@@ -175,18 +177,30 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
   // ── Handlers ──
 
   const reset = () => {
-    setTitle('');
-    setProject('Inbox');
-    setDue(null);
-    setDueTime(null);
-    setExecStartDate(null);
-    setExecStartTime(null);
+    if (initialTask) {
+      setTitle(initialTask.title);
+      setProject(initialTask.target || 'Inbox');
+      setDue(initialTask.due || null);
+      setDueTime(initialTask.dueTime || null);
+      setRemindBefore(initialTask.reminder?.remindBefore ?? null);
+      setRepeatEvery(initialTask.reminder?.repeatEvery ?? null);
+      setPriority(initialTask.priority || 'Low');
+      setExecStartDate(initialTask.execStartDate || null);
+      setExecStartTime(initialTask.execStartTime || null);
+    } else {
+      setTitle('');
+      setProject('Inbox');
+      setDue(null);
+      setDueTime(null);
+      setRemindBefore(null);
+      setRepeatEvery(null);
+      setPriority('Low');
+      setExecStartDate(null);
+      setExecStartTime(null);
+    }
     setCalendarMode(null);
     setClockMode(null);
     setShowConfirm(false);
-    setPriority('Low');
-    setRemindBefore(null);
-    setRepeatEvery(null);
     setShowOffsetDropdown(false);
     setShowRepeatDropdown(false);
   };
@@ -314,7 +328,9 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects }: AddT
         <RNAnimated.View style={[styles.overlay, { opacity: opacityAnim }]}>
           <RNAnimated.View style={[styles.modal, { backgroundColor: colors.ghSurface, borderColor: colors.ghBorder, transform: [{ scale: scaleAnim }] }]}>
             <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              <Text style={[styles.modalTitle, { color: colors.ghText }]}>New Task</Text>
+              <Text style={[styles.modalTitle, { color: colors.ghText }]}>
+                {initialTask ? 'Edit Task' : 'Add Task'}
+              </Text>
 
               {/* ── Title ── */}
               <Text style={[styles.label, { color: colors.ghMuted }]}>Title</Text>

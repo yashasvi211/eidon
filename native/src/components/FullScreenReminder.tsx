@@ -4,17 +4,13 @@ import {
   Text,
   Modal,
   StyleSheet,
-  TouchableOpacity,
   TextInput,
-  useColorScheme,
-  useWindowDimensions,
   KeyboardAvoidingView,
   Platform,
-  Image,
   StatusBar,
+  BackHandler,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import * as LocalAuthentication from "expo-local-authentication";
 import { Feather } from "@expo/vector-icons";
 import * as EidonAlarm from "../../modules/expo-eidon-alarm";
 import Animated, {
@@ -22,23 +18,32 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   withSpring,
+  withRepeat,
+  withSequence,
   withDelay,
   interpolate,
   Extrapolation,
   runOnJS,
+  Easing,
   FadeIn,
-  FadeOut,
-  SlideInDown,
 } from "react-native-reanimated";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { Colors } from "../constants/theme";
+import {
+  GestureHandlerRootView,
+  Gesture,
+  GestureDetector,
+} from "react-native-gesture-handler";
 import { Task } from "./DetailPanel";
 import { NotificationData } from "./NotificationBanner";
 import SwipeButton from "./sub_components/SwipeButton";
+import ConfirmationModal from "./sub_components/ConfirmationModal";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
-type ReminderPhase = "locked" | "details" | "acknowledge" | "reflect" | "final_confirm";
+type ReminderPhase =
+  | "countdown"           // Initial 60s — circle + STABILIZE / DEFER slides
+  | "details"             // After STABILIZE — task details + response input
+  | "uncontained"         // 60s expired — escalation stage, sound_2 plays
+  | "uncontained_details"; // After STABILIZE in uncontained — response input
 
 interface FullScreenReminderProps {
   visible: boolean;
@@ -50,17 +55,10 @@ interface FullScreenReminderProps {
   colors: any;
 }
 
-// ─── Helpers ───────────────────────────────────────────────────────────────────
+// ─── Singleton guard — prevent two alarms from running at once ──────────────────
+let _isAlarmActive = false;
 
-const fmtDateDisplay = (iso?: string) => {
-  if (!iso) return "";
-  const [y, m, d] = iso.split("-").map(Number);
-  const months = [
-    "Jan","Feb","Mar","Apr","May","Jun",
-    "Jul","Aug","Sep","Oct","Nov","Dec",
-  ];
-  return `${months[m - 1]} ${d}, ${y}`;
-};
+// ─── Helpers ───────────────────────────────────────────────────────────────────
 
 const getDeadlineLabel = (dueDate?: string) => {
   if (!dueDate) return "";
@@ -84,12 +82,274 @@ const getDeadlineColor = (dueDate?: string) => {
   const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
   if (diffDays < 0) return "#f85149";
   if (diffDays === 0) return "#e3b341";
-  if (diffDays === 1) return "#f0883e";
   if (diffDays <= 2) return "#f0883e";
   return "#3fb950";
 };
 
-// ─── Component ─────────────────────────────────────────────────────────────────
+// ─── Pulsing Countdown Circle ───────────────────────────────────────────────────
+// A sleek glowing circle that pulses and shrinks slightly as time decreases.
+// Replaces the arc approach to avoid clipping glitches.
+
+function PulsingCountdownCircle({
+  seconds,
+  totalSeconds,
+  color,
+  size = 220,
+}: {
+  seconds: number;
+  totalSeconds: number;
+  color: string;
+  size?: number;
+}) {
+  const progress = totalSeconds > 0 ? seconds / totalSeconds : 0;
+  
+  // Outer glowing pulse
+  const pulseAnim = useSharedValue(1);
+  useEffect(() => {
+    pulseAnim.value = withRepeat(
+      withSequence(
+        withTiming(1.15, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(0.95, { duration: 1000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+  }, []);
+
+  const outerStyle = useAnimatedStyle(() => ({
+    width: size,
+    height: size,
+    borderRadius: size / 2,
+    backgroundColor: `${color}1A`,
+    position: "absolute",
+    transform: [{ scale: pulseAnim.value }],
+  }));
+
+  // Inner solid circle that shrinks with progress
+  const innerScale = useSharedValue(progress);
+  useEffect(() => {
+    innerScale.value = withTiming(progress, { duration: 950, easing: Easing.linear });
+  }, [progress]);
+
+  const innerStyle = useAnimatedStyle(() => ({
+    width: size * 0.9,
+    height: size * 0.9,
+    borderRadius: (size * 0.9) / 2,
+    backgroundColor: `${color}33`,
+    borderWidth: 2,
+    borderColor: color,
+    position: "absolute",
+    transform: [{ scale: innerScale.value * 0.3 + 0.7 }], // Scale between 0.7 and 1.0
+  }));
+
+  return (
+    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
+      <Animated.View style={outerStyle} />
+      <Animated.View style={innerStyle} />
+      
+      {/* Countdown number */}
+      <Text
+        style={{
+          fontSize: size * 0.35,
+          fontWeight: "300",
+          color: "#ffffff",
+          fontVariant: ["tabular-nums"],
+          letterSpacing: -2,
+          zIndex: 10,
+        }}
+      >
+        {seconds}
+      </Text>
+    </View>
+  );
+}
+
+// ─── Pixel-style Slide Button ──────────────────────────────────────────────────
+
+interface PixelSlideButtonProps {
+  icon: string;
+  iconColor: string;
+  iconBgColor: string;
+  label: string;
+  trackColor: string;
+  onSlideComplete: () => void;
+}
+
+function PixelSlideButton({
+  icon,
+  iconColor,
+  iconBgColor,
+  label,
+  trackColor,
+  onSlideComplete,
+}: PixelSlideButtonProps) {
+  const [trackWidth, setTrackWidth] = useState(0);
+  const translateX = useSharedValue(0);
+  const thumbSize = 52;
+  const padding = 4;
+
+  const panGesture = Gesture.Pan()
+    .activeOffsetX([10, -10])
+    .failOffsetY([-15, 15])
+    .onUpdate((event) => {
+      const maxTranslate = Math.max(0, trackWidth - thumbSize - padding * 2);
+      translateX.value = Math.max(
+        0,
+        Math.min(event.translationX, maxTranslate)
+      );
+    })
+    .onEnd(() => {
+      const maxTranslate = Math.max(0, trackWidth - thumbSize - padding * 2);
+      if (translateX.value > maxTranslate * 0.75) {
+        translateX.value = withSpring(maxTranslate, {
+          damping: 24,
+          stiffness: 300,
+          mass: 0.7,
+        }, (finished) => {
+          if (finished) {
+            runOnJS(onSlideComplete)();
+          }
+        });
+      } else {
+        translateX.value = withSpring(0, {
+          damping: 24,
+          stiffness: 300,
+          mass: 0.7,
+        });
+      }
+    });
+
+  const animatedThumbStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  const animatedLabelStyle = useAnimatedStyle(() => {
+    const maxTranslate = Math.max(1, trackWidth - thumbSize - padding * 2);
+    return {
+      opacity: interpolate(
+        translateX.value,
+        [0, maxTranslate * 0.5],
+        [1, 0],
+        Extrapolation.CLAMP
+      ),
+    };
+  });
+
+  return (
+    <View
+      onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
+      style={[slideStyles.track, { backgroundColor: trackColor }]}
+    >
+      <Animated.Text style={[slideStyles.label, animatedLabelStyle]}>
+        {label}
+      </Animated.Text>
+      <GestureDetector gesture={panGesture}>
+        <Animated.View
+          style={[
+            slideStyles.thumb,
+            { backgroundColor: iconBgColor },
+            animatedThumbStyle,
+          ]}
+        >
+          <Feather name={icon as any} size={22} color={iconColor} />
+        </Animated.View>
+      </GestureDetector>
+    </View>
+  );
+}
+
+const slideStyles = StyleSheet.create({
+  track: {
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
+    position: "relative",
+    overflow: "hidden",
+    marginBottom: 12,
+  },
+  label: {
+    position: "absolute",
+    alignSelf: "center",
+    fontSize: 15,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.85)",
+    marginLeft: 40,
+    letterSpacing: 1,
+    textTransform: "uppercase",
+  },
+  thumb: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+    position: "absolute",
+    left: 4,
+    top: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+});
+
+// ─── Sound Wave Bars ───────────────────────────────────────────────────────────
+
+function SoundWaveIndicator() {
+  const bar0 = useSharedValue(0);
+  const bar1 = useSharedValue(0);
+  const bar2 = useSharedValue(0);
+  const bar3 = useSharedValue(0);
+  const bar4 = useSharedValue(0);
+  const delays = [0, 100, 200, 300, 150];
+
+  useEffect(() => {
+    const allBars = [bar0, bar1, bar2, bar3, bar4];
+    allBars.forEach((bar, i) => {
+      bar.value = withDelay(
+        delays[i],
+        withRepeat(
+          withSequence(
+            withTiming(1, { duration: 400, easing: Easing.inOut(Easing.ease) }),
+            withTiming(0.3, { duration: 400, easing: Easing.inOut(Easing.ease) })
+          ),
+          -1,
+          true
+        )
+      );
+    });
+  }, []);
+
+  const s0 = useAnimatedStyle(() => ({ height: interpolate(bar0.value, [0, 1], [8, 24], Extrapolation.CLAMP) }));
+  const s1 = useAnimatedStyle(() => ({ height: interpolate(bar1.value, [0, 1], [8, 24], Extrapolation.CLAMP) }));
+  const s2 = useAnimatedStyle(() => ({ height: interpolate(bar2.value, [0, 1], [8, 24], Extrapolation.CLAMP) }));
+  const s3 = useAnimatedStyle(() => ({ height: interpolate(bar3.value, [0, 1], [8, 24], Extrapolation.CLAMP) }));
+  const s4 = useAnimatedStyle(() => ({ height: interpolate(bar4.value, [0, 1], [8, 24], Extrapolation.CLAMP) }));
+
+  const barBase = { width: 4, borderRadius: 2, backgroundColor: "rgba(255,255,255,0.6)" };
+
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 4, marginTop: 24 }}>
+      <Animated.View style={[barBase, s0]} />
+      <Animated.View style={[barBase, s1]} />
+      <Animated.View style={[barBase, s2]} />
+      <Animated.View style={[barBase, s3]} />
+      <Animated.View style={[barBase, s4]} />
+    </View>
+  );
+}
+
+// ─── Constants ─────────────────────────────────────────────────────────────────
+
+const COUNTDOWN_SECONDS = 60;
+const UNCONTAINED_SOUND_SECONDS = 45;
+
+// Audio sources
+const sound3Source = require("../../assets/notification/notification_sound_3.mp3");
+const sound2Source = require("../../assets/notification/notification_sound_2.mp3");
+
+// ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function FullScreenReminder({
   visible,
@@ -101,148 +361,226 @@ export default function FullScreenReminder({
   colors,
 }: FullScreenReminderProps) {
   const insets = useSafeAreaInsets();
-  const { width, height } = useWindowDimensions();
 
   // ── State ──
-  const [phase, setPhase] = useState<ReminderPhase>("locked");
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [phase, setPhase] = useState<ReminderPhase>("countdown");
+  const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
   const [reflectionText, setReflectionText] = useState("");
-  const [isAuthenticating, setIsAuthenticating] = useState(false);
-  const [authSuccess, setAuthSuccess] = useState(false);
+  const [uncontainedCountdown, setUncontainedCountdown] = useState(UNCONTAINED_SOUND_SECONDS);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  // ── Refs ──
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const uncontainedTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // ── Audio Players ──
+  // Note: Sound playback is now 100% handled natively by AlarmService.kt
+  // to ensure it survives the app being swiped away from recent apps.
 
   // ── Animations ──
   const overlayOpacity = useSharedValue(0);
   const contentScale = useSharedValue(0.9);
-  const phaseProgress = useSharedValue(0);
-  const authSuccessProgress = useSharedValue(0);
-  const finalSignatureProgress = useSharedValue(0);
+  const pulseAnim = useSharedValue(1);
 
-  // ── Clock tick ──
+  // ── Back button: block hardware back during alarm ──
   useEffect(() => {
     if (!visible) return;
-    const interval = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(interval);
+    const handler = BackHandler.addEventListener("hardwareBackPress", () => {
+      // Block back button — alarm cannot be dismissed this way
+      return true;
+    });
+    return () => handler.remove();
   }, [visible]);
 
-  // ── Start / stop alarm sound ──
-  const startAlarmSound = useCallback(() => {
-    // Handled completely by the native foreground service now!
-  }, []);
-
-  const stopAlarmSound = useCallback(() => {
-    console.log("STOP ALARM TRIGGERED. phase=", phase, "visible=", visible);
-    console.log(new Error().stack);
-    if (Platform.OS === 'android') {
-      try {
-        EidonAlarm.stopAlarm();
-      } catch (e) {
-        console.warn('Failed to stop EidonAlarm', e);
-      }
+  // ── Pulsing for uncontained stage ──
+  useEffect(() => {
+    if (phase === "uncontained") {
+      pulseAnim.value = withRepeat(
+        withSequence(
+          withTiming(1.06, { duration: 800, easing: Easing.inOut(Easing.ease) }),
+          withTiming(0.94, { duration: 800, easing: Easing.inOut(Easing.ease) })
+        ),
+        -1,
+        true
+      );
+    } else {
+      pulseAnim.value = withTiming(1, { duration: 300 });
     }
-  }, [phase, visible]);
+  }, [phase]);
+
+  const pulseStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulseAnim.value }],
+  }));
+
+  // ── Stop all sounds ──
+  const stopAllSounds = useCallback(() => {
+    // Stop native alarm service sound & vibration
+    if (Platform.OS === "android") {
+      try { EidonAlarm.stopAlarm(); } catch (e) {}
+    }
+  }, []);
 
   // ── Modal lifecycle ──
   useEffect(() => {
     if (visible && notification) {
-      // Reset state
-      setPhase(requireAuth ? "locked" : "details");
+      // Duplicate guard
+      if (_isAlarmActive) {
+        setIsBlocked(true);
+        return;
+      }
+      _isAlarmActive = true;
+      setIsBlocked(false);
+
+      // Reset all state for a fresh reminder
+      setPhase("countdown");
+      setCountdown(COUNTDOWN_SECONDS);
       setReflectionText("");
-      setIsAuthenticating(false);
-      setAuthSuccess(false);
-      authSuccessProgress.value = 0;
-      phaseProgress.value = 0;
-      finalSignatureProgress.value = 0;
+      setUncontainedCountdown(UNCONTAINED_SOUND_SECONDS);
+      setShowConfirmModal(false);
 
       // Animate in
       overlayOpacity.value = withTiming(1, { duration: 400 });
       contentScale.value = withSpring(1, { damping: 22, stiffness: 200, mass: 0.8 });
 
-      // Start alarm sound
-      startAlarmSound();
+      // Play sound_3 natively handled by AlarmService.kt
+      // No JS playback needed here.
+      // Start 60s countdown
+      countdownRef.current = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            if (countdownRef.current) clearInterval(countdownRef.current);
+            countdownRef.current = null;
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
     } else {
       // Animate out
       overlayOpacity.value = withTiming(0, { duration: 300 });
       contentScale.value = withTiming(0.9, { duration: 300 });
+
+      // Cleanup
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+        countdownRef.current = null;
+      }
+      if (uncontainedTimerRef.current) {
+        clearInterval(uncontainedTimerRef.current);
+        uncontainedTimerRef.current = null;
+      }
+      stopAllSounds();
+      _isAlarmActive = false;
     }
+
+    return () => {
+      // Always release the lock on unmount to prevent it getting stuck
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+        countdownRef.current = null;
+      }
+      if (uncontainedTimerRef.current) {
+        clearInterval(uncontainedTimerRef.current);
+        uncontainedTimerRef.current = null;
+      }
+      _isAlarmActive = false;
+    };
   }, [visible, notification]);
 
-  // ── Phase transitions stop alarm ──
+  // ── Countdown reaches 0 → enter uncontained ──
   useEffect(() => {
-    if (phase === "final_confirm") {
-      // Stop alarm when user has finished reflecting
-      stopAlarmSound();
+    if (countdown === 0 && phase === "countdown") {
+      setPhase("uncontained");
     }
+  }, [countdown, phase]);
+
+  // ── Enter uncontained — switch to sound_2 (looped) ──
+  useEffect(() => {
+    if (phase === "uncontained") {
+      // Sound switch to looped phase 2 is handled natively by AlarmService.kt
+
+      // Stop native alarm service (it was running sound_3 via the service)
+      if (Platform.OS === "android") {
+        try { EidonAlarm.stopAlarm(); } catch (e) {}
+      }
+
+      setUncontainedCountdown(UNCONTAINED_SOUND_SECONDS);
+      uncontainedTimerRef.current = setInterval(() => {
+        setUncontainedCountdown((prev) => {
+          if (prev <= 1) {
+            if (uncontainedTimerRef.current) clearInterval(uncontainedTimerRef.current);
+            uncontainedTimerRef.current = null;
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (uncontainedTimerRef.current) {
+        clearInterval(uncontainedTimerRef.current);
+        uncontainedTimerRef.current = null;
+      }
+    };
   }, [phase]);
 
-  // ── Authentication ──
-  const handleAuthenticate = async () => {
-    setIsAuthenticating(true);
-    try {
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+  // ── Handlers ──
 
-      if (hasHardware && isEnrolled) {
-        const result = await LocalAuthentication.authenticateAsync({
-          promptMessage: "Authenticate to View Reminder",
-          fallbackLabel: "Use PIN",
-          disableDeviceFallback: false,
-        });
-        if (result.success) {
-          setAuthSuccess(true);
-          authSuccessProgress.value = withSpring(1, {
-            damping: 18,
-            stiffness: 45,
-            mass: 1.2,
-          });
-          setTimeout(() => {
-            setPhase("details");
-            setAuthSuccess(false);
-            authSuccessProgress.value = 0;
-          }, 1200);
-        }
-      } else {
-        // No biometric — skip auth
-        setAuthSuccess(true);
-        authSuccessProgress.value = withSpring(1, {
-          damping: 18,
-          stiffness: 45,
-          mass: 1.2,
-        });
-        setTimeout(() => {
-          setPhase("details");
-          setAuthSuccess(false);
-          authSuccessProgress.value = 0;
-        }, 1200);
-      }
-    } catch (e) {
-      console.warn("Authentication error:", e);
+  // STABILIZE CORE — move to details (sound keeps playing briefly until they type)
+  const handleStabilizeCore = useCallback(() => {
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current);
+      countdownRef.current = null;
     }
-    setIsAuthenticating(false);
-  };
+    // Stop sound 3 when moving to details — they have acknowledged
+    stopAllSounds();
+    setPhase("details");
+  }, [stopAllSounds]);
 
-  const handleAcknowledge = () => {
-    setPhase("reflect");
-  };
-
-  const handlePlanSubmitted = () => {
-    if (reflectionText.trim()) {
-      setPhase("final_confirm");
+  // DEFER CONTAINMENT — stop everything, dismiss
+  const handleDeferContainment = useCallback(() => {
+    stopAllSounds();
+    _isAlarmActive = false;
+    if (notification) {
+      onComplete(notification.taskId, "");
     }
-  };
+  }, [stopAllSounds, notification, onComplete]);
 
-  const handleSkipReflection = () => {
-    setPhase("final_confirm");
-  };
+  // Override — dismiss everything
+  const handleOverride = useCallback(() => {
+    stopAllSounds();
+    _isAlarmActive = false;
+    if (notification) {
+      onComplete(notification.taskId, "");
+    }
+  }, [stopAllSounds, notification, onComplete]);
 
-  const handleFinalize = () => {
-    // Play the signature animation then complete
-    finalSignatureProgress.value = withTiming(1, { duration: 1500 });
-    setTimeout(() => {
-      if (notification) {
-        onComplete(notification.taskId, reflectionText.trim());
-      }
-    }, 1500);
-  };
+  // Submit response — show confirmation modal
+  const handleSubmitResponse = useCallback(() => {
+    if (!reflectionText.trim()) return;
+    stopAllSounds();
+    setShowConfirmModal(true);
+  }, [reflectionText, stopAllSounds]);
+
+  // Confirmed in modal — complete
+  const handleConfirmed = useCallback(() => {
+    _isAlarmActive = false;
+    if (notification) {
+      onComplete(notification.taskId, reflectionText.trim());
+    }
+  }, [notification, onComplete, reflectionText]);
+
+  // Uncontained STABILIZE
+  const handleUncontainedStabilize = useCallback(() => {
+    if (uncontainedTimerRef.current) {
+      clearInterval(uncontainedTimerRef.current);
+      uncontainedTimerRef.current = null;
+    }
+    stopAllSounds();
+    setPhase("uncontained_details");
+  }, [stopAllSounds]);
 
   // ── Animated styles ──
   const overlayAnimatedStyle = useAnimatedStyle(() => ({
@@ -254,53 +592,15 @@ export default function FullScreenReminder({
     opacity: overlayOpacity.value,
   }));
 
-  const successCircleStyle = useAnimatedStyle(() => {
-    const scale = interpolate(
-      authSuccessProgress.value,
-      [0, 0.85, 1],
-      [0.3, 1.05, 1],
-      Extrapolation.CLAMP
-    );
-    return { transform: [{ scale }], opacity: authSuccessProgress.value };
-  });
-
-  const successLabelStyle = useAnimatedStyle(() => {
-    const opacity = interpolate(
-      authSuccessProgress.value,
-      [0.5, 1],
-      [0, 1],
-      Extrapolation.CLAMP
-    );
-    const translateY = interpolate(
-      authSuccessProgress.value,
-      [0.5, 1],
-      [12, 0],
-      Extrapolation.CLAMP
-    );
-    return { opacity, transform: [{ translateY }] };
-  });
-
-  const signatureCheckStyle = useAnimatedStyle(() => {
-    return {
-      opacity: interpolate(finalSignatureProgress.value, [0, 0.1, 0.8, 1], [0, 1, 1, 0]),
-      transform: [
-        { scale: interpolate(finalSignatureProgress.value, [0, 0.5, 1], [0.5, 1.2, 1.5]) }
-      ]
-    };
-  });
-
-  // ── Time display ──
-  const hours = currentTime.getHours();
-  const minutes = currentTime.getMinutes();
-  const timeStr = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-  const ampm = hours >= 12 ? "PM" : "AM";
-  const hours12 = hours % 12 || 12;
-  const time12Str = `${hours12}:${String(minutes).padStart(2, "0")}`;
-
   const deadlineLabel = getDeadlineLabel(task?.due);
   const deadlineColor = getDeadlineColor(task?.due);
 
   if (!visible || !notification) return null;
+  if (isBlocked) return null;
+
+  // Current phase is details or uncontained_details
+  const isDetailsPhase = phase === "details" || phase === "uncontained_details";
+  const isUncontained = phase === "uncontained" || phase === "uncontained_details";
 
   // ═══════════════════════════════════════════════════════════════════════════════
   // RENDER
@@ -313,7 +613,7 @@ export default function FullScreenReminder({
       animationType="none"
       statusBarTranslucent
       onRequestClose={() => {
-        // Prevent back button from dismissing
+        // Block hardware back — alarm cannot be dismissed this way
       }}
     >
       <GestureHandlerRootView style={{ flex: 1 }}>
@@ -323,293 +623,225 @@ export default function FullScreenReminder({
             style={[
               styles.fullScreenContent,
               {
-                paddingTop: insets.top + 20,
+                paddingTop: insets.top + 16,
                 paddingBottom: insets.bottom + 20,
               },
               contentAnimatedStyle,
             ]}
           >
-            {/* ─── AUTH SUCCESS OVERLAY ─── */}
-            {authSuccess && (
-              <View style={styles.authSuccessOverlay}>
-                <Animated.View style={[styles.authSuccessCircle, successCircleStyle]}>
-                  <Feather name="check" size={42} color="#ffffff" />
-                </Animated.View>
-                <Animated.Text
-                  style={[styles.authSuccessLabel, successLabelStyle]}
-                >
-                  Authenticated
-                </Animated.Text>
-              </View>
-            )}
 
-            {/* ─── PHASE: LOCKED ─── */}
-            {phase === "locked" && !authSuccess && (
+            {/* ──────────────────────────────────────────────────────────────── */}
+            {/* PHASE: COUNTDOWN — 60s timer, sound_3 plays once               */}
+            {/* ──────────────────────────────────────────────────────────────── */}
+            {phase === "countdown" && (
               <Animated.View
                 entering={FadeIn.duration(400)}
                 style={styles.phaseContainer}
               >
-                {/* Time */}
-                <View style={styles.timeContainer}>
-                  <Text style={styles.timeText}>{time12Str}</Text>
-                  <Text style={styles.ampmText}>{ampm}</Text>
-                </View>
-
-                {/* Reminder Label */}
-                <View style={styles.reminderLabelRow}>
-                  <View style={styles.bellPulse}>
-                    <Feather name="bell" size={20} color="#58a6ff" />
-                  </View>
-                  <Text style={styles.reminderLabel}>Reminder</Text>
-                </View>
-
-                {/* Hidden content */}
-                <View style={styles.hiddenContentBox}>
-                  <Text style={styles.hiddenDots}>• • • • • • •</Text>
-                  <Text style={styles.hiddenSubtext}>
-                    Task details are hidden
+                {/* Header */}
+                <View style={styles.topSection}>
+                  <Text style={styles.mainTitle}>
+                    Temporal containment breach detected
+                  </Text>
+                  <Text style={styles.mainSubtitle}>
+                    Reminder core reaching criticality in
                   </Text>
                 </View>
 
-                {/* Auth button */}
-                <View style={styles.bottomAction}>
-                  <TouchableOpacity
-                    style={styles.authButton}
-                    onPress={handleAuthenticate}
-                    disabled={isAuthenticating}
-                    activeOpacity={0.7}
-                  >
-                    <Feather
-                      name="lock"
-                      size={18}
-                      color="#ffffff"
-                      style={{ marginRight: 10 }}
+                {/* SVG Countdown Circle */}
+                <View style={styles.centerSection}>
+                    <PulsingCountdownCircle
+                      seconds={countdown}
+                      totalSeconds={COUNTDOWN_SECONDS}
+                      color="#E8655A"
                     />
-                    <Text style={styles.authButtonText}>
-                      {isAuthenticating
-                        ? "Authenticating..."
-                        : "Authenticate to View"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </Animated.View>
-            )}
-
-                {/* ─── PHASE: DETAILS ─── */}
-            {phase === "details" && (
-              <Animated.View
-                entering={FadeIn.duration(400)}
-                style={styles.phaseContainer}
-              >
-                <View style={styles.centerAllContainer}>
-                  {/* App Icon */}
-                  <Image source={require("../../assets/images/icon.png")} style={styles.appIcon} />
-                  
-                  {/* Time */}
-                  <View style={[styles.timeContainer, { marginTop: 12 }]}>
-                    <Text style={styles.timeText}>{time12Str}</Text>
-                    <Text style={styles.ampmText}>{ampm}</Text>
-                  </View>
-
-                  <View style={styles.dividerLine} />
-
-                  {/* Task Details perfectly centered */}
-                  <Text style={styles.taskTitleCentered} numberOfLines={3}>
-                    {task?.title || notification.taskTitle}
-                  </Text>
-
-                  {task?.due && (
-                    <View style={styles.detailRowCentered}>
-                      <Feather name="calendar" size={14} color={deadlineColor} />
-                      <Text style={[styles.detailText, { color: deadlineColor }]}>
-                        {fmtDateDisplay(task.due)}
-                        {task.dueTime ? ` at ${task.dueTime}` : ""}
-                        {deadlineLabel ? ` · ${deadlineLabel}` : ""}
-                      </Text>
-                    </View>
-                  )}
-
-                  {task?.project && (
-                    <View style={styles.detailRowCentered}>
-                      <Feather name="folder" size={14} color="#bc8cff" />
-                      <Text style={[styles.detailText, { color: "#bc8cff" }]}>
-                        {task.project}
-                      </Text>
-                    </View>
-                  )}
-
-                  {task?.notes && (
-                    <View style={[styles.notesSection, { alignSelf: 'stretch', marginTop: 24 }]}>
-                      <Text style={styles.notesLabel}>Notes</Text>
-                      <Text style={styles.notesText} numberOfLines={4}>
-                        {task.notes}
-                      </Text>
-                    </View>
-                  )}
+                  <SoundWaveIndicator />
                 </View>
 
-                {/* Continue button */}
-                <View style={styles.bottomAction}>
-                  <TouchableOpacity
-                    style={styles.continueButton}
-                    onPress={() => {
-                      setPhase("acknowledge");
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.continueButtonText}>Continue</Text>
-                    <Feather name="chevron-right" size={18} color="#ffffff" />
-                  </TouchableOpacity>
-                </View>
-              </Animated.View>
-            )}
-
-            {/* ─── PHASE: ACKNOWLEDGE ─── */}
-            {phase === "acknowledge" && (
-              <Animated.View
-                entering={FadeIn.duration(400)}
-                style={styles.phaseContainer}
-              >
-                <View style={styles.ackContent}>
-                  <View style={styles.ackIconCircle}>
-                    <Feather name="bell" size={32} color="#58a6ff" />
-                  </View>
-                  <Text style={styles.ackTitle}>Acknowledge Reminder</Text>
-                  <Text style={styles.ackSubtitle} numberOfLines={2}>
-                    {task?.title || notification.taskTitle}
-                  </Text>
-                </View>
-
-                <View style={[styles.bottomAction, { paddingHorizontal: 32 }]}>
-                  <SwipeButton
-                    text="Slide to Acknowledge"
-                    onSwipeSuccess={handleAcknowledge}
-                    colors={{
-                      ...colors,
-                      ghSurface2: "rgba(255,255,255,0.08)",
-                      ghBorder: "rgba(255,255,255,0.15)",
-                      ghMuted: "rgba(255,255,255,0.5)",
-                      ghBlue: "#58a6ff",
-                    }}
+                {/* Slide Buttons */}
+                <View style={styles.bottomSection}>
+                  <PixelSlideButton
+                    icon="shield"
+                    iconColor="#1a1a1a"
+                    iconBgColor="#C4C98E"
+                    label="Stabilize Core"
+                    trackColor="rgba(196, 201, 142, 0.18)"
+                    onSlideComplete={handleStabilizeCore}
+                  />
+                  <PixelSlideButton
+                    icon="clock"
+                    iconColor="#1a1a1a"
+                    iconBgColor="#E8655A"
+                    label="Defer Containment"
+                    trackColor="rgba(232, 101, 90, 0.18)"
+                    onSlideComplete={handleDeferContainment}
                   />
                 </View>
               </Animated.View>
             )}
 
-            {/* ─── PHASE: REFLECT ─── */}
-            {phase === "reflect" && (
+            {/* ──────────────────────────────────────────────────────────────── */}
+            {/* PHASE: UNCONTAINED — escalation, sound_2 loops                 */}
+            {/* ──────────────────────────────────────────────────────────────── */}
+            {phase === "uncontained" && (
+              <Animated.View
+                entering={FadeIn.duration(600)}
+                style={styles.phaseContainer}
+              >
+                {/* Critical Warning Header */}
+                <View style={styles.topSection}>
+                  <Text style={styles.uncontainedTitle}>
+                    TEMPORAL CONTAINMENT FAILURE
+                  </Text>
+                  <Text style={styles.uncontainedSubtitle}>
+                    Critical threshold exceeded{"\n"}
+                    Reminder has entered an uncontained state
+                  </Text>
+                </View>
+
+                {/* Pulsing SVG Ring */}
+                <View style={styles.centerSection}>
+                  <Animated.View style={pulseStyle}>
+                    <CountdownRing
+                      seconds={uncontainedCountdown}
+                      totalSeconds={UNCONTAINED_SOUND_SECONDS}
+                      color="#FF4136"
+                      size={220}
+                    />
+                  </Animated.View>
+                  <SoundWaveIndicator />
+                </View>
+
+                {/* Slide buttons */}
+                <View style={styles.bottomSection}>
+                  <PixelSlideButton
+                    icon="shield"
+                    iconColor="#1a1a1a"
+                    iconBgColor="#C4C98E"
+                    label="Stabilize Core"
+                    trackColor="rgba(196, 201, 142, 0.18)"
+                    onSlideComplete={handleUncontainedStabilize}
+                  />
+                  <PixelSlideButton
+                    icon="clock"
+                    iconColor="#1a1a1a"
+                    iconBgColor="#E8655A"
+                    label="Defer Containment"
+                    trackColor="rgba(232, 101, 90, 0.18)"
+                    onSlideComplete={handleDeferContainment}
+                  />
+                </View>
+              </Animated.View>
+            )}
+
+            {/* ──────────────────────────────────────────────────────────────── */}
+            {/* PHASE: DETAILS / UNCONTAINED_DETAILS                           */}
+            {/* Shows task info + response input + SwipeButton → ConfirmModal  */}
+            {/* ──────────────────────────────────────────────────────────────── */}
+            {isDetailsPhase && (
               <Animated.View
                 entering={FadeIn.duration(400)}
                 style={styles.phaseContainer}
               >
                 <KeyboardAvoidingView
                   behavior={Platform.OS === "ios" ? "padding" : undefined}
-                  style={styles.reflectContainer}
+                  style={{ flex: 1, justifyContent: "space-between" }}
                 >
-                  <View style={styles.reflectContent}>
-                    <View style={styles.reflectIconCircle}>
-                      <Feather name="edit-3" size={28} color="#3fb950" />
-                    </View>
-                    <Text style={styles.reflectTitle}>
-                      What's your plan?
+                  {/* Header */}
+                  <View style={styles.topSection}>
+                    {phase === "uncontained_details" && (
+                      <View style={styles.warningBadge}>
+                        <Feather name="alert-triangle" size={14} color="#FF4136" />
+                        <Text style={styles.warningBadgeText}>Uncontained</Text>
+                      </View>
+                    )}
+                    <Text style={styles.phaseTitle}>
+                      {task?.title || notification.taskTitle}
                     </Text>
-                    <Text style={styles.reflectSubtitle}>
-                      A quick note to your future self.
+                    {task?.due && (
+                      <Text style={[styles.deadlineText, { color: deadlineColor }]}>
+                        <Feather name="calendar" size={12} color={deadlineColor} />
+                        {"  "}{deadlineLabel}
+                      </Text>
+                    )}
+                  </View>
+
+                  {/* Response Input */}
+                  <View style={styles.respondCenter}>
+                    <View style={styles.respondIconCircle}>
+                      <Feather
+                        name="edit-3"
+                        size={26}
+                        color={phase === "uncontained_details" ? "#FF4136" : "#3fb950"}
+                      />
+                    </View>
+                    <Text style={styles.respondTitle}>What's your plan?</Text>
+                    <Text style={styles.respondSubtitle}>
+                      A quick note to your future self
                     </Text>
 
                     <TextInput
-                      style={styles.reflectInput}
+                      style={[
+                        styles.respondInput,
+                        phase === "uncontained_details" && {
+                          borderColor: "rgba(255, 65, 54, 0.3)",
+                        },
+                      ]}
                       placeholder="e.g., I'll finish this after dinner..."
                       placeholderTextColor="rgba(255,255,255,0.3)"
                       value={reflectionText}
                       onChangeText={setReflectionText}
                       returnKeyType="done"
                       blurOnSubmit={true}
-                      onSubmitEditing={handlePlanSubmitted}
+                      multiline
                       autoFocus
                     />
                   </View>
 
-                  <View style={styles.reflectActions}>
-                    <TouchableOpacity
-                      style={[
-                        styles.reflectSubmitBtn,
-                        {
-                          opacity: reflectionText.trim() ? 1 : 0.5,
-                          backgroundColor: reflectionText.trim()
-                            ? "#3fb950"
-                            : "rgba(63, 185, 80, 0.3)",
-                        },
-                      ]}
-                      onPress={handlePlanSubmitted}
+                  {/* Submit via SwipeButton */}
+                  <View style={styles.bottomSection}>
+                    <SwipeButton
+                      text="Swipe to Submit Response"
+                      onSwipeSuccess={handleSubmitResponse}
+                      colors={{
+                        ghBlue: phase === "uncontained_details" ? "#FF4136" : "#3fb950",
+                        ghSurface2: phase === "uncontained_details"
+                          ? "rgba(255, 65, 54, 0.1)"
+                          : "rgba(63, 185, 80, 0.1)",
+                        ghBorder: phase === "uncontained_details"
+                          ? "rgba(255, 65, 54, 0.3)"
+                          : "rgba(63, 185, 80, 0.3)",
+                        ghMuted: "rgba(255,255,255,0.6)",
+                        ghText: "#ffffff",
+                      }}
                       disabled={!reflectionText.trim()}
-                      activeOpacity={0.7}
-                    >
-                      <Feather
-                        name="check"
-                        size={18}
-                        color="#ffffff"
-                        style={{ marginRight: 8 }}
-                      />
-                      <Text style={styles.reflectSubmitText}>Submit</Text>
-                    </TouchableOpacity>
+                    />
 
-                    <TouchableOpacity
-                      style={styles.reflectSkipBtn}
-                      onPress={handleSkipReflection}
-                      activeOpacity={0.6}
+                    <Text
+                      style={styles.overrideLink}
+                      onPress={handleOverride}
                     >
-                      <Text style={styles.reflectSkipText}>Skip</Text>
-                    </TouchableOpacity>
+                      Override — skip without notes
+                    </Text>
                   </View>
                 </KeyboardAvoidingView>
               </Animated.View>
             )}
-            {/* ─── PHASE: FINAL CONFIRM ─── */}
-            {phase === "final_confirm" && (
-              <Animated.View
-                entering={FadeIn.duration(400)}
-                style={styles.phaseContainer}
-              >
-                <View style={styles.centerAllContainer}>
-                  <View style={[styles.ackIconCircle, { backgroundColor: 'rgba(63, 185, 80, 0.12)' }]}>
-                    <Feather name="check-circle" size={32} color="#3fb950" />
-                  </View>
-                  <Text style={styles.ackTitle}>Plan Captured</Text>
-                  <Text style={styles.ackSubtitle} numberOfLines={2}>
-                    {reflectionText ? `"${reflectionText}"` : "No reflection added"}
-                  </Text>
 
-                  {/* E-Signature checkmark overlay */}
-                  <Animated.View 
-                    style={[
-                      StyleSheet.absoluteFill, 
-                      { alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' },
-                      signatureCheckStyle
-                    ]}
-                  >
-                    <Feather name="check" size={120} color="#3fb950" />
-                  </Animated.View>
-                </View>
-
-                <View style={[styles.bottomAction, { paddingHorizontal: 32 }]}>
-                  <SwipeButton
-                    text="Swipe to Finalize"
-                    onSwipeSuccess={handleFinalize}
-                    colors={{
-                      ...colors,
-                      ghSurface2: "rgba(255,255,255,0.08)",
-                      ghBorder: "rgba(255,255,255,0.15)",
-                      ghMuted: "rgba(255,255,255,0.5)",
-                      ghBlue: "#3fb950", // Use green for finalize
-                    }}
-                  />
-                </View>
-              </Animated.View>
-            )}
           </Animated.View>
         </Animated.View>
       </GestureHandlerRootView>
+
+      {/* ── Confirmation Modal — shown after swipe ── */}
+      <ConfirmationModal
+        visible={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={handleConfirmed}
+        title="Submit Response"
+        description={`Log your response for:\n"${task?.title || notification?.taskTitle || ""}"`}
+        colors={colors}
+        successText="Response Logged!"
+      />
     </Modal>
   );
 }
@@ -619,7 +851,7 @@ export default function FullScreenReminder({
 const styles = StyleSheet.create({
   fullScreenOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.95)",
+    backgroundColor: "#1a1a1a",
   },
   fullScreenContent: {
     flex: 1,
@@ -630,309 +862,136 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
 
-  // ── Time ──
-  centerAllContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 16,
+  // ── Top ──
+  topSection: {
+    paddingTop: 12,
+    paddingBottom: 8,
   },
-  appIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
-    marginBottom: 8,
-  },
-  timeContainer: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    justifyContent: "center",
-    gap: 8,
-  },
-  timeText: {
-    fontSize: 64,
-    fontWeight: "200",
-    color: "#ffffff",
-    letterSpacing: -2,
-    fontVariant: ["tabular-nums"],
-  },
-  ampmText: {
-    fontSize: 20,
-    fontWeight: "400",
-    color: "rgba(255,255,255,0.4)",
-  },
-
-  // ── Reminder Label ──
-  reminderLabelRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 16,
-    gap: 10,
-  },
-  bellPulse: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(88, 166, 255, 0.12)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  reminderLabel: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "rgba(255,255,255,0.7)",
-    letterSpacing: 1,
-    textTransform: "uppercase",
-  },
-
-  // ── Locked Phase ──
-  hiddenContentBox: {
-    alignItems: "center",
-    justifyContent: "center",
-    flex: 1,
-    gap: 12,
-  },
-  hiddenDots: {
-    fontSize: 24,
-    color: "rgba(255,255,255,0.25)",
-    letterSpacing: 4,
-  },
-  hiddenSubtext: {
-    fontSize: 13,
-    color: "rgba(255,255,255,0.3)",
-  },
-
-  // ── Auth Button ──
-  bottomAction: {
-    paddingBottom: 16,
-  },
-  authButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(88, 166, 255, 0.15)",
-    borderWidth: 1,
-    borderColor: "rgba(88, 166, 255, 0.3)",
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-  },
-  authButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#58a6ff",
-  },
-
-  // ── Auth Success ──
-  authSuccessOverlay: {
-    ...StyleSheet.absoluteFill,
-    zIndex: 100,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.95)",
-  },
-  authSuccessCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#3fb950",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#3fb950",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  authSuccessLabel: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: "#ffffff",
-    marginTop: 16,
-  },
-
-  // ── Details Phase ──
-  dividerLine: {
-    height: 1,
-    width: "40%",
-    backgroundColor: "rgba(255,255,255,0.15)",
-    marginVertical: 24,
-  },
-  taskTitleCentered: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#ffffff",
-    marginBottom: 20,
-    lineHeight: 36,
-    textAlign: "center",
-  },
-  detailRowCentered: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    marginBottom: 12,
-  },
-  detailsCard: {
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: 8,
-  },
-  taskTitle: {
+  mainTitle: {
     fontSize: 26,
     fontWeight: "700",
     color: "#ffffff",
-    marginBottom: 20,
+    letterSpacing: -0.3,
     lineHeight: 34,
   },
-  detailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    marginBottom: 12,
-  },
-  detailText: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  notesSection: {
-    marginTop: 16,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderRadius: 10,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
-  },
-  notesLabel: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: "rgba(255,255,255,0.4)",
-    letterSpacing: 0.5,
-    marginBottom: 6,
-    textTransform: "uppercase",
-  },
-  notesText: {
-    fontSize: 14,
-    color: "rgba(255,255,255,0.7)",
-    lineHeight: 20,
-  },
-
-  // ── Continue Button ──
-  continueButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#58a6ff",
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    gap: 6,
-  },
-  continueButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#ffffff",
-  },
-
-  // ── Acknowledge Phase ──
-  ackContent: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 16,
-  },
-  ackIconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: "rgba(88, 166, 255, 0.12)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
-  },
-  ackTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#ffffff",
-  },
-  ackSubtitle: {
-    fontSize: 16,
+  mainSubtitle: {
+    fontSize: 15,
+    fontWeight: "400",
     color: "rgba(255,255,255,0.5)",
-    textAlign: "center",
-    paddingHorizontal: 32,
+    marginTop: 6,
   },
 
-  // ── Reflect Phase ──
-  reflectContainer: {
+  // ── Center ──
+  centerSection: {
     flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  reflectContent: {
+
+  // ── Bottom ──
+  bottomSection: {
+    paddingBottom: 8,
+  },
+
+  // ── Phase title (details screen) ──
+  phaseTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#ffffff",
+    letterSpacing: -0.3,
+    lineHeight: 32,
+  },
+  deadlineText: {
+    fontSize: 13,
+    fontWeight: "500",
+    marginTop: 6,
+  },
+
+  // ── Respond (details phase) ──
+  respondCenter: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 8,
   },
-  reflectIconCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+  respondIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: "rgba(63, 185, 80, 0.12)",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16,
+    marginBottom: 14,
   },
-  reflectTitle: {
-    fontSize: 22,
+  respondTitle: {
+    fontSize: 20,
     fontWeight: "700",
     color: "#ffffff",
-    marginBottom: 6,
+    marginBottom: 4,
   },
-  reflectSubtitle: {
+  respondSubtitle: {
     fontSize: 14,
     color: "rgba(255,255,255,0.4)",
-    marginBottom: 24,
+    marginBottom: 20,
   },
-  reflectInput: {
+  respondInput: {
     width: "100%",
-    minHeight: 100,
+    minHeight: 110,
     maxHeight: 160,
     backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
-    borderRadius: 12,
+    borderRadius: 14,
     color: "#ffffff",
     fontSize: 15,
     padding: 16,
     lineHeight: 22,
+    textAlignVertical: "top",
   },
 
-  // ── Reflect Actions ──
-  reflectActions: {
-    paddingBottom: 16,
-    gap: 12,
+  // ── Override link ──
+  overrideLink: {
+    textAlign: "center",
+    fontSize: 13,
+    fontWeight: "500",
+    color: "rgba(255,255,255,0.3)",
+    marginTop: 14,
+    paddingVertical: 4,
   },
-  reflectSubmitBtn: {
+
+  // ── Uncontained ──
+  uncontainedTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#FF4136",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+  },
+  uncontainedSubtitle: {
+    fontSize: 15,
+    fontWeight: "400",
+    color: "rgba(255,255,255,0.6)",
+    marginTop: 6,
+    lineHeight: 22,
+  },
+
+  // ── Warning Badge ──
+  warningBadge: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 14,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    gap: 6,
+    backgroundColor: "rgba(255, 65, 54, 0.15)",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    alignSelf: "flex-start",
+    marginBottom: 10,
   },
-  reflectSubmitText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#ffffff",
-  },
-  reflectSkipBtn: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-  },
-  reflectSkipText: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "rgba(255,255,255,0.4)",
+  warningBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#FF4136",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
 });
