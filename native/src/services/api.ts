@@ -176,28 +176,49 @@ async function dropboxRequest(
   return response;
 }
 
-async function loadSeedData() {
+async function mergeSeedData() {
   try {
     const bundledJson = require('../constants/tasks.json');
-    if (bundledJson && bundledJson.tasks && bundledJson.tasks.length > 0) {
-      memoryDb.tasks = bundledJson.tasks;
-      if (bundledJson.projects) {
-        memoryDb.projects = bundledJson.projects;
+    if (!bundledJson) return;
+
+    let changed = false;
+
+    // Merge tasks — only add ones whose id doesn't exist yet
+    if (bundledJson.tasks && Array.isArray(bundledJson.tasks)) {
+      for (const seedTask of bundledJson.tasks) {
+        const alreadyExists = memoryDb.tasks.some(t => t.id === seedTask.id);
+        if (!alreadyExists) {
+          memoryDb.tasks.push(JSON.parse(JSON.stringify(seedTask)));
+          changed = true;
+        }
       }
+    }
+
+    // Merge projects — only add ones whose name doesn't exist yet
+    if (bundledJson.projects && Array.isArray(bundledJson.projects)) {
+      for (const seedProj of bundledJson.projects) {
+        const alreadyExists = memoryDb.projects.some(p => p.name === seedProj.name);
+        if (!alreadyExists) {
+          memoryDb.projects.push(seedProj);
+          changed = true;
+        }
+      }
+    }
+
+    if (changed) {
       await saveDb();
-      console.log('Seed data loaded from tasks.json');
+      console.log('Seed data merged from tasks.json');
     }
   } catch (err) {
-    console.log('No seed data found, starting fresh');
+    console.log('No seed data found, skipping merge');
   }
 }
 
 export const api = {
   async init() {
     await loadDb();
-    if (memoryDb.tasks.length === 0 && memoryDb.projects.length === 0) {
-      await loadSeedData();
-    }
+    // Always merge seed data — safe to call repeatedly, only adds missing entries
+    await mergeSeedData();
     // Auto-clear legacy manually pasted tokens that don't have a refresh token
     if (memoryDb.settings.dropboxToken && !memoryDb.settings.dropboxRefreshToken) {
       memoryDb.settings.dropboxToken = '';

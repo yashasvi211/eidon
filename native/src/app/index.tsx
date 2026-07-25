@@ -18,6 +18,8 @@ import DetailPanel, {
   Task,
   Session,
   AuditEntry,
+  RecurrenceConfig,
+  StreakEntry,
 } from "../components/DetailPanel";
 import DeepStats from "../components/DeepStats";
 import TimeTracking from "../components/TimeTracking";
@@ -25,7 +27,7 @@ import ScheduledView from "../components/ScheduledView";
 import { Colors } from "../constants/theme";
 import Header from "../components/Header";
 import AddTaskModal from "../components/AddTaskModal";
-import type { ReminderConfig } from "../components/AddTaskModal";
+import type { ReminderConfig, TaskRecurrenceConfig } from "../components/AddTaskModal";
 import NotificationBanner, { NotificationData } from "../components/NotificationBanner";
 import FullScreenReminder from "../components/FullScreenReminder";
 import { syncTaskNotifications, cancelTaskNotifications } from "../services/notifications";
@@ -40,6 +42,93 @@ import Animated, {
 } from "react-native-reanimated";
 import { api } from "../services/api";
 import * as EidonAlarm from "../../modules/expo-eidon-alarm";
+
+// ─── Recurrence Helpers ──────────────────────────────────────────────────────
+
+/** Given a YYYY-MM-DD date string and a frequency, return the next period's due date string */
+function advanceRecurringTaskDue(currentDue: string, frequency: 'daily' | 'weekly' | 'monthly'): string {
+  const [y, m, d] = currentDue.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  if (frequency === 'daily') {
+    date.setDate(date.getDate() + 1);
+  } else if (frequency === 'weekly') {
+    date.setDate(date.getDate() + 7);
+  } else {
+    date.setMonth(date.getMonth() + 1);
+  }
+  const ny = date.getFullYear();
+  const nm = String(date.getMonth() + 1).padStart(2, '0');
+  const nd = String(date.getDate()).padStart(2, '0');
+  return `${ny}-${nm}-${nd}`;
+}
+
+/**
+ * Called on app load. Checks all recurring tasks for missed deadlines:
+ * If a recurring task's due date has passed and it's NOT yet done,
+ * records a missed entry, resets the streak, and advances the due date.
+ * If it IS done but the due date has passed, records a completed entry and advances.
+ */
+function processRecurrenceMissedDeadlines(tasks: Task[]): Task[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+  return tasks.map(task => {
+    if (!task.recurrence || !task.due) return task;
+    const rec = task.recurrence;
+
+    // If due date is today or future, nothing to process
+    if (task.due >= todayStr) return task;
+
+    // Due date is in the past
+    // Check if this period is already recorded in history
+    const alreadyRecorded = (rec.history || []).some(e => e.periodDue === task.due);
+    if (alreadyRecorded) {
+      // Just advance due date if not already moved forward
+      const nextDue = advanceRecurringTaskDue(task.due!, rec.frequency);
+      if (nextDue <= todayStr) {
+        // Still needs more advancing — keep going
+        return task; // Will be handled by a deeper pass (for now advance once)
+      }
+      return { ...task, due: nextDue, done: false, completedAt: null };
+    }
+
+    const newEntry: StreakEntry = {
+      id: `se_${Date.now()}_${Math.random().toString(36).slice(2)}`,
+      periodDue: task.due!,
+      completed: task.done,
+      completedAt: task.done ? (task.completedAt ?? undefined) : undefined,
+      missed: !task.done,
+    };
+
+    let newCurrentStreak = rec.currentStreak;
+    let newMaxStreak = rec.maxStreak;
+
+    if (task.done) {
+      // Was completed before deadline — streak continues
+      newCurrentStreak = rec.currentStreak + 1;
+      newMaxStreak = Math.max(rec.maxStreak, newCurrentStreak);
+    } else {
+      // Missed — break the streak
+      newCurrentStreak = 0;
+    }
+
+    const nextDue = advanceRecurringTaskDue(task.due!, rec.frequency);
+
+    return {
+      ...task,
+      due: nextDue,
+      done: false,
+      completedAt: null,
+      recurrence: {
+        ...rec,
+        currentStreak: newCurrentStreak,
+        maxStreak: newMaxStreak,
+        history: [...(rec.history || []), newEntry],
+      },
+    };
+  });
+}
 
 Notifications.setNotificationHandler({
   handleNotification: async () => {
@@ -420,6 +509,27 @@ export default function AppIndex() {
           setReminderRequireAuth(fetchedSettings.reminderRequireAuth || false);
         }
 
+        // Process any recurring tasks whose deadlines have passed
+        if (fetchedTasks) {
+          const processedTasks = processRecurrenceMissedDeadlines(fetchedTasks);
+          const changed = processedTasks.some((t, i) => {
+            const orig = fetchedTasks[i];
+            return t.due !== orig.due || t.done !== orig.done || JSON.stringify(t.recurrence) !== JSON.stringify(orig.recurrence);
+          });
+          if (changed) {
+            setTasks(processedTasks);
+            // Persist the changes
+            for (const task of processedTasks) {
+              const orig = fetchedTasks.find(t => t.id === task.id);
+              if (orig && (task.due !== orig.due || task.done !== orig.done || JSON.stringify(task.recurrence) !== JSON.stringify(orig.recurrence))) {
+                api.updateTask(task.id, { due: task.due, done: task.done, completedAt: task.completedAt, recurrence: task.recurrence }).catch(err =>
+                  console.error('Failed to persist recurrence update:', err)
+                );
+              }
+            }
+          }
+        }
+
         if (fetchedTasks) {
           // Re-sync notifications on app startup to replenish the 10 scheduled slots
           for (const task of fetchedTasks) {
@@ -554,6 +664,63 @@ export default function AppIndex() {
       }
     }
 
+    const isRecurring = !!taskToToggle.recurrence;
+    const completingNow = !taskToToggle.done; // true = we're marking as done
+
+    // For recurring tasks, completing means: record in history + advance due date + reset done flag
+    if (isRecurring && completingNow && taskToToggle.due) {
+      const rec = taskToToggle.recurrence!;
+      const nowTs = Date.now();
+
+      const newEntry: StreakEntry = {
+        id: `se_${nowTs}_${Math.random().toString(36).slice(2)}`,
+        periodDue: taskToToggle.due,
+        completed: true,
+        completedAt: nowTs,
+        missed: false,
+      };
+
+      const newCurrentStreak = rec.currentStreak + 1;
+      const newMaxStreak = Math.max(rec.maxStreak, newCurrentStreak);
+      const nextDue = advanceRecurringTaskDue(taskToToggle.due, rec.frequency);
+
+      const auditEntry: AuditEntry = {
+        timestamp: nowTs,
+        action: 'completed',
+      };
+
+      const updatedTask: Task = {
+        ...taskToToggle,
+        done: false,          // recurring tasks reset to not-done immediately
+        completedAt: null,
+        due: nextDue,         // advance to next period
+        auditLog: [...(taskToToggle.auditLog || []), auditEntry],
+        recurrence: {
+          ...rec,
+          currentStreak: newCurrentStreak,
+          maxStreak: newMaxStreak,
+          history: [...(rec.history || []), newEntry],
+        },
+      };
+
+      const previousTasks = tasks;
+      setTasks(tasks.map(t => t.id !== id ? t : updatedTask));
+
+      api.updateTask(id, {
+        done: false,
+        completedAt: null,
+        due: nextDue,
+        recurrence: updatedTask.recurrence,
+      })
+        .then(() => api.createAuditLog(id, auditEntry))
+        .catch((err: any) => {
+          console.error('Failed to update recurring task:', err);
+          setTasks(previousTasks);
+          showErrorAlert('Save Failed', `Could not save.\n\n${err?.message || err}`);
+        });
+      return;
+    }
+
     const isDone = !taskToToggle.done;
     const completedAt = isDone ? Date.now() : null;
     const auditEntry: AuditEntry = {
@@ -611,7 +778,8 @@ export default function AppIndex() {
       oldTask.project !== updatedTask.project ||
       oldTask.target !== updatedTask.target ||
       oldTask.done !== updatedTask.done ||
-      oldTask.completedAt !== updatedTask.completedAt;
+      oldTask.completedAt !== updatedTask.completedAt ||
+      JSON.stringify(oldTask.recurrence) !== JSON.stringify(updatedTask.recurrence);
 
     const syncPromises: Promise<any>[] = [];
 
@@ -628,6 +796,7 @@ export default function AppIndex() {
           completedAt: updatedTask.completedAt,
           target: updatedTask.target,
           reminder: updatedTask.reminder,
+          recurrence: updatedTask.recurrence,
         })
       );
     }
@@ -716,12 +885,30 @@ export default function AppIndex() {
     priority?: 'High' | 'Moderate' | 'Low',
     execStartDate?: string,
     execStartTime?: string,
+    recurrenceConfig?: TaskRecurrenceConfig,
   ) => {
+    // For a new recurring task with no due date set, auto-assign today's date
+    let taskDue = due;
+    if (recurrenceConfig && !taskDue) {
+      const now = new Date();
+      taskDue = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    }
+
+    const recurrence: RecurrenceConfig | undefined = recurrenceConfig
+      ? {
+          frequency: recurrenceConfig.frequency,
+          streakEnabled: recurrenceConfig.streakEnabled,
+          currentStreak: 0,
+          maxStreak: 0,
+          history: [],
+        }
+      : undefined;
+
     const newTask: Task = {
       id: "t" + Date.now(),
       title,
       project,
-      due,
+      due: taskDue,
       dueTime,
       done: false,
       target:
@@ -745,6 +932,7 @@ export default function AppIndex() {
       priority,
       execStartDate,
       execStartTime,
+      recurrence,
     };
 
     api.createTask(newTask)
@@ -754,7 +942,6 @@ export default function AppIndex() {
           return [...prev, newTask];
         });
         handleSyncNotifications(newTask);
-        // showToast(reminderConfig ? "Task created with reminder!" : "Task created!");
       })
       .catch((err: any) => {
         console.error("Failed to create task:", err);
@@ -772,7 +959,18 @@ export default function AppIndex() {
     priority?: 'High' | 'Moderate' | 'Low',
     execStartDate?: string,
     execStartTime?: string,
+    recurrenceConfig?: TaskRecurrenceConfig,
   ) => {
+    const recurrence: RecurrenceConfig | undefined = recurrenceConfig
+      ? {
+          frequency: recurrenceConfig.frequency,
+          streakEnabled: recurrenceConfig.streakEnabled,
+          currentStreak: taskToEdit.recurrence?.currentStreak ?? 0,
+          maxStreak: taskToEdit.recurrence?.maxStreak ?? 0,
+          history: taskToEdit.recurrence?.history ?? [],
+        }
+      : undefined;
+
     const updatedTask: Task = {
       ...taskToEdit,
       title,
@@ -785,6 +983,7 @@ export default function AppIndex() {
       reminder: reminderConfig
         ? { ...reminderConfig, lastNotifiedAt: taskToEdit.reminder?.lastNotifiedAt || 0, dismissed: taskToEdit.reminder?.dismissed || false }
         : undefined,
+      recurrence,
     };
     handleUpdateTask(updatedTask);
   };
@@ -1168,9 +1367,9 @@ export default function AppIndex() {
       <AddTaskModal
         visible={editingTask !== null}
         onClose={() => setEditingTask(null)}
-        onAdd={(title, project, due, reminder, dueTime, priority, execStartDate, execStartTime) => {
+        onAdd={(title, project, due, reminder, dueTime, priority, execStartDate, execStartTime, recurrenceConfig) => {
           if (editingTask) {
-            handleSaveEditTask(editingTask, title, project, due, reminder, dueTime, priority, execStartDate, execStartTime);
+            handleSaveEditTask(editingTask, title, project, due, reminder, dueTime, priority, execStartDate, execStartTime, recurrenceConfig);
           }
         }}
         projects={projects}

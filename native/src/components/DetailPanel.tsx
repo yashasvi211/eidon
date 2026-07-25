@@ -102,6 +102,21 @@ export interface TaskReminder {
   lastNotificationId?: string;
 }
 
+export interface StreakEntry {
+  id: string;
+  periodDue: string;         // YYYY-MM-DD — the due date of this recurrence window
+  completed: boolean;        // Did user complete before deadline?
+  completedAt?: number;      // Timestamp when completed
+  missed: boolean;           // Auto-marked missed when deadline passed without completion
+}
+
+export interface RecurrenceConfig {
+  frequency: 'daily' | 'weekly' | 'monthly';
+  streakEnabled: boolean;    // Whether to track streaks for this task
+  currentStreak: number;     // Active consecutive completions
+  maxStreak: number;         // All-time best streak
+  history: StreakEntry[];    // Log of every recurrence window
+}
 
 export interface Task {
   id: string;
@@ -122,6 +137,7 @@ export interface Task {
   priority?: 'High' | 'Moderate' | 'Low';
   execStartDate?: string;
   execStartTime?: string;
+  recurrence?: RecurrenceConfig;  // If set, this is a recurring task
 }
 
 interface DetailPanelProps {
@@ -981,6 +997,28 @@ export default function DetailPanel({
           tabName="details"
           tabBarWidth={tabBarWidth}
         >
+            {/* ── Streak Banner (compact) for recurring tasks ── */}
+            {task.recurrence?.streakEnabled && (() => {
+              const rec = task.recurrence!;
+              return (
+                <View style={{ backgroundColor: 'rgba(240,136,62,0.07)', borderWidth: 1, borderColor: 'rgba(240,136,62,0.22)', borderRadius: 12, padding: 12, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(240,136,62,0.15)', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontSize: 18 }}>🔥</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#f0883e', fontSize: 13, fontWeight: '700' }}>
+                      {rec.currentStreak > 0 ? `${rec.currentStreak}-day streak!` : 'Start your streak today!'}
+                    </Text>
+                    <Text style={{ color: colors.ghMuted, fontSize: 11, marginTop: 1 }}>
+                      Best: {rec.maxStreak} • {rec.frequency.charAt(0).toUpperCase() + rec.frequency.slice(1)} recurring
+                    </Text>
+                  </View>
+                  <View style={{ backgroundColor: 'rgba(240,136,62,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
+                    <Text style={{ color: '#f0883e', fontSize: 11, fontWeight: '700' }}>🏆 {rec.maxStreak} best</Text>
+                  </View>
+                </View>
+              );
+            })()}
             {(() => {
               if (!task.done && task.due) {
                 const dueObj = new Date(task.due + "T00:00:00");
@@ -1564,6 +1602,140 @@ export default function DetailPanel({
           tabName="history"
           tabBarWidth={tabBarWidth}
         >
+            {/* ── Streak Dashboard (only for recurring tasks with streaks enabled) ── */}
+            {task.recurrence?.streakEnabled && (() => {
+              const rec = task.recurrence!;
+              const history = rec.history || [];
+              const freqLabel = rec.frequency === 'daily' ? 'Daily' : rec.frequency === 'weekly' ? 'Weekly' : 'Monthly';
+
+              // Last 28 entries for the dot grid
+              const dotHistory = history.slice(-28);
+
+              const fmtPeriodDate = (iso: string) => {
+                const [y, m, d] = iso.split('-').map(Number);
+                const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                return `${months[m-1]} ${d}`;
+              };
+
+              return (
+                <View style={{ marginBottom: 20 }}>
+                  {/* Header: Streak type badge */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
+                    <View style={{ backgroundColor: 'rgba(240, 136, 62, 0.12)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={{ fontSize: 14 }}>🔥</Text>
+                      <Text style={{ color: '#f0883e', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }}>{freqLabel} Streak</Text>
+                    </View>
+                  </View>
+
+                  {/* Current + Max Streak Cards */}
+                  <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
+                    {/* Current Streak */}
+                    <View style={{ flex: 1, backgroundColor: rec.currentStreak > 0 ? 'rgba(240, 136, 62, 0.08)' : colors.ghSurface, borderWidth: 1, borderColor: rec.currentStreak > 0 ? 'rgba(240, 136, 62, 0.3)' : colors.ghBorder, borderRadius: 12, padding: 14, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 28, fontWeight: '800', color: rec.currentStreak > 0 ? '#f0883e' : colors.ghMuted }}>
+                        {rec.currentStreak}
+                      </Text>
+                      <Text style={{ fontSize: 10, fontWeight: '600', color: colors.ghMuted, marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.5 }}>Current Streak</Text>
+                      <Text style={{ fontSize: 9, color: colors.ghMuted, marginTop: 2 }}>{rec.currentStreak === 1 ? '1 in a row' : `${rec.currentStreak} in a row`}</Text>
+                    </View>
+
+                    {/* Max Streak */}
+                    <View style={{ flex: 1, backgroundColor: rec.maxStreak > 0 ? 'rgba(88, 166, 255, 0.08)' : colors.ghSurface, borderWidth: 1, borderColor: rec.maxStreak > 0 ? 'rgba(88, 166, 255, 0.25)' : colors.ghBorder, borderRadius: 12, padding: 14, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 28, fontWeight: '800', color: rec.maxStreak > 0 ? colors.ghBlue : colors.ghMuted }}>
+                        {rec.maxStreak}
+                      </Text>
+                      <Text style={{ fontSize: 10, fontWeight: '600', color: colors.ghMuted, marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.5 }}>Best Streak</Text>
+                      <Text style={{ fontSize: 9, color: colors.ghMuted, marginTop: 2 }}>All-time record</Text>
+                    </View>
+                  </View>
+
+                  {/* Dot Grid — last 28 occurrences */}
+                  {dotHistory.length > 0 && (
+                    <View style={{ backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 14, marginBottom: 14 }}>
+                      <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 10 }]}>HISTORY GRID</Text>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 5 }}>
+                        {dotHistory.map((entry, i) => {
+                          const dotColor = entry.completed ? '#3fb950' : entry.missed ? '#f85149' : colors.ghBorder2;
+                          const dotBg = entry.completed ? 'rgba(63,185,80,0.15)' : entry.missed ? 'rgba(248,81,73,0.15)' : 'transparent';
+                          return (
+                            <View
+                              key={entry.id}
+                              style={{ width: 22, height: 22, borderRadius: 5, backgroundColor: dotBg, borderWidth: 1.5, borderColor: dotColor, alignItems: 'center', justifyContent: 'center' }}
+                            >
+                              {entry.completed && <Text style={{ fontSize: 9, color: '#3fb950' }}>✓</Text>}
+                              {entry.missed && <Text style={{ fontSize: 8, color: '#f85149' }}>✗</Text>}
+                            </View>
+                          );
+                        })}
+                      </View>
+                      {/* Legend */}
+                      <View style={{ flexDirection: 'row', gap: 14, marginTop: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: '#3fb950' }} />
+                          <Text style={{ fontSize: 10, color: colors.ghMuted }}>Completed</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                          <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: '#f85149' }} />
+                          <Text style={{ fontSize: 10, color: colors.ghMuted }}>Missed</Text>
+                        </View>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Completion History List */}
+                  {history.length > 0 ? (
+                    <View>
+                      <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 10 }]}>RECURRENCE LOG</Text>
+                      <View style={{ gap: 8 }}>
+                        {[...history].reverse().map((entry) => (
+                          <View
+                            key={entry.id}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              backgroundColor: colors.ghSurface,
+                              borderWidth: 1,
+                              borderColor: entry.completed ? 'rgba(63,185,80,0.2)' : entry.missed ? 'rgba(248,81,73,0.2)' : colors.ghBorder,
+                              borderRadius: 10,
+                              padding: 12,
+                              gap: 10,
+                            }}
+                          >
+                            {/* Status dot */}
+                            <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: entry.completed ? 'rgba(63,185,80,0.12)' : 'rgba(248,81,73,0.12)', alignItems: 'center', justifyContent: 'center' }}>
+                              <Text style={{ fontSize: 13 }}>{entry.completed ? '✅' : '❌'}</Text>
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ color: colors.ghText, fontSize: 12, fontWeight: '600' }}>
+                                Due: {fmtPeriodDate(entry.periodDue)}
+                              </Text>
+                              <Text style={{ color: colors.ghMuted, fontSize: 11, marginTop: 1 }}>
+                                {entry.completed
+                                  ? `Completed ${entry.completedAt ? fmtRelativeTime(entry.completedAt) : ''}`
+                                  : 'Missed — deadline passed'}
+                              </Text>
+                            </View>
+                            <View style={{ backgroundColor: entry.completed ? 'rgba(63,185,80,0.12)' : 'rgba(248,81,73,0.12)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                              <Text style={{ fontSize: 10, fontWeight: '700', color: entry.completed ? '#3fb950' : '#f85149' }}>
+                                {entry.completed ? 'DONE' : 'MISSED'}
+                              </Text>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={{ backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 20, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 24, marginBottom: 8 }}>🎯</Text>
+                      <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: '600', marginBottom: 4 }}>No completions yet</Text>
+                      <Text style={{ color: colors.ghMuted, fontSize: 12, textAlign: 'center' }}>Complete this task before the due date to start your streak!</Text>
+                    </View>
+                  )}
+
+                  <View style={{ height: 1, backgroundColor: colors.ghBorder, marginVertical: 16 }} />
+                </View>
+              );
+            })()}
+
             <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>
               AUDIT LOG TIMELINE
             </Text>

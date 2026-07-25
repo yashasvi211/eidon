@@ -1,10 +1,11 @@
 {
   "tasks": [
     {
-      "id": "t1",
+      "id": "t_regular_1",
       "title": "Design System Redux",
       "project": "Design",
-      "due": "2026-07-25",
+      "due": "2026-07-28",
+      "dueTime": "17:00",
       "est": "4h",
       "notes": "Update the core design system components with the new color palette. Ensure accessibility standards are met.",
       "done": false,
@@ -12,91 +13,264 @@
       "priority": "High",
       "subtasks": [
         { "id": "s1", "title": "Update color tokens", "done": true },
-        { "id": "s2", "title": "Audit contrast ratios", "done": false }
+        { "id": "s2", "title": "Audit contrast ratios", "done": true },
+        { "id": "s3", "title": "Update typography scale", "done": false },
+        { "id": "s4", "title": "Document all changes", "done": false }
       ],
-      "sessions": [],
-      "createdAt": 1743379200000,
+      "sessions": [
+        { "id": "sess_1", "start": 1753336800000, "end": 1753343000000, "note": "Finished color tokens, started typography" }
+      ],
+      "createdAt": 1753200000000,
       "completedAt": null,
-      "auditLog": []
+      "auditLog": [
+        { "id": "a1", "timestamp": 1753200000000, "action": "created" },
+        { "id": "a2", "timestamp": 1753336800000, "action": "timer_started" },
+        { "id": "a3", "timestamp": 1753343000000, "action": "timer_stopped", "details": { "note": "Finished color tokens" } }
+      ]
     },
     {
-      "id": "t2",
+      "id": "t_regular_2",
       "title": "Fix memory leak in WebSocket handler",
       "project": "Engineering",
-      "due": "2026-07-13",
+      "due": "2026-07-29",
       "est": "2h",
-      "notes": "Heap snapshots show closed connections not being garbage collected.",
-      "done": false,
-      "target": "today",
-      "priority": "Moderate",
-      "subtasks": [],
-      "sessions": [],
-      "createdAt": 1743724800000,
-      "completedAt": null,
-      "auditLog": []
-    },
-    {
-      "id": "t3",
-      "title": "Update documentation for API v2",
-      "project": "Engineering",
-      "due": "2026-08-01",
-      "est": "6h",
-      "notes": "Reflect new endpoint structures and authentication methods.",
-      "done": false,
-      "target": "backlog",
-      "priority": "Low",
-      "subtasks": [],
-      "sessions": [],
-      "createdAt": 1743897600000,
-      "completedAt": null,
-      "auditLog": []
-    },
-    {
-      "id": "t4",
-      "title": "Weekly Team Sync",
-      "project": "Inbox",
-      "due": "2026-07-15",
-      "est": "1h",
-      "notes": "Discuss sprint progress and blockers.",
-      "done": false,
-      "target": "scheduled",
-      "priority": "Moderate",
-      "subtasks": [],
-      "sessions": [],
-      "createdAt": 1744070400000,
-      "completedAt": null,
-      "auditLog": []
-    },
-    {
-      "id": "t5",
-      "title": "Emergency Server Patch",
-      "project": "Engineering",
-      "due": "2026-07-12",
-      "est": "1h",
-      "notes": "Apply critical security patch to production servers.",
+      "notes": "Heap snapshots show closed connections not being garbage collected. Investigate EventEmitter references.",
       "done": false,
       "target": "today",
       "priority": "High",
       "subtasks": [],
       "sessions": [],
-      "createdAt": 1743292800000,
+      "createdAt": 1753100000000,
       "completedAt": null,
-      "auditLog": []
+      "auditLog": [
+        { "id": "a4", "timestamp": 1753100000000, "action": "created" }
+      ]
     },
     {
-      "id": "t6",
-      "title": "Review Q3 Roadmap",
-      "project": "Inbox",
-      "due": "",
-      "est": "2h",
-      "notes": "Review the upcoming features for Q3 and align with the product team.",
+      "id": "t_regular_3",
+      "title": "Onboarding flow UX research report",
+      "project": "Design",
+      "due": "2026-08-05",
+      "est": "3h",
+      "notes": "Compile user interview notes and identify top 3 friction points in the current onboarding flow.",
       "done": false,
       "target": "backlog",
+      "priority": "Moderate",
       "subtasks": [],
       "sessions": [],
-      "createdAt": 1744156800000,
+      "createdAt": 1753000000000,
       "completedAt": null,
-      "auditLog": []
+      "auditLog": [
+        { "id": "a5", "timestamp": 1753000000000, "action": "created" }
+      ]
+    },
+    {
+      "id": "t_regular_4",
+      "title": "Update API v2 documentation",
+      "project": "Engineering",
+      "due": "2026-08-10",
+      "est": "5h",
+      "notes": "Reflect new endpoint structures, authentication flow, and rate limiting rules.",
+      "done": false,
+      "target": "backlog",
+      "priority": "Low",
+      "subtasks": [],
+      "sessions": [],
+      "createdAt": 1752900000000,
+      "completedAt": null,
+      "auditLog": [
+        { "id": "a6", "timestamp": 1752900000000, "action": "created" }
+      ]
+    },
+
+    {
+      "id": "t_recur_workout",
+      "title": "Morning Workout",
+      "project": "Fitness",
+      "due": "2026-07-26",
+      "est": "1h",
+      "notes": "30 min run + 30 min strength training. Keep it consistent, not just intense.",
+      "done": false,
+      "target": "today",
+      "priority": "High",
+      "subtasks": [],
+      "sessions": [],
+      "createdAt": 1751000000000,
+      "completedAt": null,
+      "auditLog": [
+        { "id": "aw1", "timestamp": 1751000000000, "action": "created" },
+        { "id": "aw2", "timestamp": 1751700000000, "action": "completed" },
+        { "id": "aw3", "timestamp": 1751790000000, "action": "completed" },
+        { "id": "aw4", "timestamp": 1751880000000, "action": "completed" },
+        { "id": "aw5", "timestamp": 1752060000000, "action": "completed" },
+        { "id": "aw6", "timestamp": 1752150000000, "action": "completed" },
+        { "id": "aw7", "timestamp": 1752240000000, "action": "completed" },
+        { "id": "aw8", "timestamp": 1752330000000, "action": "completed" },
+        { "id": "aw9", "timestamp": 1752500000000, "action": "completed" },
+        { "id": "aw10", "timestamp": 1752590000000, "action": "completed" }
+      ],
+      "recurrence": {
+        "frequency": "daily",
+        "streakEnabled": true,
+        "currentStreak": 9,
+        "maxStreak": 14,
+        "history": [
+          { "id": "se_w01", "periodDue": "2026-07-09", "completed": true,  "completedAt": 1752036000000, "missed": false },
+          { "id": "se_w02", "periodDue": "2026-07-10", "completed": true,  "completedAt": 1752122000000, "missed": false },
+          { "id": "se_w03", "periodDue": "2026-07-11", "completed": true,  "completedAt": 1752208000000, "missed": false },
+          { "id": "se_w04", "periodDue": "2026-07-12", "completed": true,  "completedAt": 1752294000000, "missed": false },
+          { "id": "se_w05", "periodDue": "2026-07-13", "completed": false, "missed": true  },
+          { "id": "se_w06", "periodDue": "2026-07-14", "completed": false, "missed": true  },
+          { "id": "se_w07", "periodDue": "2026-07-15", "completed": true,  "completedAt": 1752552000000, "missed": false },
+          { "id": "se_w08", "periodDue": "2026-07-16", "completed": true,  "completedAt": 1752638000000, "missed": false },
+          { "id": "se_w09", "periodDue": "2026-07-17", "completed": true,  "completedAt": 1752724000000, "missed": false },
+          { "id": "se_w10", "periodDue": "2026-07-18", "completed": true,  "completedAt": 1752810000000, "missed": false },
+          { "id": "se_w11", "periodDue": "2026-07-19", "completed": true,  "completedAt": 1752896000000, "missed": false },
+          { "id": "se_w12", "periodDue": "2026-07-20", "completed": true,  "completedAt": 1752982000000, "missed": false },
+          { "id": "se_w13", "periodDue": "2026-07-21", "completed": true,  "completedAt": 1753068000000, "missed": false },
+          { "id": "se_w14", "periodDue": "2026-07-22", "completed": true,  "completedAt": 1753154000000, "missed": false },
+          { "id": "se_w15", "periodDue": "2026-07-23", "completed": true,  "completedAt": 1753240000000, "missed": false },
+          { "id": "se_w16", "periodDue": "2026-07-24", "completed": true,  "completedAt": 1753326000000, "missed": false }
+        ]
+      }
+    },
+
+    {
+      "id": "t_recur_reading",
+      "title": "Read 30 Minutes (Non-Fiction)",
+      "project": "Learning",
+      "due": "2026-07-26",
+      "est": "30m",
+      "notes": "Currently reading: Atomic Habits by James Clear. Focus on note-taking key concepts.",
+      "done": false,
+      "target": "today",
+      "priority": "Moderate",
+      "subtasks": [],
+      "sessions": [],
+      "createdAt": 1752000000000,
+      "completedAt": null,
+      "auditLog": [
+        { "id": "ar1", "timestamp": 1752000000000, "action": "created" }
+      ],
+      "recurrence": {
+        "frequency": "daily",
+        "streakEnabled": true,
+        "currentStreak": 3,
+        "maxStreak": 6,
+        "history": [
+          { "id": "se_r01", "periodDue": "2026-07-15", "completed": true,  "completedAt": 1752584000000, "missed": false },
+          { "id": "se_r02", "periodDue": "2026-07-16", "completed": true,  "completedAt": 1752670000000, "missed": false },
+          { "id": "se_r03", "periodDue": "2026-07-17", "completed": true,  "completedAt": 1752756000000, "missed": false },
+          { "id": "se_r04", "periodDue": "2026-07-18", "completed": true,  "completedAt": 1752842000000, "missed": false },
+          { "id": "se_r05", "periodDue": "2026-07-19", "completed": true,  "completedAt": 1752928000000, "missed": false },
+          { "id": "se_r06", "periodDue": "2026-07-20", "completed": true,  "completedAt": 1753014000000, "missed": false },
+          { "id": "se_r07", "periodDue": "2026-07-21", "completed": false, "missed": true  },
+          { "id": "se_r08", "periodDue": "2026-07-22", "completed": false, "missed": true  },
+          { "id": "se_r09", "periodDue": "2026-07-23", "completed": false, "missed": true  },
+          { "id": "se_r10", "periodDue": "2026-07-24", "completed": true,  "completedAt": 1753354000000, "missed": false },
+          { "id": "se_r11", "periodDue": "2026-07-25", "completed": true,  "completedAt": 1753440000000, "missed": false }
+        ]
+      }
+    },
+
+    {
+      "id": "t_recur_weekly_review",
+      "title": "Weekly Engineering Sync",
+      "project": "Engineering",
+      "due": "2026-08-01",
+      "dueTime": "15:00",
+      "est": "1h",
+      "notes": "Review open PRs, discuss system design decisions, check on sprint progress, unblock team members.",
+      "done": false,
+      "target": "scheduled",
+      "priority": "Moderate",
+      "subtasks": [],
+      "sessions": [],
+      "createdAt": 1748000000000,
+      "completedAt": null,
+      "auditLog": [
+        { "id": "ae1", "timestamp": 1748000000000, "action": "created" }
+      ],
+      "recurrence": {
+        "frequency": "weekly",
+        "streakEnabled": true,
+        "currentStreak": 5,
+        "maxStreak": 8,
+        "history": [
+          { "id": "se_e01", "periodDue": "2026-05-23", "completed": true,  "completedAt": 1747991400000, "missed": false },
+          { "id": "se_e02", "periodDue": "2026-05-30", "completed": true,  "completedAt": 1748596200000, "missed": false },
+          { "id": "se_e03", "periodDue": "2026-06-06", "completed": true,  "completedAt": 1749201000000, "missed": false },
+          { "id": "se_e04", "periodDue": "2026-06-13", "completed": true,  "completedAt": 1749805800000, "missed": false },
+          { "id": "se_e05", "periodDue": "2026-06-20", "completed": true,  "completedAt": 1750410600000, "missed": false },
+          { "id": "se_e06", "periodDue": "2026-06-27", "completed": true,  "completedAt": 1751015400000, "missed": false },
+          { "id": "se_e07", "periodDue": "2026-07-04", "completed": true,  "completedAt": 1751620200000, "missed": false },
+          { "id": "se_e08", "periodDue": "2026-07-11", "completed": false, "missed": true  },
+          { "id": "se_e09", "periodDue": "2026-07-18", "completed": false, "missed": true  },
+          { "id": "se_e10", "periodDue": "2026-07-25", "completed": true,  "completedAt": 1753438200000, "missed": false }
+        ]
+      }
+    },
+
+    {
+      "id": "t_recur_no_streak",
+      "title": "Meditate 10 Minutes",
+      "project": "Fitness",
+      "due": "2026-07-26",
+      "est": "10m",
+      "notes": "Use Headspace or guided breathing. Do it right after waking up before checking phone.",
+      "done": false,
+      "target": "today",
+      "priority": "Low",
+      "subtasks": [],
+      "sessions": [],
+      "createdAt": 1753200000000,
+      "completedAt": null,
+      "auditLog": [
+        { "id": "am1", "timestamp": 1753200000000, "action": "created" }
+      ],
+      "recurrence": {
+        "frequency": "daily",
+        "streakEnabled": false,
+        "currentStreak": 0,
+        "maxStreak": 0,
+        "history": []
+      }
+    },
+
+    {
+      "id": "t_recur_monthly",
+      "title": "Monthly OKR & Roadmap Review",
+      "project": "Learning",
+      "due": "2026-08-25",
+      "est": "3h",
+      "notes": "Review quarterly OKR progress. Adjust priorities. Update personal roadmap. Share update with team lead.",
+      "done": false,
+      "target": "scheduled",
+      "priority": "High",
+      "subtasks": [
+        { "id": "sm1", "title": "Review last month's OKRs", "done": false },
+        { "id": "sm2", "title": "Set next month's key results", "done": false },
+        { "id": "sm3", "title": "Update roadmap doc", "done": false }
+      ],
+      "sessions": [],
+      "createdAt": 1743000000000,
+      "completedAt": null,
+      "auditLog": [
+        { "id": "ao1", "timestamp": 1743000000000, "action": "created" }
+      ],
+      "recurrence": {
+        "frequency": "monthly",
+        "streakEnabled": true,
+        "currentStreak": 4,
+        "maxStreak": 4,
+        "history": [
+          { "id": "se_o01", "periodDue": "2026-03-25", "completed": true, "completedAt": 1742895600000, "missed": false },
+          { "id": "se_o02", "periodDue": "2026-04-25", "completed": true, "completedAt": 1745574000000, "missed": false },
+          { "id": "se_o03", "periodDue": "2026-05-25", "completed": true, "completedAt": 1748166000000, "missed": false },
+          { "id": "se_o04", "periodDue": "2026-06-25", "completed": true, "completedAt": 1750844400000, "missed": false },
+          { "id": "se_o05", "periodDue": "2026-07-25", "completed": true, "completedAt": 1753436400000, "missed": false }
+        ]
+      }
     }
   ],
   "projects": [
@@ -111,6 +285,14 @@
     {
       "name": "Design",
       "color": "#ff7b72"
+    },
+    {
+      "name": "Fitness",
+      "color": "#3fb950"
+    },
+    {
+      "name": "Learning",
+      "color": "#bc8cff"
     }
   ]
 }

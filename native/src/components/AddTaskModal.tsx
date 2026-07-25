@@ -21,10 +21,15 @@ export interface ReminderConfig {
   repeatEvery?: number;    // ms between repeat notifications
 }
 
+export interface TaskRecurrenceConfig {
+  frequency: 'daily' | 'weekly' | 'monthly';
+  streakEnabled: boolean;
+}
+
 interface AddTaskModalProps {
   visible: boolean;
   onClose: () => void;
-  onAdd: (title: string, project: string, due?: string, reminder?: ReminderConfig, dueTime?: string, priority?: 'High' | 'Moderate' | 'Low', execStartDate?: string, execStartTime?: string) => void;
+  onAdd: (title: string, project: string, due?: string, reminder?: ReminderConfig, dueTime?: string, priority?: 'High' | 'Moderate' | 'Low', execStartDate?: string, execStartTime?: string, recurrence?: TaskRecurrenceConfig) => void;
   projects: Project[];
   initialTask?: any;
 }
@@ -88,6 +93,11 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
   // Reminder state
   const [remindBefore, setRemindBefore] = useState<number | null>(null);   // ms
   const [repeatEvery, setRepeatEvery] = useState<number | null>(null);     // ms
+
+  // Recurrence state
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurrenceFrequency, setRecurrenceFrequency] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const [streakEnabled, setStreakEnabled] = useState(false);
   
   // Dropdown states
   const [showOffsetDropdown, setShowOffsetDropdown] = useState(false);
@@ -187,6 +197,9 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
       setPriority(initialTask.priority || 'Low');
       setExecStartDate(initialTask.execStartDate || null);
       setExecStartTime(initialTask.execStartTime || null);
+      setIsRecurring(!!initialTask.recurrence);
+      setRecurrenceFrequency(initialTask.recurrence?.frequency || 'daily');
+      setStreakEnabled(initialTask.recurrence?.streakEnabled || false);
     } else {
       setTitle('');
       setProject('Inbox');
@@ -197,6 +210,9 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
       setPriority('Low');
       setExecStartDate(null);
       setExecStartTime(null);
+      setIsRecurring(false);
+      setRecurrenceFrequency('daily');
+      setStreakEnabled(false);
     }
     setCalendarMode(null);
     setClockMode(null);
@@ -223,8 +239,12 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
       }
     }
 
+    const recurrenceConfig: TaskRecurrenceConfig | undefined = isRecurring
+      ? { frequency: recurrenceFrequency, streakEnabled }
+      : undefined;
+
     animateClose(() => {
-      onAdd(title.trim(), project, due || undefined, reminder, dueTime || undefined, priority, execStartDate || undefined, execStartTime || undefined);
+      onAdd(title.trim(), project, due || undefined, reminder, dueTime || undefined, priority, execStartDate || undefined, execStartTime || undefined, recurrenceConfig);
       reset();
       onClose();
     });
@@ -321,7 +341,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
     }
   }
 
-  const canSubmit = title.trim().length > 0 && due !== null && !hasDateButNoTime && !hasTimeButNoDate && !isPastDue && !hasPartialExec && !isExecInvalid;
+  const canSubmit = title.trim().length > 0 && (isRecurring || due !== null) && !hasDateButNoTime && !hasTimeButNoDate && !isPastDue && !hasPartialExec && !isExecInvalid;
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
@@ -617,6 +637,79 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
                   </Text>
                 </View>
               )}
+
+              {/* ── Recurring Task Section ── */}
+              <View style={{ marginTop: 20 }}>
+                {/* Toggle Row */}
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.ghBg, borderWidth: 1, borderColor: isRecurring ? colors.ghBlue : colors.ghBorder, borderRadius: 10, padding: 14 }}
+                  onPress={() => {
+                    setIsRecurring(v => !v);
+                    if (isRecurring) setStreakEnabled(false);
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: isRecurring ? `${colors.ghBlue}20` : `${colors.ghMuted}12`, alignItems: 'center', justifyContent: 'center' }}>
+                      <Feather name="repeat" size={14} color={isRecurring ? colors.ghBlue : colors.ghMuted} />
+                    </View>
+                    <View>
+                      <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: '600' }}>Recurring Task</Text>
+                      <Text style={{ color: colors.ghMuted, fontSize: 11, marginTop: 1 }}>Resets automatically on schedule</Text>
+                    </View>
+                  </View>
+                  {/* Checkbox */}
+                  <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: isRecurring ? colors.ghBlue : colors.ghBorder, backgroundColor: isRecurring ? colors.ghBlue : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                    {isRecurring && <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>✓</Text>}
+                  </View>
+                </TouchableOpacity>
+
+                {/* Frequency + Streak Options (shown when recurring is ON) */}
+                {isRecurring && (
+                  <View style={{ marginTop: 12, gap: 10 }}>
+                    {/* Frequency Selector */}
+                    <View>
+                      <Text style={[styles.label, { color: colors.ghMuted }]}>Repeat Frequency</Text>
+                      <View style={styles.chipRow}>
+                        {(['daily', 'weekly', 'monthly'] as const).map(freq => (
+                          <TouchableOpacity
+                            key={freq}
+                            style={[styles.chip, { borderColor: recurrenceFrequency === freq ? colors.ghBlue : colors.ghBorder, backgroundColor: recurrenceFrequency === freq ? `${colors.ghBlue}18` : 'transparent' }]}
+                            onPress={() => setRecurrenceFrequency(freq)}
+                          >
+                            <Text style={{ color: recurrenceFrequency === freq ? colors.ghBlue : colors.ghMuted, fontSize: 12, fontWeight: '600', textTransform: 'capitalize' }}>
+                              {freq}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+
+                    {/* Streak Tracking Toggle */}
+                    <TouchableOpacity
+                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: streakEnabled ? 'rgba(240,136,62,0.06)' : colors.ghBg, borderWidth: 1, borderColor: streakEnabled ? 'rgba(240,136,62,0.4)' : colors.ghBorder, borderRadius: 10, padding: 12 }}
+                      onPress={() => setStreakEnabled(v => !v)}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <Text style={{ fontSize: 18 }}>🔥</Text>
+                        <View>
+                          <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: '600' }}>Enable Streak Tracking</Text>
+                          <Text style={{ color: colors.ghMuted, fontSize: 11, marginTop: 1 }}>Track your consistency over time</Text>
+                        </View>
+                      </View>
+                      <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: streakEnabled ? '#f0883e' : colors.ghBorder, backgroundColor: streakEnabled ? '#f0883e' : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                        {streakEnabled && <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>✓</Text>}
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* Info note about recurring */}
+                    <View style={{ backgroundColor: `${colors.ghBlue}08`, borderWidth: 1, borderColor: `${colors.ghBlue}20`, borderRadius: 8, padding: 10 }}>
+                      <Text style={{ color: colors.ghMuted, fontSize: 11, lineHeight: 16 }}>
+                        📋 The task resets for the next period when you complete it or when the due date passes. {streakEnabled ? '\n🔥 Streak breaks if you miss a period.' : ''}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
 
             {/* ── Actions ── */}
             <View style={styles.actions}>

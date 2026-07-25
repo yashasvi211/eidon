@@ -303,6 +303,38 @@ export default function TaskPanel({
                       ✓ {subtasksDone}/{totalSubtasks}
                     </Text>
                   )}
+
+                  {/* Recurring indicator */}
+                  {task.recurrence && (
+                    <Text
+                      style={[
+                        styles.taskTag,
+                        {
+                          color: '#58a6ff',
+                          borderColor: 'rgba(88,166,255,0.3)',
+                          backgroundColor: 'rgba(88,166,255,0.08)',
+                        },
+                      ]}
+                    >
+                      ↻ {task.recurrence.frequency}
+                    </Text>
+                  )}
+
+                  {/* Streak badge */}
+                  {task.recurrence?.streakEnabled && task.recurrence.currentStreak > 0 && (
+                    <Text
+                      style={[
+                        styles.taskTag,
+                        {
+                          color: '#f0883e',
+                          borderColor: 'rgba(240,136,62,0.35)',
+                          backgroundColor: 'rgba(240,136,62,0.1)',
+                        },
+                      ]}
+                    >
+                      🔥 {task.recurrence.currentStreak}
+                    </Text>
+                  )}
                 </View>
               </View>
 
