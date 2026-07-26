@@ -292,6 +292,7 @@ export default function Sidebar({
     { id: 'scheduled', label: 'Scheduled', icon: '📅' },
     { id: 'timetracking', label: 'Time Tracking', icon: '⏱️' },
     { id: 'stats', label: 'Deep Stats', icon: '📈' },
+    { id: 'tracking', label: 'Tracking', icon: '📊' },
     { id: 'backlog', label: 'Backlog', icon: '📦', badge: backlogBadgeCount },
   ];
 

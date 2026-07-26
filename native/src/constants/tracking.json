@@ -1,0 +1,152 @@
+{
+  "trackers": [
+    {
+      "id": "tracker_study",
+      "name": "Study Time",
+      "emoji": "📚",
+      "unit": "hours",
+      "valueType": "duration",
+      "frequency": "daily",
+      "color": "#bc8cff",
+      "createdAt": 1748390400000,
+      "entries": [
+        { "id": "st_01", "period": "2026-07-05", "value": 5400,  "recordedAt": 1751731200000 },
+        { "id": "st_02", "period": "2026-07-06", "value": 7200,  "recordedAt": 1751817600000 },
+        { "id": "st_03", "period": "2026-07-07", "value": 3600,  "recordedAt": 1751904000000 },
+        { "id": "st_04", "period": "2026-07-09", "value": 9000,  "recordedAt": 1752076800000 },
+        { "id": "st_05", "period": "2026-07-10", "value": 6300,  "recordedAt": 1752163200000 },
+        { "id": "st_06", "period": "2026-07-11", "value": 7800,  "recordedAt": 1752249600000 },
+        { "id": "st_07", "period": "2026-07-12", "value": 4500,  "recordedAt": 1752336000000 },
+        { "id": "st_08", "period": "2026-07-14", "value": 10800, "recordedAt": 1752508800000 },
+        { "id": "st_09", "period": "2026-07-15", "value": 8100,  "recordedAt": 1752595200000 },
+        { "id": "st_10", "period": "2026-07-16", "value": 5400,  "recordedAt": 1752681600000 },
+        { "id": "st_11", "period": "2026-07-17", "value": 9600,  "recordedAt": 1752768000000 },
+        { "id": "st_12", "period": "2026-07-18", "value": 7200,  "recordedAt": 1752854400000 },
+        { "id": "st_13", "period": "2026-07-19", "value": 3000,  "recordedAt": 1752940800000 },
+        { "id": "st_14", "period": "2026-07-21", "value": 12600, "recordedAt": 1753113600000 },
+        { "id": "st_15", "period": "2026-07-22", "value": 9000,  "recordedAt": 1753200000000 },
+        { "id": "st_16", "period": "2026-07-23", "value": 7200,  "recordedAt": 1753286400000 },
+        { "id": "st_17", "period": "2026-07-24", "value": 10800, "recordedAt": 1753372800000 },
+        { "id": "st_18", "period": "2026-07-25", "value": 8400,  "recordedAt": 1753459200000 },
+        { "id": "st_19", "period": "2026-07-26", "value": 5400,  "recordedAt": 1753545600000 }
+      ]
+    },
+    {
+      "id": "tracker_skipping",
+      "name": "Skipping",
+      "emoji": "🪢",
+      "unit": "skips",
+      "valueType": "count",
+      "frequency": "daily",
+      "color": "#3fb950",
+      "createdAt": 1750464000000,
+      "entries": [
+        { "id": "sk_01", "period": "2026-07-13", "value": 300,  "recordedAt": 1752422400000 },
+        { "id": "sk_02", "period": "2026-07-14", "value": 450,  "recordedAt": 1752508800000 },
+        { "id": "sk_03", "period": "2026-07-15", "value": 400,  "recordedAt": 1752595200000 },
+        { "id": "sk_04", "period": "2026-07-16", "value": 550,  "recordedAt": 1752681600000 },
+        { "id": "sk_05", "period": "2026-07-17", "value": 500,  "recordedAt": 1752768000000 },
+        { "id": "sk_06", "period": "2026-07-18", "value": 350,  "recordedAt": 1752854400000 },
+        { "id": "sk_07", "period": "2026-07-20", "value": 600,  "recordedAt": 1753027200000 },
+        { "id": "sk_08", "period": "2026-07-21", "value": 700,  "recordedAt": 1753113600000 },
+        { "id": "sk_09", "period": "2026-07-22", "value": 650,  "recordedAt": 1753200000000 },
+        { "id": "sk_10", "period": "2026-07-23", "value": 480,  "recordedAt": 1753286400000 },
+        { "id": "sk_11", "period": "2026-07-24", "value": 750,  "recordedAt": 1753372800000 },
+        { "id": "sk_12", "period": "2026-07-25", "value": 600,  "recordedAt": 1753459200000 },
+        { "id": "sk_13", "period": "2026-07-26", "value": 450,  "recordedAt": 1753545600000 }
+      ]
+    },
+    {
+      "id": "tracker_walking",
+      "name": "Walking",
+      "emoji": "🚶",
+      "unit": "km",
+      "valueType": "decimal",
+      "frequency": "daily",
+      "color": "#58a6ff",
+      "createdAt": 1750464000000,
+      "entries": [
+        { "id": "wk_01", "period": "2026-07-16", "value": 4.5, "recordedAt": 1752681600000 },
+        { "id": "wk_02", "period": "2026-07-17", "value": 5.2, "recordedAt": 1752768000000 },
+        { "id": "wk_03", "period": "2026-07-18", "value": 6.0, "recordedAt": 1752854400000 },
+        { "id": "wk_04", "period": "2026-07-20", "value": 3.8, "recordedAt": 1753027200000 },
+        { "id": "wk_05", "period": "2026-07-21", "value": 5.5, "recordedAt": 1753113600000 },
+        { "id": "wk_06", "period": "2026-07-22", "value": 4.2, "recordedAt": 1753200000000 },
+        { "id": "wk_07", "period": "2026-07-23", "value": 5.0, "recordedAt": 1753286400000 },
+        { "id": "wk_08", "period": "2026-07-24", "value": 6.3, "recordedAt": 1753372800000 },
+        { "id": "wk_09", "period": "2026-07-25", "value": 5.8, "recordedAt": 1753459200000 },
+        { "id": "wk_10", "period": "2026-07-26", "value": 4.7, "recordedAt": 1753545600000 }
+      ]
+    },
+    {
+      "id": "tracker_books",
+      "name": "Books Read",
+      "emoji": "📖",
+      "unit": "books",
+      "valueType": "count",
+      "frequency": "weekly",
+      "color": "#e3b341",
+      "createdAt": 1746566400000,
+      "entries": [
+        { "id": "bk_01", "period": "2026-W19", "value": 1, "recordedAt": 1746998400000 },
+        { "id": "bk_02", "period": "2026-W20", "value": 2, "recordedAt": 1747612800000 },
+        { "id": "bk_03", "period": "2026-W21", "value": 1, "recordedAt": 1748217600000 },
+        { "id": "bk_04", "period": "2026-W23", "value": 3, "recordedAt": 1749427200000 },
+        { "id": "bk_05", "period": "2026-W24", "value": 2, "recordedAt": 1750032000000 },
+        { "id": "bk_06", "period": "2026-W25", "value": 1, "recordedAt": 1750636800000 },
+        { "id": "bk_07", "period": "2026-W26", "value": 2, "recordedAt": 1751241600000 },
+        { "id": "bk_08", "period": "2026-W27", "value": 3, "recordedAt": 1751846400000 },
+        { "id": "bk_09", "period": "2026-W29", "value": 1, "recordedAt": 1753056000000 },
+        { "id": "bk_10", "period": "2026-W30", "value": 2, "recordedAt": 1753545600000 }
+      ]
+    },
+    {
+      "id": "tracker_weight",
+      "name": "Weight",
+      "emoji": "⚖️",
+      "unit": "kg",
+      "valueType": "decimal",
+      "frequency": "daily",
+      "color": "#58a6ff",
+      "createdAt": 1748390400000,
+      "entries": [
+        { "id": "wt_01", "period": "2026-07-06", "value": 79.2, "recordedAt": 1751817600000 },
+        { "id": "wt_02", "period": "2026-07-07", "value": 78.9, "recordedAt": 1751904000000 },
+        { "id": "wt_03", "period": "2026-07-08", "value": 79.1, "recordedAt": 1751990400000 },
+        { "id": "wt_04", "period": "2026-07-09", "value": 78.8, "recordedAt": 1752076800000 },
+        { "id": "wt_05", "period": "2026-07-10", "value": 78.5, "recordedAt": 1752163200000 },
+        { "id": "wt_06", "period": "2026-07-11", "value": 78.7, "recordedAt": 1752249600000 },
+        { "id": "wt_07", "period": "2026-07-13", "value": 78.2, "recordedAt": 1752422400000 },
+        { "id": "wt_08", "period": "2026-07-14", "value": 78.0, "recordedAt": 1752508800000 },
+        { "id": "wt_09", "period": "2026-07-15", "value": 77.8, "recordedAt": 1752595200000 },
+        { "id": "wt_10", "period": "2026-07-16", "value": 78.1, "recordedAt": 1752681600000 },
+        { "id": "wt_11", "period": "2026-07-17", "value": 77.6, "recordedAt": 1752768000000 },
+        { "id": "wt_12", "period": "2026-07-18", "value": 77.5, "recordedAt": 1752854400000 },
+        { "id": "wt_13", "period": "2026-07-20", "value": 77.3, "recordedAt": 1753027200000 },
+        { "id": "wt_14", "period": "2026-07-21", "value": 77.0, "recordedAt": 1753113600000 },
+        { "id": "wt_15", "period": "2026-07-22", "value": 77.2, "recordedAt": 1753200000000 },
+        { "id": "wt_16", "period": "2026-07-23", "value": 76.8, "recordedAt": 1753286400000 },
+        { "id": "wt_17", "period": "2026-07-24", "value": 76.9, "recordedAt": 1753372800000 },
+        { "id": "wt_18", "period": "2026-07-25", "value": 76.6, "recordedAt": 1753459200000 },
+        { "id": "wt_19", "period": "2026-07-26", "value": 76.4, "recordedAt": 1753545600000 }
+      ]
+    },
+    {
+      "id": "tracker_movies",
+      "name": "Movies Watched",
+      "emoji": "🎬",
+      "unit": "movies",
+      "valueType": "count",
+      "frequency": "monthly",
+      "color": "#ff7b72",
+      "createdAt": 1740441600000,
+      "entries": [
+        { "id": "mv_01", "period": "2026-03", "value": 5,  "recordedAt": 1743465600000 },
+        { "id": "mv_02", "period": "2026-04", "value": 7,  "recordedAt": 1746144000000 },
+        { "id": "mv_03", "period": "2026-05", "value": 4,  "recordedAt": 1748736000000 },
+        { "id": "mv_04", "period": "2026-06", "value": 9,  "recordedAt": 1751414400000 },
+        { "id": "mv_05", "period": "2026-07", "value": 6,  "recordedAt": 1753545600000 }
+      ]
+    }
+  ]
+}

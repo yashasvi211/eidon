@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
 import { Task, Session, AuditEntry } from "../components/DetailPanel";
+import { Tracker, TrackerEntry } from "../types/tracking";
 import { DROPBOX_APP_KEY, DROPBOX_APP_SECRET } from '../constants/env';
 
 const DB_FILE_URI = FileSystem.documentDirectory + 'eidon_db.json';
@@ -12,6 +13,7 @@ const DROPBOX_CONTENT = 'https://content.dropboxapi.com';
 interface AppDatabase {
   tasks: Task[];
   projects: { name: string; color: string }[];
+  trackers: Tracker[];
   settings: {
     isSleeping: boolean;
     sleepStartTime: number | null;
@@ -30,6 +32,7 @@ interface AppDatabase {
 let memoryDb: AppDatabase = {
   tasks: [],
   projects: [],
+  trackers: [],
   settings: {
     isSleeping: false,
     sleepStartTime: null,
@@ -56,6 +59,7 @@ async function loadDb() {
       const content = await FileSystem.readAsStringAsync(DB_FILE_URI);
       const parsed = JSON.parse(content);
       memoryDb = { ...memoryDb, ...parsed };
+      memoryDb.trackers = parsed.trackers || [];
       if (!memoryDb.settings) {
         memoryDb.settings = {
           isSleeping: false,
@@ -205,6 +209,26 @@ async function mergeSeedData() {
       }
     }
 
+    try {
+      const trackingJson = require('../constants/tracking.json');
+      const trackingList = Array.isArray(trackingJson) ? trackingJson : trackingJson.trackers;
+      if (trackingList && Array.isArray(trackingList)) {
+        for (const seedTracker of trackingList) {
+          const idx = memoryDb.trackers.findIndex(t => t.id === seedTracker.id);
+          if (idx === -1) {
+            memoryDb.trackers.push(JSON.parse(JSON.stringify(seedTracker)));
+            changed = true;
+          } else if ((memoryDb.trackers[idx].entries?.length || 0) < (seedTracker.entries?.length || 0)) {
+            memoryDb.trackers[idx] = JSON.parse(JSON.stringify(seedTracker));
+            changed = true;
+          }
+        }
+      }
+    } catch (e) {
+      console.log('No tracking seed data found');
+    }
+
+
     if (changed) {
       await saveDb();
       console.log('Seed data merged from tasks.json');
@@ -223,6 +247,60 @@ export const api = {
     if (memoryDb.settings.dropboxToken && !memoryDb.settings.dropboxRefreshToken) {
       memoryDb.settings.dropboxToken = '';
       memoryDb.settings.tokenExpiresAt = 0;
+      await saveDb();
+    }
+  },
+
+
+  // --- TRACKERS ---
+  async getTrackers(): Promise<Tracker[]> {
+    await loadDb();
+    return memoryDb.trackers || [];
+  },
+
+  async createTracker(tracker: Tracker): Promise<void> {
+    await loadDb();
+    const exists = memoryDb.trackers.some(t => t.id === tracker.id);
+    if (!exists) {
+      memoryDb.trackers.push(JSON.parse(JSON.stringify(tracker)));
+      await saveDb();
+    }
+  },
+
+  async updateTracker(trackerId: string, updates: Partial<Tracker>): Promise<void> {
+    await loadDb();
+    const trackerIndex = memoryDb.trackers.findIndex(t => t.id === trackerId);
+    if (trackerIndex !== -1) {
+      memoryDb.trackers[trackerIndex] = { ...memoryDb.trackers[trackerIndex], ...updates };
+      await saveDb();
+    }
+  },
+
+  async deleteTracker(trackerId: string): Promise<void> {
+    await loadDb();
+    memoryDb.trackers = memoryDb.trackers.filter(t => t.id !== trackerId);
+    await saveDb();
+  },
+
+  async upsertTrackerEntry(trackerId: string, entry: TrackerEntry): Promise<void> {
+    await loadDb();
+    const tracker = memoryDb.trackers.find(t => t.id === trackerId);
+    if (tracker) {
+      const entryIndex = tracker.entries.findIndex(e => e.period === entry.period);
+      if (entryIndex !== -1) {
+        tracker.entries[entryIndex] = entry;
+      } else {
+        tracker.entries.push(entry);
+      }
+      await saveDb();
+    }
+  },
+
+  async deleteTrackerEntry(trackerId: string, entryId: string): Promise<void> {
+    await loadDb();
+    const tracker = memoryDb.trackers.find(t => t.id === trackerId);
+    if (tracker) {
+      tracker.entries = tracker.entries.filter(e => e.id !== entryId);
       await saveDb();
     }
   },
@@ -361,6 +439,7 @@ export const api = {
         const parsed = JSON.parse(content);
         if (parsed.tasks) {
           memoryDb = { ...memoryDb, ...parsed };
+      memoryDb.trackers = parsed.trackers || [];
           if (!memoryDb.settings) {
             memoryDb.settings = { isSleeping: false, sleepStartTime: null, dropboxToken: '', dropboxRefreshToken: '', tokenExpiresAt: 0, dropboxPath: '/eidon_db.json', syncIntervalMinutes: 30, lastSyncTime: null, autoSyncEnabled: false, reminderStyle: 'banner', reminderRequireAuth: false };
           }

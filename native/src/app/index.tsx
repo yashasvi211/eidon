@@ -27,6 +27,10 @@ import TimeTracking from "../components/TimeTracking";
 import ScheduledView from "../components/ScheduledView";
 import { Colors } from "../constants/theme";
 import Header from "../components/Header";
+import TrackingScreen from "../components/TrackingScreen";
+import TrackerDetail from "../components/TrackerDetail";
+import AddTrackerModal from "../components/AddTrackerModal";
+import { Tracker } from "../types/tracking";
 import AddTaskModal from "../components/AddTaskModal";
 import type { ReminderConfig, TaskRecurrenceConfig } from "../components/AddTaskModal";
 import NotificationBanner, { NotificationData } from "../components/NotificationBanner";
@@ -265,6 +269,17 @@ export default function AppIndex() {
 
   const [projects, setProjects] = useState<{ name: string; color: string }[]>([]);
 
+  // Tracking state
+  const [trackers, setTrackers] = useState<Tracker[]>([]);
+  const [selectedTracker, setSelectedTracker] = useState<Tracker | null>(null);
+  const [showAddTrackerModal, setShowAddTrackerModal] = useState(false);
+
+  useEffect(() => {
+    if (currentView !== "tracking") {
+      setSelectedTracker(null);
+    }
+  }, [currentView]);
+
   // Notification/reminder state
   const [activeNotification, setActiveNotification] = useState<NotificationData | null>(null);
   const [notificationQueue, setNotificationQueue] = useState<NotificationData[]>([]);
@@ -498,9 +513,11 @@ export default function AppIndex() {
         const fetchedTasks = await api.getTasks();
         const fetchedProjects = await api.getProjects();
         const fetchedSettings = await api.getSettings();
+        const fetchedTrackers = await api.getTrackers();
 
         setTasks(fetchedTasks || []);
         setProjects(fetchedProjects || []);
+        setTrackers(fetchedTrackers || []);
         if (fetchedSettings) {
           setIsSleeping(fetchedSettings.isSleeping);
           setSleepStartTime(fetchedSettings.sleepStartTime);
@@ -1163,10 +1180,50 @@ export default function AppIndex() {
     try {
       const fetchedTasks = await api.getTasks();
       const fetchedProjects = await api.getProjects();
+      const fetchedTrackers = await api.getTrackers();
       setTasks(fetchedTasks || []);
       setProjects(fetchedProjects || []);
+      setTrackers(fetchedTrackers || []);
     } catch (err: any) {
       console.error("Failed to reload data:", err);
+    }
+  };
+
+  const handleAddTracker = async (newTracker: Tracker) => {
+    try {
+      await api.createTracker(newTracker);
+      setTrackers(prev => [...prev, newTracker]);
+      setShowAddTrackerModal(false);
+      showToast("Tracker created");
+    } catch (err: any) {
+      console.error("Failed to create tracker:", err);
+      showErrorAlert("Save Failed", `Could not save tracker.\n\n${err?.message || err}`);
+    }
+  };
+
+  const handleUpdateTracker = async (updatedTracker: Tracker) => {
+    try {
+      await api.updateTracker(updatedTracker.id, updatedTracker);
+      setTrackers(prev => prev.map(t => t.id === updatedTracker.id ? updatedTracker : t));
+      if (selectedTracker?.id === updatedTracker.id) {
+        setSelectedTracker(updatedTracker);
+      }
+    } catch (err: any) {
+      console.error("Failed to update tracker:", err);
+      showErrorAlert("Update Failed", `Could not update tracker.\n\n${err?.message || err}`);
+    }
+  };
+
+  const handleDeleteTracker = async () => {
+    if (!selectedTracker) return;
+    try {
+      await api.deleteTracker(selectedTracker.id);
+      setTrackers(prev => prev.filter(t => t.id !== selectedTracker.id));
+      setSelectedTracker(null);
+      showToast("Tracker deleted");
+    } catch (err: any) {
+      console.error("Failed to delete tracker:", err);
+      showErrorAlert("Delete Failed", `Could not delete tracker.\n\n${err?.message || err}`);
     }
   };
 
@@ -1204,6 +1261,25 @@ export default function AppIndex() {
         />
       );
     }
+    if (currentView === "tracking") {
+      if (selectedTracker) {
+        return (
+          <TrackerDetail
+            tracker={selectedTracker}
+            onBack={() => setSelectedTracker(null)}
+            onUpdate={handleUpdateTracker}
+            onDelete={handleDeleteTracker}
+          />
+        );
+      }
+      return (
+        <TrackingScreen
+          trackers={trackers}
+          onSelectTracker={(t) => setSelectedTracker(t)}
+          onAddTracker={() => setShowAddTrackerModal(true)}
+        />
+      );
+    }
 
     return (
       <TaskPanel
@@ -1224,7 +1300,21 @@ export default function AppIndex() {
     );
   };
 
-  const headerRight = (
+  const headerRight = currentView === "tracking" ? (
+    selectedTracker ? null : (
+      <TouchableOpacity
+        style={[
+          styles.addBtn,
+          { backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder },
+        ]}
+        onPress={() => setShowAddTrackerModal(true)}
+      >
+        <Text style={{ color: colors.ghText, fontSize: 12, fontWeight: "600" }}>
+          + New Tracker
+        </Text>
+      </TouchableOpacity>
+    )
+  ) : (
     <TouchableOpacity
       style={[
         styles.addBtn,
@@ -1250,7 +1340,11 @@ export default function AppIndex() {
             ? "Deep Stats"
             : currentView === "timetracking"
               ? "Time Tracking"
-              : currentView.charAt(0).toUpperCase() + currentView.slice(1));
+              : currentView === "tracking"
+                ? selectedTracker
+                  ? `${selectedTracker.emoji} ${selectedTracker.name}`
+                  : "Tracking"
+                : currentView.charAt(0).toUpperCase() + currentView.slice(1));
 
   const handleTouchStart = (e: any) => {
     touchStartX.current = e.nativeEvent.pageX;
@@ -1412,6 +1506,12 @@ export default function AppIndex() {
         }}
         projects={projects}
         initialTask={editingTask}
+      />
+
+      <AddTrackerModal
+        visible={showAddTrackerModal}
+        onClose={() => setShowAddTrackerModal(false)}
+        onAdd={handleAddTracker}
       />
 
       <Modal
