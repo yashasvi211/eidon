@@ -151,7 +151,13 @@ async function readProjectMeta(folderName: string): Promise<{ name: string; colo
   const meta = await readJson<{ name: string; color: string }>(
     EIDON_DIR + folderName + '/.meta.json'
   );
-  return meta ?? { name: folderName, color: '#58a6ff' };
+  const name = (meta && meta.name && typeof meta.name === 'string' && meta.name.trim() !== '') 
+    ? meta.name 
+    : folderName;
+  const color = (meta && meta.color && typeof meta.color === 'string' && meta.color.trim() !== '') 
+    ? meta.color 
+    : '#58a6ff';
+  return { name, color };
 }
 
 async function writeProjectMeta(folderName: string, data: { name: string; color: string }) {
@@ -245,15 +251,31 @@ async function loadAll() {
   cache.projectMeta = [];
   cache.tasks = [];
 
+  const seenProjNames = new Set<string>();
+  const seenTaskIds = new Set<string>();
   for (const folder of folderNames) {
     const meta = await readProjectMeta(folder);
-    cache.projectMeta.push(meta);
+    const lower = meta.name.toLowerCase();
+    if (!seenProjNames.has(lower)) {
+      seenProjNames.add(lower);
+      cache.projectMeta.push(meta);
+    }
 
     // Load tasks inside this folder
     const files = await listJsonFiles(EIDON_DIR + folder + '/');
     for (const file of files) {
       const task = await readJson<Task>(EIDON_DIR + folder + '/' + file);
-      if (task) cache.tasks.push(task);
+      if (task) {
+        if (!seenTaskIds.has(task.id)) {
+          seenTaskIds.add(task.id);
+          cache.tasks.push(task);
+        } else {
+          // Duplicate task file on disk! Delete it so it never reappears.
+          try {
+            await FileSystem.deleteAsync(EIDON_DIR + folder + '/' + file, { idempotent: true });
+          } catch (e) {}
+        }
+      }
     }
   }
 
@@ -365,12 +387,22 @@ export const api = {
 
   async getProjects(): Promise<{ name: string; color: string }[]> {
     await loadAll();
+    const seen = new Set<string>();
+    const uniq: { name: string; color: string }[] = [];
+    for (const p of cache.projectMeta) {
+      const lower = p.name.toLowerCase();
+      if (!seen.has(lower)) {
+        seen.add(lower);
+        uniq.push(p);
+      }
+    }
+    cache.projectMeta = uniq;
     return [...cache.projectMeta];
   },
 
   async createProject(project: { name: string; color: string }): Promise<void> {
     await loadAll();
-    const already = cache.projectMeta.some(p => p.name === project.name);
+    const already = cache.projectMeta.some(p => p.name.toLowerCase() === project.name.toLowerCase());
     if (already) return;
     const folder = projectFolder(project.name);
     await ensureDir(EIDON_DIR + folder + '/');
@@ -385,7 +417,7 @@ export const api = {
     if (dirInfo.exists) {
       await FileSystem.deleteAsync(EIDON_DIR + folder + '/', { idempotent: true });
     }
-    cache.projectMeta = cache.projectMeta.filter(p => p.name !== projectName);
+    cache.projectMeta = cache.projectMeta.filter(p => p.name.toLowerCase() !== projectName.toLowerCase());
     cache.tasks = cache.tasks.filter(t => t.project !== projectName);
   },
 
@@ -393,6 +425,15 @@ export const api = {
 
   async getTasks(): Promise<Task[]> {
     await loadAll();
+    const seen = new Set<string>();
+    const uniq: Task[] = [];
+    for (const t of cache.tasks) {
+      if (!seen.has(t.id)) {
+        seen.add(t.id);
+        uniq.push(t);
+      }
+    }
+    cache.tasks = uniq;
     return [...cache.tasks];
   },
 
@@ -432,8 +473,11 @@ export const api = {
     await loadAll();
     const task = cache.tasks.find(t => t.id === taskId);
     if (!task) return;
-    const path = taskFilePath(task.project || 'Inbox', taskId);
-    await FileSystem.deleteAsync(path, { idempotent: true });
+    for (const proj of cache.projectMeta) {
+      const path = taskFilePath(proj.name, taskId);
+      await FileSystem.deleteAsync(path, { idempotent: true }).catch(() => {});
+    }
+    await FileSystem.deleteAsync(taskFilePath('Inbox', taskId), { idempotent: true }).catch(() => {});
     cache.tasks = cache.tasks.filter(t => t.id !== taskId);
   },
 
@@ -613,11 +657,18 @@ export const api = {
     try {
       const tasksJson = require('../constants/tasks.json');
       if (tasksJson.tasks) {
-        for (const task of tasksJson.tasks as Task[]) {
-          const exists = cache.tasks.some(t => t.id === task.id);
-          if (exists) {
-            await api.deleteTask(task.id);
+        for (const mockTask of tasksJson.tasks as Task[]) {
+          const matching = cache.tasks.filter(t => t.id === mockTask.id || t.title === mockTask.title);
+          for (const m of matching) {
+            await api.deleteTask(m.id);
             taskCount++;
+          }
+        }
+      }
+      if (tasksJson.projects) {
+        for (const proj of tasksJson.projects as { name: string; color: string }[]) {
+          if (proj.name !== 'Inbox' && !cache.tasks.some(t => t.project === proj.name)) {
+            await api.deleteProject(proj.name);
           }
         }
       }
@@ -627,10 +678,10 @@ export const api = {
       const trackingJson = require('../constants/tracking.json');
       const trackerList = Array.isArray(trackingJson) ? trackingJson : trackingJson.trackers;
       if (trackerList) {
-        for (const tracker of trackerList as Tracker[]) {
-          const exists = cache.trackers.some(t => t.id === tracker.id);
-          if (exists) {
-            await api.deleteTracker(tracker.id);
+        for (const mockTracker of trackerList as Tracker[]) {
+          const matching = cache.trackers.filter(t => t.id === mockTracker.id || t.name === mockTracker.name);
+          for (const m of matching) {
+            await api.deleteTracker(m.id);
             trackerCount++;
           }
         }
@@ -712,40 +763,67 @@ export const api = {
     const token = cache.settings.dropboxToken;
     if (!token) return { success: false, message: 'No Dropbox token configured.' };
 
-    // Determine upload path: if user set a .json path use it, otherwise use /eidon/eidon_export.json
-    let remotePath = cache.settings.dropboxPath || '/eidon/';
-    if (!remotePath.endsWith('.json')) {
-      if (!remotePath.endsWith('/')) remotePath += '/';
-      remotePath += 'eidon_export.json';
+    let remoteRoot = cache.settings.dropboxPath || '/eidon';
+    if (remoteRoot.endsWith('.json')) {
+      remoteRoot = remoteRoot.substring(0, remoteRoot.lastIndexOf('/')) || '/eidon';
     }
+    if (remoteRoot.endsWith('/')) remoteRoot = remoteRoot.slice(0, -1);
 
     try {
-      const exportContent = buildExportJson();
-      const response = await fetch(`${DROPBOX_CONTENT}/2/files/upload`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Dropbox-API-Arg': JSON.stringify({ path: remotePath, mode: 'overwrite', mute: true }),
-          'Content-Type': 'application/octet-stream',
-        },
-        body: exportContent,
-      });
+      const filesToUpload: { localPath: string; relPath: string }[] = [];
+      const scanDirForUpload = async (dir: string, prefix: string) => {
+        try {
+          const items = await FileSystem.readDirectoryAsync(dir);
+          for (const item of items) {
+            if (item.startsWith('.')) continue;
+            const fullPath = dir + item;
+            const info = await FileSystem.getInfoAsync(fullPath);
+            if (info.isDirectory) {
+              await scanDirForUpload(fullPath + '/', prefix + '/' + item);
+            } else if (item.endsWith('.json')) {
+              filesToUpload.push({ localPath: fullPath, relPath: prefix + '/' + item });
+            }
+          }
+        } catch {}
+      };
 
-      if (response.status >= 200 && response.status < 300) {
+      await scanDirForUpload(EIDON_DIR, '');
+      if (filesToUpload.length === 0) {
+        return { success: false, message: 'No files found to sync.' };
+      }
+
+      let uploadedCount = 0;
+      let lastError = '';
+
+      for (const f of filesToUpload) {
+        try {
+          const content = await FileSystem.readAsStringAsync(f.localPath);
+          const remoteFilePath = `${remoteRoot}${f.relPath}`;
+          const response = await fetch(`${DROPBOX_CONTENT}/2/files/upload`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Dropbox-API-Arg': JSON.stringify({ path: remoteFilePath, mode: 'overwrite', mute: true }),
+              'Content-Type': 'application/octet-stream',
+            },
+            body: content,
+          });
+          if (response.status >= 200 && response.status < 300) {
+            uploadedCount++;
+          } else {
+            lastError = `Failed on ${f.relPath} (${response.status})`;
+          }
+        } catch (e: any) {
+          lastError = e.message || 'Network error';
+        }
+      }
+
+      if (uploadedCount > 0) {
         cache.settings.lastSyncTime = Date.now();
         await writeJson(SETTINGS_FILE, cache.settings);
-        return { success: true, message: `Uploaded to Dropbox as ${remotePath}` };
+        return { success: true, message: `Synced ${uploadedCount} files across folders to Dropbox (${remoteRoot})` };
       } else {
-        const errText = await response.text();
-        let msg = `Upload failed (${response.status})`;
-        try {
-          const j = JSON.parse(errText);
-          const s = j.error_summary || j.error?.['.tag'] || '';
-          if (s) msg += `: ${s}`;
-        } catch {
-          if (errText) msg += `: ${errText.slice(0, 300)}`;
-        }
-        return { success: false, message: msg };
+        return { success: false, message: `Upload failed: ${lastError || 'Unknown error'}` };
       }
     } catch (err: any) {
       return { success: false, message: err.message || 'Upload failed' };

@@ -167,9 +167,11 @@ export default function TaskPanel({
   };
 
   const baseFiltered = tasks
+    .filter((t, idx, self) => self.findIndex(x => x.id === t.id) === idx)
     .filter((t) => {
       if (currentProject) return t.project === currentProject;
       if (currentView === "inbox") return t.project === "Inbox";
+      if (currentView === "all") return true;
       const backlog = isTaskBacklog(t);
       if (currentView === "backlog") return backlog;
       if (currentView === "today") return !backlog && isTaskCurrent(t);
@@ -404,7 +406,7 @@ export default function TaskPanel({
   const activeTasks = baseFiltered.filter(t => !t.done);
   const completedTasks = baseFiltered.filter(t => t.done);
 
-  if (!currentProject && currentView === "backlog") {
+  if (!currentProject && (currentView === "backlog" || currentView === "all")) {
     const byProject = activeTasks.reduce((acc, t) => {
       if (!acc[t.project]) acc[t.project] = [];
       acc[t.project].push(t);
@@ -467,7 +469,7 @@ export default function TaskPanel({
     <View style={[styles.container, { backgroundColor: colors.ghBg }]}>
       <FlatList
         data={listData}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => `${item.id}_${index}`}
         renderItem={renderItem}
         contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
       />

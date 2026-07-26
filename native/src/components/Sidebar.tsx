@@ -328,13 +328,35 @@ export default function Sidebar({
     setModalNewProjectName('');
   };
 
-  const todayBadgeCount = tasks.filter((t) => t.target === 'today' && !t.done).length;
-  const inboxBadgeCount = tasks.filter((t) => t.project === 'Inbox' && !t.done).length;
-  const backlogBadgeCount = tasks.filter((t) => t.target === 'backlog' && !t.done).length;
+  const seenProjNames = new Set<string>();
+  const uniqProjects = (projects || []).filter(Boolean).filter(p => {
+    if (!p || !p.name) return false;
+    const lower = p.name.trim().toLowerCase();
+    if (lower === 'inbox') return false;
+    if (seenProjNames.has(lower)) return false;
+    seenProjNames.add(lower);
+    return true;
+  });
+
+  const uniqTasks = tasks.filter((t, idx, self) => self.findIndex(x => x.id === t.id) === idx);
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const isTaskBacklog = (t: Task) => !t.recurrence && (t.target === "backlog" || (t.due && t.due < todayStr));
+  const isTaskCurrent = (t: Task) => {
+    if (isTaskBacklog(t)) return false;
+    if (t.due && t.due > todayStr) return false;
+    return t.target === "today" || t.due === todayStr || (!t.due && t.target === "today");
+  };
+
+  const todayBadgeCount = uniqTasks.filter((t) => !t.done && !isTaskBacklog(t) && isTaskCurrent(t)).length;
+  const inboxBadgeCount = uniqTasks.filter((t) => !t.done && t.project === 'Inbox').length;
+  const allBadgeCount = uniqTasks.filter((t) => !t.done).length;
+  const backlogBadgeCount = uniqTasks.filter((t) => !t.done && isTaskBacklog(t)).length;
 
   const views = [
     { id: 'today', label: "Today's Tasks", icon: '☀️', badge: todayBadgeCount },
     { id: 'inbox', label: 'Inbox', icon: '📥', badge: inboxBadgeCount },
+    { id: 'all', label: 'All', icon: '📋', badge: allBadgeCount },
     { id: 'scheduled', label: 'Scheduled', icon: '📅' },
     { id: 'timetracking', label: 'Time Tracking', icon: '⏱️' },
     { id: 'stats', label: 'Deep Stats', icon: '📈' },
@@ -347,6 +369,13 @@ export default function Sidebar({
       {!hideHeader && (
         <View style={styles.header}>
           <Text style={[styles.headerText, { color: colors.ghText }]}>Eidon</Text>
+          <TouchableOpacity 
+            style={styles.headerSettingsBtn} 
+            onPress={() => setIsSettingsOpen(true)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Feather name="settings" size={18} color={colors.ghMuted} />
+          </TouchableOpacity>
         </View>
       )}
       
@@ -387,48 +416,34 @@ export default function Sidebar({
           <Text style={[styles.sectionTitle, { color: colors.ghMuted }]}>PROJECTS</Text>
         </View>
         
-        {projects.map((proj) => {
-          const isActive = currentProject === proj.name;
+        {uniqProjects.map((proj, idx) => {
+          const pName = (proj && proj.name && typeof proj.name === 'string' && proj.name.trim() !== '') ? proj.name : `Project_${idx}`;
+          const pColor = (proj && proj.color && typeof proj.color === 'string' && proj.color.trim() !== '') ? proj.color : '#58a6ff';
+          const isActive = currentProject === pName;
           return (
             <TouchableOpacity
-              key={proj.name}
+              key={`${pName}_${idx}`}
               style={[
                 styles.menuItem,
-                isActive && { backgroundColor: colors.ghSurface2 }
+                isActive ? { backgroundColor: colors.ghSurface2 } : null
               ]}
               onPress={() => {
-                setCurrentProject(proj.name);
+                setCurrentProject(pName);
                 setCurrentView('today');
               }}
             >
-              {isActive && <View style={[styles.activeIndicator, { backgroundColor: colors.ghBlue }]} />}
-              <View style={[styles.projectColorDot, { backgroundColor: proj.color }]} />
+              {isActive ? <View style={[styles.activeIndicator, { backgroundColor: colors.ghBlue }]} /> : null}
+              <View style={[styles.projectColorDot, { backgroundColor: pColor }]} />
               <Text style={[
                 styles.menuText,
                 { color: isActive ? colors.ghText : colors.ghMuted }
               ]} numberOfLines={1}>
-                {proj.name}
+                {pName}
               </Text>
             </TouchableOpacity>
           );
         })}
       </ScrollView>
-
-      <View style={[styles.footer, { borderTopColor: colors.ghBorder, borderBottomWidth: 1, borderBottomColor: colors.ghBorder }]}>
-        <View style={styles.userSection}>
-          <View style={[styles.avatar, { backgroundColor: colors.ghBlue }]}>
-            <Text style={styles.avatarText}>JD</Text>
-          </View>
-          <Text style={[styles.userName, { color: colors.ghText }]} numberOfLines={1}>John Doe</Text>
-        </View>
-
-        <TouchableOpacity 
-          style={styles.footerBtn} 
-          onPress={() => setIsSettingsOpen(true)}
-        >
-          <Feather name="settings" size={16} color={colors.ghMuted} />
-        </TouchableOpacity>
-      </View>
       {insets.bottom > 0 && <View style={{ height: insets.bottom }} />}
 
       <Modal
@@ -851,32 +866,36 @@ export default function Sidebar({
               {/* MANAGE PROJECTS */}
               <View style={styles.settingsSection}>
                 <Text style={[styles.settingsSectionTitle, { color: colors.ghMuted }]}>MANAGE PROJECTS</Text>
-                {projects.length === 0 ? (
+                {uniqProjects.length === 0 ? (
                   <Text style={{ color: colors.ghMuted, fontStyle: 'italic', fontSize: 13, paddingHorizontal: 4 }}>
                     No projects created yet.
                   </Text>
                 ) : (
-                  projects.map((proj) => (
-                    <View
-                      key={proj.name}
-                      style={[
-                        styles.projectManageItem,
-                        { borderBottomColor: colors.ghBorder }
-                      ]}
-                    >
-                      <View style={[styles.projectColorDot, { backgroundColor: proj.color }]} />
-                      <Text style={[styles.projectManageName, { color: colors.ghText }]} numberOfLines={1}>
-                        {proj.name}
-                      </Text>
-                      <TouchableOpacity
-                        onPress={() => onDeleteProject(proj.name)}
-                        style={styles.deleteProjBtn}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  uniqProjects.map((proj, idx) => {
+                    const pName = (proj && proj.name && typeof proj.name === 'string' && proj.name.trim() !== '') ? proj.name : `Project_${idx}`;
+                    const pColor = (proj && proj.color && typeof proj.color === 'string' && proj.color.trim() !== '') ? proj.color : '#58a6ff';
+                    return (
+                      <View
+                        key={`manage_${pName}_${idx}`}
+                        style={[
+                          styles.projectManageItem,
+                          { borderBottomColor: colors.ghBorder }
+                        ]}
                       >
-                        <Feather name="trash-2" size={14} color={colors.ghRed} />
-                      </TouchableOpacity>
-                    </View>
-                  ))
+                        <View style={[styles.projectColorDot, { backgroundColor: pColor }]} />
+                        <Text style={[styles.projectManageName, { color: colors.ghText }]} numberOfLines={1}>
+                          {pName}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => onDeleteProject(pName)}
+                          style={styles.deleteProjBtn}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                          <Feather name="trash-2" size={14} color={colors.ghRed} />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })
                 )}
               </View>
             </ScrollView>
@@ -952,6 +971,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 22,
     paddingBottom: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerSettingsBtn: {
+    padding: 4,
   },
   headerText: {
     fontSize: 20,
