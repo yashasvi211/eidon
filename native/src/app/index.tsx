@@ -9,6 +9,7 @@ import {
   Modal,
   Platform,
   Alert,
+  AppState,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -80,51 +81,49 @@ function processRecurrenceMissedDeadlines(tasks: Task[]): Task[] {
     // If due date is today or future, nothing to process
     if (task.due >= todayStr) return task;
 
-    // Due date is in the past
-    // Check if this period is already recorded in history
-    const alreadyRecorded = (rec.history || []).some(e => e.periodDue === task.due);
-    if (alreadyRecorded) {
-      // Just advance due date if not already moved forward
-      const nextDue = advanceRecurringTaskDue(task.due!, rec.frequency);
-      if (nextDue <= todayStr) {
-        // Still needs more advancing — keep going
-        return task; // Will be handled by a deeper pass (for now advance once)
-      }
-      return { ...task, due: nextDue, done: false, completedAt: null };
-    }
-
-    const newEntry: StreakEntry = {
-      id: `se_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-      periodDue: task.due!,
-      completed: task.done,
-      completedAt: task.done ? (task.completedAt ?? undefined) : undefined,
-      missed: !task.done,
-    };
-
+    // Due date is in the past (< todayStr). Loop until due >= todayStr!
+    let currDue = task.due;
     let newCurrentStreak = rec.currentStreak;
     let newMaxStreak = rec.maxStreak;
+    let newHistory = [...(rec.history || [])];
+    let isDone = task.done;
+    let completedAt = task.completedAt;
 
-    if (task.done) {
-      // Was completed before deadline — streak continues
-      newCurrentStreak = rec.currentStreak + 1;
-      newMaxStreak = Math.max(rec.maxStreak, newCurrentStreak);
-    } else {
-      // Missed — break the streak
-      newCurrentStreak = 0;
+    while (currDue < todayStr) {
+      const alreadyRecorded = newHistory.some(e => e.periodDue === currDue);
+      if (!alreadyRecorded) {
+        const newEntry: StreakEntry = {
+          id: `se_${Date.now()}_${Math.random().toString(36).slice(2)}_${currDue}`,
+          periodDue: currDue,
+          completed: isDone,
+          completedAt: isDone ? (completedAt ?? undefined) : undefined,
+          missed: !isDone,
+        };
+        newHistory.push(newEntry);
+
+        if (isDone) {
+          newCurrentStreak += 1;
+          newMaxStreak = Math.max(newMaxStreak, newCurrentStreak);
+        } else {
+          newCurrentStreak = 0; // Missed! Break streak!
+        }
+      }
+      // Once we process one cycle, subsequent missed cycles in the loop are not 'done'
+      isDone = false;
+      completedAt = null;
+      currDue = advanceRecurringTaskDue(currDue, rec.frequency);
     }
-
-    const nextDue = advanceRecurringTaskDue(task.due!, rec.frequency);
 
     return {
       ...task,
-      due: nextDue,
+      due: currDue,
       done: false,
       completedAt: null,
       recurrence: {
         ...rec,
         currentStreak: newCurrentStreak,
         maxStreak: newMaxStreak,
-        history: [...(rec.history || []), newEntry],
+        history: newHistory,
       },
     };
   });
@@ -576,6 +575,35 @@ export default function AppIndex() {
     registerForPushNotificationsAsync();
   }, []);
 
+  // Check recurring task deadlines when app returns to foreground from background/sleep
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        setTasks((prev) => {
+          if (!prev || prev.length === 0) return prev;
+          const processed = processRecurrenceMissedDeadlines(prev);
+          const changed = processed.some((t, i) => {
+            const orig = prev[i];
+            return t.due !== orig.due || t.done !== orig.done || JSON.stringify(t.recurrence) !== JSON.stringify(orig.recurrence);
+          });
+          if (changed) {
+            for (const task of processed) {
+              const orig = prev.find(t => t.id === task.id);
+              if (orig && (task.due !== orig.due || task.done !== orig.done || JSON.stringify(task.recurrence) !== JSON.stringify(orig.recurrence))) {
+                api.updateTask(task.id, { due: task.due, done: task.done, completedAt: task.completedAt, recurrence: task.recurrence }).catch(err =>
+                  console.error('Failed to persist recurrence update on app resume:', err)
+                );
+              }
+            }
+            return processed;
+          }
+          return prev;
+        });
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
   // Check Android alarm permissions when reminderStyle changes to fullscreen
   useEffect(() => {
     if (Platform.OS !== 'android' || reminderStyle !== 'fullscreen') return;
@@ -669,6 +697,16 @@ export default function AppIndex() {
 
     // For recurring tasks, completing means: record in history + advance due date + reset done flag
     if (isRecurring && completingNow && taskToToggle.due) {
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+      if (taskToToggle.due > todayStr) {
+        showErrorAlert(
+          "Task Not Due Yet",
+          `This recurring task is scheduled for ${taskToToggle.due}. You can only complete it on or after its scheduled date to maintain your streak.`
+        );
+        return;
+      }
+
       const rec = taskToToggle.recurrence!;
       const nowTs = Date.now();
 

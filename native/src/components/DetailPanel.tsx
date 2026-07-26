@@ -1019,38 +1019,6 @@ export default function DetailPanel({
                 </View>
               );
             })()}
-            {(() => {
-              if (!task.done && task.due) {
-                const dueObj = new Date(task.due + "T00:00:00");
-                if (task.dueTime) {
-                  const [h, m] = task.dueTime.split(":").map(Number);
-                  dueObj.setHours(h, m, 0, 0);
-                }
-                const diffMs = dueObj.getTime() - nowTime;
-                if (diffMs > 0) {
-                  const d = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-                  const h = Math.floor((diffMs / (1000 * 60 * 60)) % 24);
-                  const m = Math.floor((diffMs / 1000 / 60) % 60);
-                  const s = Math.floor((diffMs / 1000) % 60);
-                  return (
-                    <View style={{ backgroundColor: "rgba(31, 111, 235, 0.06)", borderWidth: 1, borderColor: "rgba(31, 111, 235, 0.15)", padding: 14, borderRadius: 12, marginBottom: 16, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                      <View style={{ flexDirection: "row", alignItems: "center" }}>
-                        <View style={{ backgroundColor: "rgba(31, 111, 235, 0.12)", width: 32, height: 32, borderRadius: 8, alignItems: "center", justifyContent: "center", marginRight: 10 }}>
-                          <Feather name="clock" size={15} color={colors.ghBlue || "#58a6ff"} />
-                        </View>
-                        <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: "600" }}>Time Left</Text>
-                      </View>
-                      <View style={{ backgroundColor: colors.ghSurface2, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 }}>
-                        <Text style={{ color: colors.ghBlue || "#58a6ff", fontSize: 13, fontWeight: "700", fontFamily: "monospace" }}>
-                          {d}d {h}h {m}m {s}s
-                        </Text>
-                      </View>
-                    </View>
-                  );
-                }
-              }
-              return null;
-            })()}
 
             {/* Status & Priority Row */}
             <View style={{ flexDirection: "row", gap: 10, marginBottom: 16 }}>
@@ -1301,6 +1269,7 @@ export default function DetailPanel({
 
                 let activeTimeStr = "-";
                 let overdueTimeStr = "-";
+                let timeLeftStr = "-";
 
                 if (task.due) {
                   const dueObj = new Date(task.due + "T00:00:00");
@@ -1311,7 +1280,13 @@ export default function DetailPanel({
                   
                   const diffMs = dueObj.getTime() - nowTime;
                   
-                  if (diffMs < 0) {
+                  if (diffMs > 0 && !task.done) {
+                    const d = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                    const h = Math.floor((diffMs / (1000 * 60 * 60)) % 24);
+                    const m = Math.floor((diffMs / 1000 / 60) % 60);
+                    const s = Math.floor((diffMs / 1000) % 60);
+                    timeLeftStr = `${d}d ${h}h ${m}m ${s}s`;
+                  } else if (diffMs < 0) {
                     const overMs = Math.abs(diffMs);
                     const overDays = Math.floor(overMs / (1000 * 60 * 60 * 24));
                     const overHours = Math.floor((overMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -1338,6 +1313,7 @@ export default function DetailPanel({
                   "Completed": { name: "check-circle", color: colors.ghGreen },
                   "Execution Start": { name: "play-circle", color: colors.ghBlue },
                   "Due": { name: "calendar", color: colors.ghBlue },
+                  "Time Left": { name: "clock", color: colors.ghBlue },
                   "Active Time": { name: "activity", color: "#56d4dd" },
                   "Overdue Time": { name: "alert-circle", color: colors.ghRed },
                 };
@@ -1357,6 +1333,7 @@ export default function DetailPanel({
                 if (completedAtStr) rows.push({ label: "Completed", value: completedAtStr, color: colors.ghGreen || "#3fb950" });
                 rows.push({ label: "Execution Start", value: execStartStr, color: colors.ghText });
                 rows.push({ label: "Due", value: dueStr, color: colors.ghText });
+                if (timeLeftStr !== "-") rows.push({ label: "Time Left", value: timeLeftStr, color: colors.ghBlue || "#58a6ff" });
                 if (activeTimeStr !== "-") rows.push({ label: "Active Time", value: activeTimeStr, color: "#56d4dd" });
                 if (overdueTimeStr !== "-") rows.push({ label: "Overdue Time", value: overdueTimeStr, color: colors.ghRed || '#f85149' });
 

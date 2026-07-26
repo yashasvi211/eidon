@@ -159,8 +159,12 @@ export default function TaskPanel({
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
-  const isTaskBacklog = (t: Task) => t.target === "backlog" || (t.due && t.due < todayStr);
-  const isTaskCurrent = (t: Task) => !isTaskBacklog(t) && (t.target === "today" || t.due === todayStr || (!t.due && t.target === "today"));
+  const isTaskBacklog = (t: Task) => !t.recurrence && (t.target === "backlog" || (t.due && t.due < todayStr));
+  const isTaskCurrent = (t: Task) => {
+    if (isTaskBacklog(t)) return false;
+    if (t.due && t.due > todayStr) return false; // Future scheduled occurrences MUST disappear from Today!
+    return t.target === "today" || t.due === todayStr || (!t.due && t.target === "today");
+  };
 
   const baseFiltered = tasks
     .filter((t) => {
