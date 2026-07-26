@@ -138,7 +138,9 @@ Notifications.setNotificationHandler({
     const settings = await api.getSettings();
     const isFullscreen = settings.reminderStyle === 'fullscreen';
     return {
-      shouldShowAlert: !isFullscreen, // OS banner hidden if in fullscreen mode
+      shouldShowAlert: !isFullscreen,
+      shouldShowBanner: !isFullscreen,
+      shouldShowList: !isFullscreen,
       shouldPlaySound: true,
       shouldSetBadge: false,
     };

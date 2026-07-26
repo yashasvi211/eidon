@@ -10,7 +10,7 @@ import * as EidonAlarm from '../../modules/expo-eidon-alarm';
 import * as WebBrowser from 'expo-web-browser';
 import { DROPBOX_APP_KEY, DROPBOX_APP_SECRET } from '../constants/env';
 import * as DocumentPicker from "expo-document-picker";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 interface Project {
   name: string;
   color: string;
@@ -78,7 +78,7 @@ export default function Sidebar({
 
   // Dropbox / sync state
   const [dropboxToken, setDropboxToken] = useState('');
-  const [dropboxPath, setDropboxPath] = useState('/eidon_db.json');
+  const [dropboxPath, setDropboxPath] = useState('/eidon/');
   const [syncInterval, setSyncInterval] = useState('30');
   const [autoSyncEnabled, setAutoSyncEnabled] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
@@ -86,6 +86,13 @@ export default function Sidebar({
   const [syncLoading, setSyncLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
   const [connectionLoading, setConnectionLoading] = useState(false);
+
+  // Developer / data state
+  const [mockDataLoading, setMockDataLoading] = useState(false);
+  const [mockDataStatus, setMockDataStatus] = useState<string | null>(null);
+  const [fileTree, setFileTree] = useState<{ path: string; size?: number }[]>([]);
+  const [showFileTree, setShowFileTree] = useState(false);
+  const [fileTreeLoading, setFileTreeLoading] = useState(false);
 
   // Reminder settings state
   const [reminderStyle, setReminderStyle] = useState<'banner' | 'fullscreen'>('banner');
@@ -140,7 +147,7 @@ export default function Sidebar({
           api.updateSettings({ dropboxToken: '', dropboxRefreshToken: '', tokenExpiresAt: 0 });
         }
         setDropboxToken(token);
-        setDropboxPath(s.dropboxPath || '/eidon_db.json');
+        setDropboxPath(s.dropboxPath || '/eidon/');
         setSyncInterval(String(s.syncIntervalMinutes || 30));
         setAutoSyncEnabled(s.autoSyncEnabled || false);
         setLastSyncTime(s.lastSyncTime || null);
@@ -241,8 +248,7 @@ export default function Sidebar({
 
   const handleSaveSyncSettings = async () => {
     await api.updateSettings({
-      dropboxToken: dropboxToken.trim(),
-      dropboxPath: dropboxPath.trim() || '/eidon_db.json',
+      dropboxPath: dropboxPath.trim() || '/eidon/',
       syncIntervalMinutes: parseInt(syncInterval) || 30,
       autoSyncEnabled,
     });
@@ -257,6 +263,46 @@ export default function Sidebar({
 
     setSyncStatus('Settings saved');
     setTimeout(() => setSyncStatus(null), 3000);
+  };
+
+  const handleLoadMockData = async () => {
+    setMockDataLoading(true);
+    setMockDataStatus(null);
+    try {
+      const { tasks, trackers } = await api.loadMockData();
+      setMockDataStatus(`✓ Loaded ${tasks} tasks + ${trackers} trackers`);
+      if (onDataChanged) onDataChanged();
+    } catch (e: any) {
+      setMockDataStatus('Failed: ' + e.message);
+    }
+    setMockDataLoading(false);
+    setTimeout(() => setMockDataStatus(null), 5000);
+  };
+
+  const handleRemoveMockData = async () => {
+    setMockDataLoading(true);
+    setMockDataStatus(null);
+    try {
+      const { tasks, trackers } = await api.removeMockData();
+      setMockDataStatus(`✓ Removed ${tasks} tasks + ${trackers} trackers`);
+      if (onDataChanged) onDataChanged();
+    } catch (e: any) {
+      setMockDataStatus('Failed: ' + e.message);
+    }
+    setMockDataLoading(false);
+    setTimeout(() => setMockDataStatus(null), 5000);
+  };
+
+  const handleBrowseFiles = async () => {
+    setFileTreeLoading(true);
+    try {
+      const files = await api.listAllFiles();
+      setFileTree(files);
+      setShowFileTree(true);
+    } catch (e: any) {
+      setSyncStatus('Error: ' + e.message);
+    }
+    setFileTreeLoading(false);
   };
 
   const handleTestConnection = async () => {
@@ -504,7 +550,7 @@ export default function Sidebar({
                     <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
                       <TouchableOpacity
                         style={[
-                          styles.btn,
+                          styles.modalActionBtn,
                           { 
                             borderColor: alarmSound === 'notification_sound_1' ? colors.ghBlue : colors.ghBorder,
                             backgroundColor: alarmSound === 'notification_sound_1' ? colors.ghBlue + '20' : colors.ghSurface2
@@ -521,7 +567,7 @@ export default function Sidebar({
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[
-                          styles.btn,
+                          styles.modalActionBtn,
                           { 
                             borderColor: alarmSound !== 'notification_sound_1' && alarmSound ? colors.ghBlue : colors.ghBorder,
                             backgroundColor: alarmSound !== 'notification_sound_1' && alarmSound ? colors.ghBlue + '20' : colors.ghSurface2
@@ -716,6 +762,54 @@ export default function Sidebar({
                 </Text>
               </View>
 
+              {/* DEVELOPER / DATA */}
+              <View style={styles.settingsSection}>
+                <Text style={[styles.settingsSectionTitle, { color: colors.ghMuted }]}>DEVELOPER / DATA</Text>
+                <Text style={[styles.settingsHelp, { color: colors.ghMuted, marginBottom: 10 }]}>
+                  Manage local folder structure, populate test data, and inspect files on device.
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                  <TouchableOpacity
+                    style={[styles.modalActionBtn, { flex: 1, minWidth: '45%', backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder, borderWidth: 1 }]}
+                    onPress={handleLoadMockData}
+                    disabled={mockDataLoading}
+                  >
+                    <Feather name={mockDataLoading ? 'loader' : 'database'} size={14} color={colors.ghText} style={{ marginRight: 6 }} />
+                    <Text style={[styles.modalActionBtnText, { color: colors.ghText }]}>
+                      {mockDataLoading ? 'Loading...' : 'Load Mock Data'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalActionBtn, { flex: 1, minWidth: '45%', backgroundColor: colors.ghSurface2, borderColor: colors.ghRed, borderWidth: 1 }]}
+                    onPress={handleRemoveMockData}
+                    disabled={mockDataLoading}
+                  >
+                    <Feather name="trash-2" size={14} color={colors.ghRed} style={{ marginRight: 6 }} />
+                    <Text style={[styles.modalActionBtnText, { color: colors.ghRed }]}>
+                      Remove Mock
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalActionBtn, { width: '100%', backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder, borderWidth: 1, marginTop: 4 }]}
+                    onPress={handleBrowseFiles}
+                    disabled={fileTreeLoading}
+                  >
+                    <Feather name="folder" size={14} color={colors.ghText} style={{ marginRight: 6 }} />
+                    <Text style={[styles.modalActionBtnText, { color: colors.ghText }]}>
+                      {fileTreeLoading ? 'Scanning...' : 'Browse Files'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {mockDataStatus && (
+                  <Text style={[styles.statusText, { color: mockDataStatus.includes('Failed') ? colors.ghRed : colors.ghGreen, marginBottom: 8 }]}>
+                    {mockDataStatus}
+                  </Text>
+                )}
+                <Text style={[styles.syncInfo, { color: colors.ghMuted }]}>
+                  Storage root: {api.getStorageRoot()}
+                </Text>
+              </View>
+
               {/* ADD PROJECT */}
               <View style={styles.settingsSection}>
                 <Text style={[styles.settingsSectionTitle, { color: colors.ghMuted }]}>ADD PROJECT</Text>
@@ -788,6 +882,60 @@ export default function Sidebar({
             </ScrollView>
           </RNAnimated.View>
         </RNAnimated.View>
+      </Modal>
+
+      {/* FILE BROWSER MODAL */}
+      <Modal
+        visible={showFileTree}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowFileTree(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.ghSurface, borderColor: colors.ghBorder, maxHeight: '80%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.ghText }]}>📁 On-Device Files ({fileTree.length})</Text>
+              <TouchableOpacity onPress={() => setShowFileTree(false)} style={styles.closeBtn}>
+                <Feather name="x" size={20} color={colors.ghMuted} />
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.syncInfo, { color: colors.ghMuted, marginBottom: 12, paddingHorizontal: 16 }]}>
+              {api.getStorageRoot()}
+            </Text>
+            <ScrollView style={{ paddingHorizontal: 16, marginBottom: 16 }}>
+              {fileTree.length === 0 ? (
+                <Text style={{ color: colors.ghMuted, fontStyle: 'italic', paddingVertical: 10 }}>No files found in storage root.</Text>
+              ) : (
+                fileTree.map((item, index) => (
+                  <View key={index} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: colors.ghBorder }}>
+                    <Feather
+                      name={item.path.endsWith('/') ? 'folder' : 'file-text'}
+                      size={14}
+                      color={item.path.endsWith('/') ? colors.ghBlue : colors.ghMuted}
+                      style={{ marginRight: 8 }}
+                    />
+                    <Text style={{ flex: 1, color: item.path.endsWith('/') ? colors.ghText : colors.ghMuted, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 12, fontWeight: item.path.endsWith('/') ? '700' : '400' }}>
+                      {item.path}
+                    </Text>
+                    {item.size !== undefined && (
+                      <Text style={{ color: colors.ghMuted, fontSize: 11 }}>
+                        {item.size > 1024 ? `${(item.size / 1024).toFixed(1)} KB` : `${item.size} B`}
+                      </Text>
+                    )}
+                  </View>
+                ))
+              )}
+            </ScrollView>
+            <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+              <TouchableOpacity
+                style={[styles.saveBtn, { backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder, borderWidth: 1 }]}
+                onPress={() => setShowFileTree(false)}
+              >
+                <Text style={[styles.saveBtnText, { color: colors.ghText }]}>Close Browser</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
     </View>
   );

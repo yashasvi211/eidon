@@ -2,130 +2,291 @@ import * as FileSystem from 'expo-file-system/legacy';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
 import * as Sharing from 'expo-sharing';
-import { Task, Session, AuditEntry } from "../components/DetailPanel";
-import { Tracker, TrackerEntry } from "../types/tracking";
+import { Task, Session, AuditEntry } from '../components/DetailPanel';
+import { Tracker, TrackerEntry } from '../types/tracking';
 import { DROPBOX_APP_KEY, DROPBOX_APP_SECRET } from '../constants/env';
 
-const DB_FILE_URI = FileSystem.documentDirectory + 'eidon_db.json';
-const DROPBOX_API = 'https://api.dropboxapi.com';
+// ─── File System Layout ──────────────────────────────────────────────────────
+//
+//  <documentDirectory>/eidon/
+//  ├── settings.json
+//  ├── Inbox/
+//  │   └── <task-id>.json
+//  ├── <ProjectName>/
+//  │   └── <task-id>.json
+//  └── tracking/
+//      └── <tracker-id>.json
+//
+// ─────────────────────────────────────────────────────────────────────────────
+
+const EIDON_DIR      = FileSystem.documentDirectory + 'eidon/';
+const SETTINGS_FILE  = EIDON_DIR + 'settings.json';
+const TRACKING_DIR   = EIDON_DIR + 'tracking/';
+const LEGACY_DB_FILE = FileSystem.documentDirectory + 'eidon_db.json';
+const DROPBOX_API    = 'https://api.dropboxapi.com';
 const DROPBOX_CONTENT = 'https://content.dropboxapi.com';
 
-interface AppDatabase {
-  tasks: Task[];
-  projects: { name: string; color: string }[];
-  trackers: Tracker[];
-  settings: {
-    isSleeping: boolean;
-    sleepStartTime: number | null;
-    dropboxToken: string;
-    dropboxRefreshToken?: string;
-    tokenExpiresAt?: number;
-    dropboxPath: string;
-    syncIntervalMinutes: number;
-    lastSyncTime: number | null;
-    autoSyncEnabled: boolean;
-    reminderStyle: 'banner' | 'fullscreen';
-    reminderRequireAuth: boolean;
-  };
+// ─── Settings type ────────────────────────────────────────────────────────────
+
+export interface AppSettings {
+  isSleeping: boolean;
+  sleepStartTime: number | null;
+  dropboxToken: string;
+  dropboxRefreshToken?: string;
+  tokenExpiresAt?: number;
+  dropboxPath: string;
+  syncIntervalMinutes: number;
+  lastSyncTime: number | null;
+  autoSyncEnabled: boolean;
+  reminderStyle: 'banner' | 'fullscreen';
+  reminderRequireAuth: boolean;
 }
 
-let memoryDb: AppDatabase = {
-  tasks: [],
-  projects: [],
-  trackers: [],
-  settings: {
-    isSleeping: false,
-    sleepStartTime: null,
-    dropboxToken: '',
-    dropboxRefreshToken: '',
-    tokenExpiresAt: 0,
-    dropboxPath: '/eidon_db.json',
-    syncIntervalMinutes: 30,
-    lastSyncTime: null,
-    autoSyncEnabled: false,
-    reminderStyle: 'banner',
-    reminderRequireAuth: false,
-  }
+const DEFAULT_SETTINGS: AppSettings = {
+  isSleeping: false,
+  sleepStartTime: null,
+  dropboxToken: '',
+  dropboxRefreshToken: '',
+  tokenExpiresAt: 0,
+  dropboxPath: '/eidon/',
+  syncIntervalMinutes: 30,
+  lastSyncTime: null,
+  autoSyncEnabled: false,
+  reminderStyle: 'banner',
+  reminderRequireAuth: false,
 };
 
-let dbLoaded = false;
+// ─── In-memory cache (populated on first access, updated on writes) ───────────
+
+interface MemoryCache {
+  tasks: Task[];
+  projects: string[];  // just folder names; colour stored in a meta sidecar
+  projectMeta: { name: string; color: string }[];  // full project objects
+  trackers: Tracker[];
+  settings: AppSettings;
+  loaded: boolean;
+}
+
+let cache: MemoryCache = {
+  tasks: [],
+  projects: [],
+  projectMeta: [],
+  trackers: [],
+  settings: { ...DEFAULT_SETTINGS },
+  loaded: false,
+};
+
 let autoSyncTimer: ReturnType<typeof setInterval> | null = null;
 
-async function loadDb() {
-  if (dbLoaded) return;
-  try {
-    const fileInfo = await FileSystem.getInfoAsync(DB_FILE_URI);
-    if (fileInfo.exists) {
-      const content = await FileSystem.readAsStringAsync(DB_FILE_URI);
-      const parsed = JSON.parse(content);
-      memoryDb = { ...memoryDb, ...parsed };
-      memoryDb.trackers = parsed.trackers || [];
-      if (!memoryDb.settings) {
-        memoryDb.settings = {
-          isSleeping: false,
-          sleepStartTime: null,
-          dropboxToken: '',
-          dropboxRefreshToken: '',
-          tokenExpiresAt: 0,
-          dropboxPath: '/eidon_db.json',
-          syncIntervalMinutes: 30,
-          lastSyncTime: null,
-          autoSyncEnabled: false,
-          reminderStyle: 'banner',
-          reminderRequireAuth: false,
-        };
-      } else {
-        memoryDb.settings = {
-          isSleeping: memoryDb.settings.isSleeping ?? false,
-          sleepStartTime: memoryDb.settings.sleepStartTime ?? null,
-          dropboxToken: memoryDb.settings.dropboxToken ?? '',
-          dropboxRefreshToken: memoryDb.settings.dropboxRefreshToken ?? '',
-          tokenExpiresAt: memoryDb.settings.tokenExpiresAt ?? 0,
-          dropboxPath: memoryDb.settings.dropboxPath ?? '/eidon_db.json',
-          syncIntervalMinutes: memoryDb.settings.syncIntervalMinutes ?? 30,
-          lastSyncTime: memoryDb.settings.lastSyncTime ?? null,
-          autoSyncEnabled: memoryDb.settings.autoSyncEnabled ?? false,
-          reminderStyle: memoryDb.settings.reminderStyle ?? 'banner',
-          reminderRequireAuth: memoryDb.settings.reminderRequireAuth ?? false,
-        };
-      }
-    }
-  } catch (err) {
-    console.error("Failed to load DB", err);
+// ─── Low-level helpers ────────────────────────────────────────────────────────
+
+async function ensureDir(path: string) {
+  const info = await FileSystem.getInfoAsync(path);
+  if (!info.exists) {
+    await FileSystem.makeDirectoryAsync(path, { intermediates: true });
   }
-  dbLoaded = true;
 }
 
-async function saveDb() {
+async function writeJson(uri: string, data: unknown) {
+  await FileSystem.writeAsStringAsync(uri, JSON.stringify(data, null, 2), {
+    encoding: FileSystem.EncodingType.UTF8,
+  });
+}
+
+async function readJson<T>(uri: string): Promise<T | null> {
   try {
-    const content = JSON.stringify(memoryDb, null, 2);
-    await FileSystem.writeAsStringAsync(DB_FILE_URI, content);
-  } catch (err) {
-    console.error("Failed to save DB", err);
+    const info = await FileSystem.getInfoAsync(uri);
+    if (!info.exists) return null;
+    const content = await FileSystem.readAsStringAsync(uri, {
+      encoding: FileSystem.EncodingType.UTF8,
+    });
+    return JSON.parse(content) as T;
+  } catch {
+    return null;
   }
 }
+
+// Returns folder names inside a dir, filtering hidden/system files
+async function listFolders(dir: string): Promise<string[]> {
+  try {
+    const items = await FileSystem.readDirectoryAsync(dir);
+    const result: string[] = [];
+    for (const item of items) {
+      if (item.startsWith('.') || item === 'tracking') continue;
+      const info = await FileSystem.getInfoAsync(dir + item);
+      if (info.isDirectory) result.push(item);
+    }
+    return result;
+  } catch {
+    return [];
+  }
+}
+
+async function listJsonFiles(dir: string): Promise<string[]> {
+  try {
+    const items = await FileSystem.readDirectoryAsync(dir);
+    return items.filter(f => f.endsWith('.json') && !f.startsWith('.'));
+  } catch {
+    return [];
+  }
+}
+
+// project name → safe folder name (replace slashes etc)
+function projectFolder(project: string): string {
+  return project.trim().replace(/[/\\:*?"<>|]/g, '_') || 'Inbox';
+}
+
+function taskFilePath(project: string, taskId: string): string {
+  return EIDON_DIR + projectFolder(project) + '/' + taskId + '.json';
+}
+
+function trackerFilePath(trackerId: string): string {
+  return TRACKING_DIR + trackerId + '.json';
+}
+
+// ─── projects meta sidecar ──────────────────────────────────────────────────
+// We store project color info in <projectFolder>/.meta.json
+
+async function readProjectMeta(folderName: string): Promise<{ name: string; color: string }> {
+  const meta = await readJson<{ name: string; color: string }>(
+    EIDON_DIR + folderName + '/.meta.json'
+  );
+  return meta ?? { name: folderName, color: '#58a6ff' };
+}
+
+async function writeProjectMeta(folderName: string, data: { name: string; color: string }) {
+  await writeJson(EIDON_DIR + folderName + '/.meta.json', data);
+}
+
+// ─── Migration from legacy single-file DB ────────────────────────────────────
+
+async function migrateLegacyDb() {
+  const info = await FileSystem.getInfoAsync(LEGACY_DB_FILE);
+  if (!info.exists) return;
+
+  console.log('[eidon] Migrating legacy eidon_db.json to folder structure…');
+  try {
+    const content = await FileSystem.readAsStringAsync(LEGACY_DB_FILE);
+    const legacy = JSON.parse(content);
+
+    // Migrate settings
+    if (legacy.settings) {
+      const s: AppSettings = { ...DEFAULT_SETTINGS, ...legacy.settings };
+      // wipe manually-pasted tokens that have no refresh token
+      if (s.dropboxToken && !s.dropboxRefreshToken) {
+        s.dropboxToken = '';
+        s.tokenExpiresAt = 0;
+      }
+      s.dropboxPath = s.dropboxPath?.replace('eidon_db.json', '') || '/eidon/';
+      await writeJson(SETTINGS_FILE, s);
+    }
+
+    // Migrate projects (with colours)
+    const projectList: { name: string; color: string }[] = legacy.projects || [];
+    // Always ensure Inbox exists
+    if (!projectList.some(p => p.name === 'Inbox')) {
+      projectList.unshift({ name: 'Inbox', color: '#58a6ff' });
+    }
+    for (const proj of projectList) {
+      const folder = projectFolder(proj.name);
+      await ensureDir(EIDON_DIR + folder + '/');
+      await writeProjectMeta(folder, proj);
+    }
+
+    // Migrate tasks
+    const tasks: Task[] = legacy.tasks || [];
+    for (const task of tasks) {
+      const proj = task.project || 'Inbox';
+      const folder = projectFolder(proj);
+      await ensureDir(EIDON_DIR + folder + '/');
+      await writeJson(taskFilePath(proj, task.id), task);
+    }
+
+    // Migrate trackers
+    await ensureDir(TRACKING_DIR);
+    const trackers: Tracker[] = legacy.trackers || [];
+    for (const tracker of trackers) {
+      await writeJson(trackerFilePath(tracker.id), tracker);
+    }
+
+    // Rename legacy file so migration doesn't run again
+    await FileSystem.moveAsync({
+      from: LEGACY_DB_FILE,
+      to: LEGACY_DB_FILE + '.migrated',
+    });
+
+    console.log('[eidon] Migration complete.');
+  } catch (err) {
+    console.error('[eidon] Migration failed:', err);
+  }
+}
+
+// ─── Load everything into memory cache ───────────────────────────────────────
+
+async function loadAll() {
+  if (cache.loaded) return;
+
+  await ensureDir(EIDON_DIR);
+  await ensureDir(TRACKING_DIR);
+  // Always ensure Inbox project exists
+  await ensureDir(EIDON_DIR + 'Inbox/');
+
+  // Run migration if old file exists
+  await migrateLegacyDb();
+
+  // Settings
+  const settings = await readJson<AppSettings>(SETTINGS_FILE);
+  cache.settings = settings ? { ...DEFAULT_SETTINGS, ...settings } : { ...DEFAULT_SETTINGS };
+
+  // Projects (scan folders)
+  const folderNames = await listFolders(EIDON_DIR);
+  // Always include Inbox even if empty
+  if (!folderNames.includes('Inbox')) folderNames.unshift('Inbox');
+  cache.projectMeta = [];
+  cache.tasks = [];
+
+  for (const folder of folderNames) {
+    const meta = await readProjectMeta(folder);
+    cache.projectMeta.push(meta);
+
+    // Load tasks inside this folder
+    const files = await listJsonFiles(EIDON_DIR + folder + '/');
+    for (const file of files) {
+      const task = await readJson<Task>(EIDON_DIR + folder + '/' + file);
+      if (task) cache.tasks.push(task);
+    }
+  }
+
+  // Trackers
+  cache.trackers = [];
+  const trackerFiles = await listJsonFiles(TRACKING_DIR);
+  for (const file of trackerFiles) {
+    const tracker = await readJson<Tracker>(TRACKING_DIR + file);
+    if (tracker) cache.trackers.push(tracker);
+  }
+
+  cache.loaded = true;
+}
+
+// ─── Dropbox helpers ──────────────────────────────────────────────────────────
 
 async function refreshAccessTokenIfNeeded() {
-  if (!memoryDb.settings.dropboxRefreshToken) return;
-  // Check if token expires within 5 minutes (300000ms)
-  const expiresAt = memoryDb.settings.tokenExpiresAt || 0;
+  if (!cache.settings.dropboxRefreshToken) return;
+  const expiresAt = cache.settings.tokenExpiresAt || 0;
   if (Date.now() > expiresAt - 300000) {
     try {
       const response = await fetch('https://api.dropbox.com/oauth2/token', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(memoryDb.settings.dropboxRefreshToken)}&client_id=${encodeURIComponent(DROPBOX_APP_KEY)}&client_secret=${encodeURIComponent(DROPBOX_APP_SECRET)}`,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(cache.settings.dropboxRefreshToken!)}&client_id=${encodeURIComponent(DROPBOX_APP_KEY)}&client_secret=${encodeURIComponent(DROPBOX_APP_SECRET)}`,
       });
       if (response.ok) {
         const data = await response.json();
-        memoryDb.settings.dropboxToken = data.access_token;
-        memoryDb.settings.tokenExpiresAt = Date.now() + (data.expires_in * 1000);
-        await saveDb();
+        cache.settings.dropboxToken = data.access_token;
+        cache.settings.tokenExpiresAt = Date.now() + (data.expires_in * 1000);
+        await writeJson(SETTINGS_FILE, cache.settings);
       } else {
         const errText = await response.text();
-        console.error('Failed to refresh token', errText);
         throw new Error('Could not refresh Dropbox token: ' + errText);
       }
     } catch (err) {
@@ -143,8 +304,8 @@ async function dropboxRequest(
     contentType?: string;
   } = {},
 ) {
-  const token = memoryDb.settings.dropboxToken;
-  if (!token) throw new Error("Dropbox not configured. Add an access token in Settings.");
+  const token = cache.settings.dropboxToken;
+  if (!token) throw new Error('Dropbox not configured. Add an access token in Settings.');
 
   const { method = 'POST', headers = {}, body, contentType } = options;
   const url = endpoint.startsWith('https') ? endpoint : `${DROPBOX_API}${endpoint}`;
@@ -180,326 +341,409 @@ async function dropboxRequest(
   return response;
 }
 
-async function mergeSeedData() {
-  try {
-    const bundledJson = require('../constants/tasks.json');
-    if (!bundledJson) return;
-
-    let changed = false;
-
-    // Merge tasks — only add ones whose id doesn't exist yet
-    if (bundledJson.tasks && Array.isArray(bundledJson.tasks)) {
-      for (const seedTask of bundledJson.tasks) {
-        const alreadyExists = memoryDb.tasks.some(t => t.id === seedTask.id);
-        if (!alreadyExists) {
-          memoryDb.tasks.push(JSON.parse(JSON.stringify(seedTask)));
-          changed = true;
-        }
-      }
-    }
-
-    // Merge projects — only add ones whose name doesn't exist yet
-    if (bundledJson.projects && Array.isArray(bundledJson.projects)) {
-      for (const seedProj of bundledJson.projects) {
-        const alreadyExists = memoryDb.projects.some(p => p.name === seedProj.name);
-        if (!alreadyExists) {
-          memoryDb.projects.push(seedProj);
-          changed = true;
-        }
-      }
-    }
-
-    try {
-      const trackingJson = require('../constants/tracking.json');
-      const trackingList = Array.isArray(trackingJson) ? trackingJson : trackingJson.trackers;
-      if (trackingList && Array.isArray(trackingList)) {
-        for (const seedTracker of trackingList) {
-          const idx = memoryDb.trackers.findIndex(t => t.id === seedTracker.id);
-          if (idx === -1) {
-            memoryDb.trackers.push(JSON.parse(JSON.stringify(seedTracker)));
-            changed = true;
-          } else if ((memoryDb.trackers[idx].entries?.length || 0) < (seedTracker.entries?.length || 0)) {
-            memoryDb.trackers[idx] = JSON.parse(JSON.stringify(seedTracker));
-            changed = true;
-          }
-        }
-      }
-    } catch (e) {
-      console.log('No tracking seed data found');
-    }
-
-
-    if (changed) {
-      await saveDb();
-      console.log('Seed data merged from tasks.json');
-    }
-  } catch (err) {
-    console.log('No seed data found, skipping merge');
-  }
+// Build a single export JSON from current state (for Dropbox backup)
+function buildExportJson(): string {
+  return JSON.stringify({
+    version: 2,
+    exportedAt: new Date().toISOString(),
+    settings: cache.settings,
+    projects: cache.projectMeta,
+    tasks: cache.tasks,
+    trackers: cache.trackers,
+  }, null, 2);
 }
 
+// ─── Public API ───────────────────────────────────────────────────────────────
+
 export const api = {
+
   async init() {
-    await loadDb();
-    // Always merge seed data — safe to call repeatedly, only adds missing entries
-    await mergeSeedData();
-    // Auto-clear legacy manually pasted tokens that don't have a refresh token
-    if (memoryDb.settings.dropboxToken && !memoryDb.settings.dropboxRefreshToken) {
-      memoryDb.settings.dropboxToken = '';
-      memoryDb.settings.tokenExpiresAt = 0;
-      await saveDb();
+    await loadAll();
+  },
+
+  // ── PROJECTS ────────────────────────────────────────────────────────────────
+
+  async getProjects(): Promise<{ name: string; color: string }[]> {
+    await loadAll();
+    return [...cache.projectMeta];
+  },
+
+  async createProject(project: { name: string; color: string }): Promise<void> {
+    await loadAll();
+    const already = cache.projectMeta.some(p => p.name === project.name);
+    if (already) return;
+    const folder = projectFolder(project.name);
+    await ensureDir(EIDON_DIR + folder + '/');
+    await writeProjectMeta(folder, project);
+    cache.projectMeta.push(project);
+  },
+
+  async deleteProject(projectName: string): Promise<void> {
+    await loadAll();
+    const folder = projectFolder(projectName);
+    const dirInfo = await FileSystem.getInfoAsync(EIDON_DIR + folder + '/');
+    if (dirInfo.exists) {
+      await FileSystem.deleteAsync(EIDON_DIR + folder + '/', { idempotent: true });
     }
+    cache.projectMeta = cache.projectMeta.filter(p => p.name !== projectName);
+    cache.tasks = cache.tasks.filter(t => t.project !== projectName);
   },
 
+  // ── TASKS ────────────────────────────────────────────────────────────────────
 
-  // --- TRACKERS ---
-  async getTrackers(): Promise<Tracker[]> {
-    await loadDb();
-    return memoryDb.trackers || [];
-  },
-
-  async createTracker(tracker: Tracker): Promise<void> {
-    await loadDb();
-    const exists = memoryDb.trackers.some(t => t.id === tracker.id);
-    if (!exists) {
-      memoryDb.trackers.push(JSON.parse(JSON.stringify(tracker)));
-      await saveDb();
-    }
-  },
-
-  async updateTracker(trackerId: string, updates: Partial<Tracker>): Promise<void> {
-    await loadDb();
-    const trackerIndex = memoryDb.trackers.findIndex(t => t.id === trackerId);
-    if (trackerIndex !== -1) {
-      memoryDb.trackers[trackerIndex] = { ...memoryDb.trackers[trackerIndex], ...updates };
-      await saveDb();
-    }
-  },
-
-  async deleteTracker(trackerId: string): Promise<void> {
-    await loadDb();
-    memoryDb.trackers = memoryDb.trackers.filter(t => t.id !== trackerId);
-    await saveDb();
-  },
-
-  async upsertTrackerEntry(trackerId: string, entry: TrackerEntry): Promise<void> {
-    await loadDb();
-    const tracker = memoryDb.trackers.find(t => t.id === trackerId);
-    if (tracker) {
-      const entryIndex = tracker.entries.findIndex(e => e.period === entry.period);
-      if (entryIndex !== -1) {
-        tracker.entries[entryIndex] = entry;
-      } else {
-        tracker.entries.push(entry);
-      }
-      await saveDb();
-    }
-  },
-
-  async deleteTrackerEntry(trackerId: string, entryId: string): Promise<void> {
-    await loadDb();
-    const tracker = memoryDb.trackers.find(t => t.id === trackerId);
-    if (tracker) {
-      tracker.entries = tracker.entries.filter(e => e.id !== entryId);
-      await saveDb();
-    }
-  },
-
-  // --- TASKS ---
   async getTasks(): Promise<Task[]> {
-    await loadDb();
-    return memoryDb.tasks || [];
+    await loadAll();
+    return [...cache.tasks];
   },
 
   async createTask(task: Partial<Task>): Promise<void> {
-    await loadDb();
-    const exists = memoryDb.tasks.some(t => t.id === task.id);
-    if (!exists) {
-      memoryDb.tasks.push(JSON.parse(JSON.stringify(task)));
-      await saveDb();
-    }
+    await loadAll();
+    if (!task.id) return;
+    const already = cache.tasks.some(t => t.id === task.id);
+    if (already) return;
+    const proj = (task as Task).project || 'Inbox';
+    const folder = projectFolder(proj);
+    await ensureDir(EIDON_DIR + folder + '/');
+    const full = task as Task;
+    await writeJson(taskFilePath(proj, full.id), full);
+    cache.tasks.push(full);
   },
 
   async updateTask(taskId: string, updates: Partial<Task>): Promise<void> {
-    await loadDb();
-    const taskIndex = memoryDb.tasks.findIndex(t => t.id === taskId);
-    if (taskIndex !== -1) {
-      memoryDb.tasks[taskIndex] = { ...memoryDb.tasks[taskIndex], ...updates };
-      await saveDb();
+    await loadAll();
+    const idx = cache.tasks.findIndex(t => t.id === taskId);
+    if (idx === -1) return;
+    const oldTask = cache.tasks[idx];
+    const updated = { ...oldTask, ...updates };
+    cache.tasks[idx] = updated;
+    // If project changed, move the file
+    if (updates.project && updates.project !== oldTask.project) {
+      const oldPath = taskFilePath(oldTask.project || 'Inbox', taskId);
+      const newFolder = projectFolder(updates.project);
+      await ensureDir(EIDON_DIR + newFolder + '/');
+      await FileSystem.deleteAsync(oldPath, { idempotent: true });
+      await writeJson(taskFilePath(updates.project, taskId), updated);
+    } else {
+      await writeJson(taskFilePath(updated.project || 'Inbox', taskId), updated);
     }
   },
 
   async deleteTask(taskId: string): Promise<void> {
-    await loadDb();
-    memoryDb.tasks = memoryDb.tasks.filter(t => t.id !== taskId);
-    await saveDb();
+    await loadAll();
+    const task = cache.tasks.find(t => t.id === taskId);
+    if (!task) return;
+    const path = taskFilePath(task.project || 'Inbox', taskId);
+    await FileSystem.deleteAsync(path, { idempotent: true });
+    cache.tasks = cache.tasks.filter(t => t.id !== taskId);
   },
 
-  // --- SUBTASKS ---
+  // ── SUBTASKS ─────────────────────────────────────────────────────────────────
+
   async createSubtask(taskId: string, subtask: { id: string; title: string; done?: boolean }): Promise<void> {
-    await loadDb();
-    const task = memoryDb.tasks.find(t => t.id === taskId);
-    if (task) {
-      if (!task.subtasks) task.subtasks = [];
-      task.subtasks.push({ id: subtask.id, title: subtask.title, done: subtask.done || false });
-      await saveDb();
-    }
+    const task = cache.tasks.find(t => t.id === taskId);
+    if (!task) return;
+    if (!task.subtasks) task.subtasks = [];
+    task.subtasks.push({ id: subtask.id, title: subtask.title, done: subtask.done || false });
+    await writeJson(taskFilePath(task.project || 'Inbox', taskId), task);
   },
 
   async updateSubtask(taskId: string, subtaskId: string, updates: { title?: string; done?: boolean }): Promise<void> {
-    await loadDb();
-    const task = memoryDb.tasks.find(t => t.id === taskId);
-    if (task && task.subtasks) {
-      const sub = task.subtasks.find(s => s.id === subtaskId);
-      if (sub) {
-        if (updates.title !== undefined) sub.title = updates.title;
-        if (updates.done !== undefined) sub.done = updates.done;
-        await saveDb();
-      }
-    }
+    const task = cache.tasks.find(t => t.id === taskId);
+    if (!task?.subtasks) return;
+    const sub = task.subtasks.find(s => s.id === subtaskId);
+    if (!sub) return;
+    if (updates.title !== undefined) sub.title = updates.title;
+    if (updates.done !== undefined) sub.done = updates.done;
+    await writeJson(taskFilePath(task.project || 'Inbox', taskId), task);
   },
 
   async deleteSubtask(taskId: string, subtaskId: string): Promise<void> {
-    await loadDb();
-    const task = memoryDb.tasks.find(t => t.id === taskId);
-    if (task && task.subtasks) {
-      task.subtasks = task.subtasks.filter(s => s.id !== subtaskId);
-      await saveDb();
-    }
+    const task = cache.tasks.find(t => t.id === taskId);
+    if (!task?.subtasks) return;
+    task.subtasks = task.subtasks.filter(s => s.id !== subtaskId);
+    await writeJson(taskFilePath(task.project || 'Inbox', taskId), task);
   },
 
-  // --- SESSIONS ---
+  // ── SESSIONS ─────────────────────────────────────────────────────────────────
+
   async createSession(taskId: string, session: Session): Promise<void> {
-    await loadDb();
-    const task = memoryDb.tasks.find(t => t.id === taskId);
-    if (task) {
-      if (!task.sessions) task.sessions = [];
-      task.sessions.push(session);
-      await saveDb();
-    }
+    const task = cache.tasks.find(t => t.id === taskId);
+    if (!task) return;
+    if (!task.sessions) task.sessions = [];
+    task.sessions.push(session);
+    await writeJson(taskFilePath(task.project || 'Inbox', taskId), task);
   },
 
-  // --- AUDIT LOGS ---
+  // ── AUDIT LOGS ───────────────────────────────────────────────────────────────
+
   async createAuditLog(taskId: string, entry: AuditEntry): Promise<void> {
-    await loadDb();
-    const task = memoryDb.tasks.find(t => t.id === taskId);
-    if (task) {
-      if (!task.auditLog) task.auditLog = [];
-      task.auditLog.push(entry);
-      await saveDb();
-    }
+    const task = cache.tasks.find(t => t.id === taskId);
+    if (!task) return;
+    if (!task.auditLog) task.auditLog = [];
+    task.auditLog.push(entry);
+    await writeJson(taskFilePath(task.project || 'Inbox', taskId), task);
   },
 
-  // --- PROJECTS ---
-  async getProjects(): Promise<{ name: string; color: string }[]> {
-    await loadDb();
-    return memoryDb.projects || [];
+  // ── TRACKERS ─────────────────────────────────────────────────────────────────
+
+  async getTrackers(): Promise<Tracker[]> {
+    await loadAll();
+    return [...cache.trackers];
   },
 
-  async createProject(project: { name: string; color: string }): Promise<void> {
-    await loadDb();
-    memoryDb.projects.push(project);
-    await saveDb();
+  async createTracker(tracker: Tracker): Promise<void> {
+    await loadAll();
+    const already = cache.trackers.some(t => t.id === tracker.id);
+    if (already) return;
+    await ensureDir(TRACKING_DIR);
+    await writeJson(trackerFilePath(tracker.id), tracker);
+    cache.trackers.push(tracker);
   },
 
-  async deleteProject(projectName: string): Promise<void> {
-    await loadDb();
-    memoryDb.projects = memoryDb.projects.filter(p => p.name !== projectName);
-    await saveDb();
+  async updateTracker(trackerId: string, updates: Partial<Tracker>): Promise<void> {
+    await loadAll();
+    const idx = cache.trackers.findIndex(t => t.id === trackerId);
+    if (idx === -1) return;
+    const updated = { ...cache.trackers[idx], ...updates };
+    cache.trackers[idx] = updated;
+    await writeJson(trackerFilePath(trackerId), updated);
   },
 
-  // --- SETTINGS ---
-  async getSettings() {
-    await loadDb();
-    return { ...memoryDb.settings };
+  async deleteTracker(trackerId: string): Promise<void> {
+    await loadAll();
+    await FileSystem.deleteAsync(trackerFilePath(trackerId), { idempotent: true });
+    cache.trackers = cache.trackers.filter(t => t.id !== trackerId);
   },
 
-  async updateSettings(payload: Partial<AppDatabase['settings']>): Promise<void> {
-    await loadDb();
-    memoryDb.settings = { ...memoryDb.settings, ...payload };
-    await saveDb();
-  },
-
-  // --- EXPORT / IMPORT JSON (works with any app, including Dropbox) ---
-  async exportData() {
-    await loadDb();
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(DB_FILE_URI, { mimeType: 'application/json', dialogTitle: 'Export Eidon Data' });
+  async upsertTrackerEntry(trackerId: string, entry: TrackerEntry): Promise<void> {
+    await loadAll();
+    const tracker = cache.trackers.find(t => t.id === trackerId);
+    if (!tracker) return;
+    const idx = tracker.entries.findIndex(e => e.period === entry.period);
+    if (idx !== -1) {
+      tracker.entries[idx] = entry;
     } else {
-      throw new Error("Sharing is not available on this device");
+      tracker.entries.push(entry);
+    }
+    await writeJson(trackerFilePath(trackerId), tracker);
+  },
+
+  async deleteTrackerEntry(trackerId: string, entryId: string): Promise<void> {
+    await loadAll();
+    const tracker = cache.trackers.find(t => t.id === trackerId);
+    if (!tracker) return;
+    tracker.entries = tracker.entries.filter(e => e.id !== entryId);
+    await writeJson(trackerFilePath(trackerId), tracker);
+  },
+
+  // ── SETTINGS ─────────────────────────────────────────────────────────────────
+
+  async getSettings(): Promise<AppSettings> {
+    await loadAll();
+    return { ...cache.settings };
+  },
+
+  async updateSettings(payload: Partial<AppSettings>): Promise<void> {
+    await loadAll();
+    cache.settings = { ...cache.settings, ...payload };
+    await writeJson(SETTINGS_FILE, cache.settings);
+  },
+
+  // ── MOCK DATA ────────────────────────────────────────────────────────────────
+
+  async loadMockData(): Promise<{ tasks: number; trackers: number }> {
+    await loadAll();
+    let taskCount = 0;
+    let trackerCount = 0;
+
+    // Load tasks mock data
+    try {
+      const tasksJson = require('../constants/tasks.json');
+      if (tasksJson.projects) {
+        for (const proj of tasksJson.projects as { name: string; color: string }[]) {
+          const exists = cache.projectMeta.some(p => p.name === proj.name);
+          if (!exists) {
+            await api.createProject(proj);
+          }
+        }
+      }
+      if (tasksJson.tasks) {
+        for (const task of tasksJson.tasks as Task[]) {
+          const exists = cache.tasks.some(t => t.id === task.id);
+          if (!exists) {
+            await api.createTask(task);
+            taskCount++;
+          }
+        }
+      }
+    } catch (e) {
+      console.log('[mock] No tasks.json found');
+    }
+
+    // Load tracking mock data
+    try {
+      const trackingJson = require('../constants/tracking.json');
+      const trackerList = Array.isArray(trackingJson) ? trackingJson : trackingJson.trackers;
+      if (trackerList) {
+        for (const tracker of trackerList as Tracker[]) {
+          const existingIdx = cache.trackers.findIndex(t => t.id === tracker.id);
+          if (existingIdx === -1) {
+            await api.createTracker(tracker);
+            trackerCount++;
+          } else if ((cache.trackers[existingIdx].entries?.length || 0) < (tracker.entries?.length || 0)) {
+            // Upgrade sparse existing tracker with richer mock data
+            cache.trackers[existingIdx] = tracker;
+            await writeJson(trackerFilePath(tracker.id), tracker);
+            trackerCount++;
+          }
+        }
+      }
+    } catch (e) {
+      console.log('[mock] No tracking.json found');
+    }
+
+    return { tasks: taskCount, trackers: trackerCount };
+  },
+
+  async removeMockData(): Promise<{ tasks: number; trackers: number }> {
+    await loadAll();
+    let taskCount = 0;
+    let trackerCount = 0;
+
+    try {
+      const tasksJson = require('../constants/tasks.json');
+      if (tasksJson.tasks) {
+        for (const task of tasksJson.tasks as Task[]) {
+          const exists = cache.tasks.some(t => t.id === task.id);
+          if (exists) {
+            await api.deleteTask(task.id);
+            taskCount++;
+          }
+        }
+      }
+    } catch (e) {}
+
+    try {
+      const trackingJson = require('../constants/tracking.json');
+      const trackerList = Array.isArray(trackingJson) ? trackingJson : trackingJson.trackers;
+      if (trackerList) {
+        for (const tracker of trackerList as Tracker[]) {
+          const exists = cache.trackers.some(t => t.id === tracker.id);
+          if (exists) {
+            await api.deleteTracker(tracker.id);
+            trackerCount++;
+          }
+        }
+      }
+    } catch (e) {}
+
+    return { tasks: taskCount, trackers: trackerCount };
+  },
+
+  // ── EXPORT / IMPORT ──────────────────────────────────────────────────────────
+
+  async exportData() {
+    await loadAll();
+    // Write export to a temp file and share it
+    const exportUri = FileSystem.documentDirectory + 'eidon_export.json';
+    await FileSystem.writeAsStringAsync(exportUri, buildExportJson());
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(exportUri, { mimeType: 'application/json', dialogTitle: 'Export Eidon Data' });
+    } else {
+      throw new Error('Sharing is not available on this device');
     }
   },
 
-  async importData() {
+  async importData(): Promise<boolean> {
     const result = await DocumentPicker.getDocumentAsync({ type: 'application/json' });
     if (!result.canceled && result.assets && result.assets.length > 0) {
       const uri = result.assets[0].uri;
       const content = await FileSystem.readAsStringAsync(uri);
       try {
         const parsed = JSON.parse(content);
-        if (parsed.tasks) {
-          memoryDb = { ...memoryDb, ...parsed };
-      memoryDb.trackers = parsed.trackers || [];
-          if (!memoryDb.settings) {
-            memoryDb.settings = { isSleeping: false, sleepStartTime: null, dropboxToken: '', dropboxRefreshToken: '', tokenExpiresAt: 0, dropboxPath: '/eidon_db.json', syncIntervalMinutes: 30, lastSyncTime: null, autoSyncEnabled: false, reminderStyle: 'banner', reminderRequireAuth: false };
-          }
-          await saveDb();
-          return true;
-        } else {
-          throw new Error("Invalid format");
+        // Support both v1 (legacy single-file) and v2 (new export format)
+        const tasks: Task[] = parsed.tasks || [];
+        const projects: { name: string; color: string }[] = parsed.projects || [];
+        const trackers: Tracker[] = parsed.trackers || [];
+        const settings: Partial<AppSettings> = parsed.settings || {};
+
+        if (tasks.length === 0 && trackers.length === 0) {
+          throw new Error('No tasks or trackers found in the file.');
         }
-      } catch (e) {
-        throw new Error("Invalid database file format.");
+
+        // Reset cache so we rewrite everything
+        cache.loaded = false;
+        await loadAll();
+
+        // Write settings (merge, don't overwrite tokens)
+        const { dropboxToken, dropboxRefreshToken, tokenExpiresAt, ...safeSettings } = settings;
+        await api.updateSettings(safeSettings);
+
+        // Write projects
+        for (const proj of projects) {
+          await api.createProject(proj);
+        }
+
+        // Write tasks
+        for (const task of tasks) {
+          const exists = cache.tasks.some(t => t.id === task.id);
+          if (!exists) await api.createTask(task);
+        }
+
+        // Write trackers
+        for (const tracker of trackers) {
+          const exists = cache.trackers.some(t => t.id === tracker.id);
+          if (!exists) await api.createTracker(tracker);
+        }
+
+        return true;
+      } catch (e: any) {
+        throw new Error('Invalid Eidon export file: ' + e.message);
       }
     }
     return false;
   },
 
-  // --- DROPBOX SYNC ---
+  // ── DROPBOX SYNC ─────────────────────────────────────────────────────────────
 
-  /**
-   * Upload to Dropbox via API (requires access token).
-   * Get a token at https://www.dropbox.com/developers/apps
-   */
   async uploadToDropbox(): Promise<{ success: boolean; message: string }> {
-    await loadDb();
+    await loadAll();
     await refreshAccessTokenIfNeeded();
-    const path = memoryDb.settings.dropboxPath || '/eidon_db.json';
-    const token = memoryDb.settings.dropboxToken;
+    const token = cache.settings.dropboxToken;
     if (!token) return { success: false, message: 'No Dropbox token configured.' };
 
-    try {
-      // Use Expo's native file uploader for proper binary content handling
-      const result = await FileSystem.uploadAsync(
-        `${DROPBOX_CONTENT}/2/files/upload`,
-        DB_FILE_URI,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Dropbox-API-Arg': JSON.stringify({ path, mode: 'overwrite', mute: true }),
-            'Content-Type': 'application/octet-stream',
-          },
-          uploadType: FileSystem.FileSystemUploadType.BINARY_CONTENT,
-        },
-      );
+    // Determine upload path: if user set a .json path use it, otherwise use /eidon/eidon_export.json
+    let remotePath = cache.settings.dropboxPath || '/eidon/';
+    if (!remotePath.endsWith('.json')) {
+      if (!remotePath.endsWith('/')) remotePath += '/';
+      remotePath += 'eidon_export.json';
+    }
 
-      if (result.status >= 200 && result.status < 300) {
-        const now = Date.now();
-        memoryDb.settings.lastSyncTime = now;
-        await saveDb();
-        return { success: true, message: 'Uploaded to Dropbox!' };
+    try {
+      const exportContent = buildExportJson();
+      const response = await fetch(`${DROPBOX_CONTENT}/2/files/upload`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Dropbox-API-Arg': JSON.stringify({ path: remotePath, mode: 'overwrite', mute: true }),
+          'Content-Type': 'application/octet-stream',
+        },
+        body: exportContent,
+      });
+
+      if (response.status >= 200 && response.status < 300) {
+        cache.settings.lastSyncTime = Date.now();
+        await writeJson(SETTINGS_FILE, cache.settings);
+        return { success: true, message: `Uploaded to Dropbox as ${remotePath}` };
       } else {
-        let msg = `Upload failed (${result.status})`;
+        const errText = await response.text();
+        let msg = `Upload failed (${response.status})`;
         try {
-          const errJson = JSON.parse(result.body);
-          const errField = errJson.error;
-          const summary = errJson.error_summary
-            || (typeof errField === 'string' ? errField : null)
-            || errField?.['.tag']
-            || '';
-          if (summary) msg += `: ${summary}`;
+          const j = JSON.parse(errText);
+          const s = j.error_summary || j.error?.['.tag'] || '';
+          if (s) msg += `: ${s}`;
         } catch {
-          if (result.body) msg += `: ${result.body.slice(0, 300)}`;
+          if (errText) msg += `: ${errText.slice(0, 300)}`;
         }
         return { success: false, message: msg };
       }
@@ -508,13 +752,10 @@ export const api = {
     }
   },
 
-  /**
-   * Test Dropbox API connection (requires access token).
-   */
   async testDropboxConnection(): Promise<{ success: boolean; message: string }> {
-    await loadDb();
+    await loadAll();
     await refreshAccessTokenIfNeeded();
-    const token = memoryDb.settings.dropboxToken;
+    const token = cache.settings.dropboxToken;
     if (!token) return { success: false, message: 'No Dropbox token configured.' };
 
     try {
@@ -532,8 +773,7 @@ export const api = {
         let msg = `Dropbox error (${response.status})`;
         try {
           const j = JSON.parse(text);
-          const e = j.error;
-          const s = j.error_summary || (typeof e === 'string' ? e : e?.['.tag']) || '';
+          const s = j.error_summary || (typeof j.error === 'string' ? j.error : j.error?.['.tag']) || '';
           if (s) msg += `: ${s}`;
         } catch {
           if (text) msg += `: ${text.slice(0, 300)}`;
@@ -548,11 +788,12 @@ export const api = {
     }
   },
 
-  // --- AUTO SYNC (requires access token for upload) ---
+  // ── AUTO SYNC ────────────────────────────────────────────────────────────────
+
   startAutoSync(callback?: (result: { success: boolean; message: string }) => void) {
     this.stopAutoSync();
-    if (!memoryDb.settings.autoSyncEnabled || !memoryDb.settings.dropboxToken) return;
-    const intervalMs = memoryDb.settings.syncIntervalMinutes * 60 * 1000;
+    if (!cache.settings.autoSyncEnabled || !cache.settings.dropboxToken) return;
+    const intervalMs = cache.settings.syncIntervalMinutes * 60 * 1000;
     autoSyncTimer = setInterval(async () => {
       const result = await this.uploadToDropbox();
       if (callback) callback(result);
@@ -570,9 +811,40 @@ export const api = {
     return autoSyncTimer !== null;
   },
 
-  // --- GET RAW JSON STRING (for debug / display) ---
+  // ── DEBUG ────────────────────────────────────────────────────────────────────
+
   async getRawJson(): Promise<string> {
-    await loadDb();
-    return JSON.stringify(memoryDb, null, 2);
+    await loadAll();
+    return buildExportJson();
+  },
+
+  /** Returns the on-device eidon folder URI for display purposes */
+  getStorageRoot(): string {
+    return EIDON_DIR;
+  },
+
+  /** List all files in the eidon folder tree (for debugging / Dropbox preview) */
+  async listAllFiles(): Promise<{ path: string; size?: number }[]> {
+    await loadAll();
+    const result: { path: string; size?: number }[] = [];
+
+    const scanDir = async (dir: string, prefix: string) => {
+      try {
+        const items = await FileSystem.readDirectoryAsync(dir);
+        for (const item of items) {
+          const fullPath = dir + item;
+          const info = await FileSystem.getInfoAsync(fullPath);
+          if (info.isDirectory) {
+            result.push({ path: prefix + item + '/' });
+            await scanDir(fullPath + '/', prefix + item + '/');
+          } else {
+            result.push({ path: prefix + item, size: (info as any).size });
+          }
+        }
+      } catch { /* skip inaccessible dirs */ }
+    };
+
+    await scanDir(EIDON_DIR, 'eidon/');
+    return result;
   },
 };

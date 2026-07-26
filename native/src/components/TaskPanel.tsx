@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   useColorScheme,
+  FlatList,
 } from "react-native";
 import { Colors } from "../constants/theme";
 import { Task } from "./DetailPanel";
@@ -15,7 +16,6 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import DraggableFlatList, { ScaleDecorator, RenderItemParams } from "react-native-draggable-flatlist";
 
 interface Project {
   name: string;
@@ -190,7 +190,7 @@ export default function TaskPanel({
     return found ? found.color : "#bc8cff";
   };
 
-  const renderTaskItem = (task: Task, index: number, drag: () => void, isActiveDrag: boolean) => {
+  const renderTaskItem = (task: Task, index: number) => {
     const pColor = getProjectColor(task.project);
     const isHex = pColor.startsWith("#");
     const projectBorderColor = isHex ? `${pColor}4d` : "rgba(188, 140, 255, 0.3)";
@@ -205,29 +205,25 @@ export default function TaskPanel({
     const subtaskStyles = getSubtaskProgressStyles(subtasksDone, totalSubtasks, colors);
 
     return (
-      <ScaleDecorator>
-        <Animated.View
-          key={task.id}
-          layout={LinearTransition}
-          entering={FadeIn.duration(200)}
-          exiting={FadeOut.duration(150)}
+      <Animated.View
+        key={task.id}
+        layout={LinearTransition}
+        entering={FadeIn.duration(200)}
+        exiting={FadeOut.duration(150)}
+      >
+        <View
+          style={[
+            styles.taskItem,
+            { borderBottomColor: colors.ghBorder },
+            isActive && { backgroundColor: "rgba(31,111,235,0.06)" },
+          ]}
         >
-          <View
-            style={[
-              styles.taskItem,
-              { borderBottomColor: colors.ghBorder },
-              isActive && { backgroundColor: "rgba(31,111,235,0.06)" },
-              isActiveDrag && { backgroundColor: colors.ghSurface2, opacity: 0.9, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 3.84 },
-            ]}
-          >
 
 
             {/* Task Details Area */}
             <TouchableOpacity 
               style={styles.taskBodyTouchArea}
               onPress={() => onOpenDetail(task)}
-              onLongPress={!task.done ? drag : undefined}
-              delayLongPress={200}
               activeOpacity={0.7}
             >
               <Text style={[styles.taskNumber, { color: colors.ghMuted }]}>
@@ -361,13 +357,12 @@ export default function TaskPanel({
               )}
 
             </TouchableOpacity>
-          </View>
-        </Animated.View>
-      </ScaleDecorator>
+        </View>
+      </Animated.View>
     );
   };
 
-  const renderItem = ({ item, drag, isActive }: RenderItemParams<ListItem>) => {
+  const renderItem = ({ item }: { item: ListItem }) => {
     if (item.type === 'header') {
       if (item.isCompletedHeader) {
         return (
@@ -400,7 +395,7 @@ export default function TaskPanel({
         </View>
       );
     }
-    return renderTaskItem(item.task, item.index, drag, isActive);
+    return renderTaskItem(item.task, item.index);
   };
 
   let listData: ListItem[] = [];
@@ -468,56 +463,12 @@ export default function TaskPanel({
     }
   }
 
-  const handleDragEnd = ({ data }: { data: ListItem[] }) => {
-    if (!setTasks) return;
-    
-    // Create an array of tasks in their new order
-    const reorderedTasks = data.filter(i => i.type === 'task').map(i => (i as any).task as Task);
-    const reorderedIds = new Set(reorderedTasks.map(t => t.id));
-
-    setTasks(prev => {
-      // Create a map for quick lookup of the new order
-      const newOrderMap = new Map<string, number>();
-      reorderedTasks.forEach((t, i) => newOrderMap.set(t.id, i));
-
-      // Build the final array
-      // First, all tasks that were NOT dragged maintain their original positions relative to the entire list?
-      // Actually, since we only see a filtered subset, dragging changes their relative order.
-      // Easiest is to just sort the previous list: if a and b are both in reorderedTasks, sort by newOrderMap.
-      const newPrev = [...prev];
-      newPrev.sort((a, b) => {
-        if (newOrderMap.has(a.id) && newOrderMap.has(b.id)) {
-          return newOrderMap.get(a.id)! - newOrderMap.get(b.id)!;
-        }
-        return 0; // maintain relative order for un-reordered items? 
-        // Wait, if a is reordered and b is not, sorting like this is unstable and doesn't inject correctly.
-        // A better approach is to take the filtered tasks out, and then place them back in the new order at the exact indices they occupied.
-      });
-
-      // Let's do the index replacement approach:
-      // Find all indices of the tasks that were involved in the filtered list
-      const indices = [];
-      for (let i = 0; i < prev.length; i++) {
-        if (reorderedIds.has(prev[i].id)) {
-          indices.push(i);
-        }
-      }
-      // Re-insert them at the same indices in the new order
-      const result = [...prev];
-      for (let i = 0; i < indices.length; i++) {
-        result[indices[i]] = reorderedTasks[i];
-      }
-      return result;
-    });
-  };
-
   return (
     <View style={[styles.container, { backgroundColor: colors.ghBg }]}>
-      <DraggableFlatList
+      <FlatList
         data={listData}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
-        onDragEnd={handleDragEnd}
         contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
       />
     </View>

@@ -702,11 +702,10 @@ export default function FullScreenReminder({
                 {/* Pulsing SVG Ring */}
                 <View style={styles.centerSection}>
                   <Animated.View style={pulseStyle}>
-                    <CountdownRing
+                    <PulsingCountdownCircle
                       seconds={uncontainedCountdown}
                       totalSeconds={UNCONTAINED_SOUND_SECONDS}
                       color="#FF4136"
-                      size={220}
                     />
                   </Animated.View>
                   <SoundWaveIndicator />
