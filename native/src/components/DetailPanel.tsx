@@ -365,24 +365,37 @@ const AUDIT_ICONS: {
 
 
 
-const getDeadlineInfo = (dueDate?: string, colors?: any, isDone?: boolean) => {
+const getDeadlineInfo = (dueDate?: string, colors?: any, isDone?: boolean, dueTime?: string) => {
   if (isDone) {
     return { color: colors.ghGreen || "#3fb950", label: "Completed", dotColor: colors.ghGreen || "#3fb950" };
   }
   if (!dueDate)
     return { color: colors.ghText, label: "", dotColor: "transparent" };
   const now = new Date();
-  now.setHours(0, 0, 0, 0);
   const due = new Date(dueDate + "T00:00:00");
+  if (dueTime && dueTime.trim() !== '') {
+    const [h, m] = dueTime.split(":").map(Number);
+    if (!isNaN(h) && !isNaN(m)) due.setHours(h, m, 0, 0);
+  } else {
+    due.setHours(23, 59, 59, 999);
+  }
   const diffMs = due.getTime() - now.getTime();
-  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 
-  if (diffDays < 0)
+  if (diffMs < 0) {
+    const overMs = Math.abs(diffMs);
+    const overDays = Math.floor(overMs / (1000 * 60 * 60 * 24));
+    const overHours = Math.floor((overMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const overMins = Math.floor((overMs % (1000 * 60 * 60)) / (1000 * 60));
+    let labelStr = `${overDays}d overdue`;
+    if (overDays === 0 && overHours > 0) labelStr = `${overHours}h overdue`;
+    else if (overDays === 0 && overHours === 0) labelStr = `${Math.max(1, overMins)}m overdue`;
     return {
       color: "#f85149",
-      label: `${Math.abs(diffDays)}d overdue`,
+      label: `! Overdue`,
       dotColor: "#f85149",
     };
+  }
+  const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
   if (diffDays === 0)
     return { color: "#e3b341", label: "Due today!", dotColor: "#e3b341" };
   if (diffDays === 1)
@@ -433,6 +446,8 @@ export default function DetailPanel({
   const colors = Colors[scheme === "dark" ? "dark" : "light"];
   const { width, height } = useWindowDimensions();
   const isLargeScreen = width >= 768;
+
+  if (!task) return null;
 
   const [localActiveTab, setLocalActiveTab] = useState<
     "details" | "checklist" | "timetracking" | "history"
@@ -784,7 +799,7 @@ export default function DetailPanel({
   const totalSubtasks = subtasks.length;
   const progress = getSubtaskProgressInfo(subtasksDone, totalSubtasks, colors);
 
-  const dlInfo = getDeadlineInfo(task.due, colors, task.done);
+  const dlInfo = getDeadlineInfo(task.due, colors, task.done, task.dueTime);
   const isThisTaskTimerRunning =
     isTimerRunning && activeTimerTaskId === task.id;
 
@@ -897,16 +912,6 @@ export default function DetailPanel({
         >
           {task.title}
         </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          {onEditTask && (
-            <TouchableOpacity onPress={() => onEditTask(task)} style={{ padding: 4 }}>
-              <Feather name="edit-2" size={16} color={colors.ghMuted} />
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
-            <Text style={{ color: colors.ghMuted, fontSize: 20 }}>×</Text>
-          </TouchableOpacity>
-        </View>
       </View>
     </>
   );
@@ -1003,7 +1008,7 @@ export default function DetailPanel({
               return (
                 <View style={{ backgroundColor: 'rgba(240,136,62,0.07)', borderWidth: 1, borderColor: 'rgba(240,136,62,0.22)', borderRadius: 12, padding: 12, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(240,136,62,0.15)', alignItems: 'center', justifyContent: 'center' }}>
-                    <Text style={{ fontSize: 18 }}>🔥</Text>
+                    <Text style={{ fontSize: 18, color: '#f0883e', fontWeight: '800' }}>★</Text>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: '#f0883e', fontSize: 13, fontWeight: '700' }}>
@@ -1014,7 +1019,61 @@ export default function DetailPanel({
                     </Text>
                   </View>
                   <View style={{ backgroundColor: 'rgba(240,136,62,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
-                    <Text style={{ color: '#f0883e', fontSize: 11, fontWeight: '700' }}>🏆 {rec.maxStreak} best</Text>
+                    <Text style={{ color: '#f0883e', fontSize: 11, fontWeight: '700' }}>★ {rec.maxStreak} best</Text>
+                  </View>
+                </View>
+              );
+            })()}
+
+            {/* Overdue Alert Banner / Card */}
+            {(() => {
+              if (task.done || !task.due) return null;
+              const now = new Date();
+              const due = new Date(task.due + "T00:00:00");
+              if (task.dueTime && task.dueTime.trim() !== '') {
+                const [h, m] = task.dueTime.split(":").map(Number);
+                if (!isNaN(h) && !isNaN(m)) due.setHours(h, m, 0, 0);
+              } else {
+                due.setHours(23, 59, 59, 999);
+              }
+              const diffMs = due.getTime() - now.getTime();
+              if (diffMs >= 0) return null;
+              const overMs = Math.abs(diffMs);
+              const ovdDays = Math.floor(overMs / (1000 * 60 * 60 * 24));
+              const ovdHours = Math.floor((overMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+              const ovdMins = Math.floor((overMs % (1000 * 60 * 60)) / (1000 * 60));
+              let timeStr = `${ovdDays} ${ovdDays === 1 ? 'day' : 'days'}`;
+              if (ovdDays === 0 && ovdHours > 0) timeStr = `${ovdHours} ${ovdHours === 1 ? 'hour' : 'hours'}`;
+              else if (ovdDays === 0 && ovdHours === 0) timeStr = `${Math.max(1, ovdMins)} ${ovdMins === 1 ? 'minute' : 'minutes'}`;
+              return (
+                <View style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: "rgba(248, 81, 73, 0.12)",
+                  borderWidth: 1,
+                  borderColor: "rgba(248, 81, 73, 0.35)",
+                  borderRadius: 12,
+                  padding: 14,
+                  marginBottom: 16
+                }}>
+                  <View style={{
+                    backgroundColor: colors.ghRed || "#f85149",
+                    width: 32,
+                    height: 32,
+                    borderRadius: 8,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginRight: 12
+                  }}>
+                    <Feather name="alert-octagon" size={16} color="#fff" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: colors.ghRed || "#f85149", fontWeight: "700", fontSize: 14, marginBottom: 2 }}>
+                      ! Task is Overdue by {timeStr}
+                    </Text>
+                    <Text style={{ color: colors.ghMuted, fontSize: 12 }}>
+                      Due date was {task.dueTime ? formatCustomDate(due) : formatCustomDate(due).split(',')[0]}
+                    </Text>
                   </View>
                 </View>
               );
@@ -1184,33 +1243,6 @@ export default function DetailPanel({
                   </Text>
                 </View>
 
-                {/* Next Reminder Countdown */}
-                <View style={{ width: "50%", padding: 5 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-                    <View style={{ backgroundColor: "rgba(207, 34, 46, 0.12)", width: 28, height: 28, borderRadius: 7, alignItems: "center", justifyContent: "center", marginRight: 8 }}>
-                      <Feather name="bell" size={13} color={colors.ghRed} />
-                    </View>
-                    <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 0 }]}>
-                      NEXT REMINDER
-                    </Text>
-                  </View>
-                  {nextReminder ? (
-                    <Text style={{ color: colors.ghText, fontSize: 16, fontWeight: "700", fontFamily: "monospace" }}>
-                      {(() => {
-                        const diff = nextReminder.getTime() - nowTime;
-                        if (diff <= 0) return "Triggering...";
-                        const m = Math.floor(diff / 60000);
-                        const s = Math.floor((diff % 60000) / 1000);
-                        return `${m}m ${s}s`;
-                      })()}
-                    </Text>
-                  ) : (
-                    <Text style={{ color: colors.ghMuted, fontSize: 16, fontWeight: "500", fontFamily: "monospace" }}>
-                      None
-                    </Text>
-                  )}
-                </View>
-
                 {/* Time Spent */}
                 <View style={{ width: "50%", padding: 5 }}>
                   <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
@@ -1290,7 +1322,10 @@ export default function DetailPanel({
                     const overMs = Math.abs(diffMs);
                     const overDays = Math.floor(overMs / (1000 * 60 * 60 * 24));
                     const overHours = Math.floor((overMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                    const overMins = Math.floor((overMs % (1000 * 60 * 60)) / (1000 * 60));
                     overdueTimeStr = `${overDays}d ${overHours}h`;
+                    if (overDays === 0 && overHours === 0) overdueTimeStr = `${Math.max(1, overMins)}m`;
+                    else if (overDays === 0 && overHours > 0) overdueTimeStr = `${overHours}h ${overMins}m`;
                   }
 
                   if (task.execStartDate) {
@@ -1599,7 +1634,7 @@ export default function DetailPanel({
                   {/* Header: Streak type badge */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 14 }}>
                     <View style={{ backgroundColor: 'rgba(240, 136, 62, 0.12)', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={{ fontSize: 14 }}>🔥</Text>
+                      <Text style={{ fontSize: 14, color: '#f0883e', fontWeight: '800' }}>★</Text>
                       <Text style={{ color: '#f0883e', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 }}>{freqLabel} Streak</Text>
                     </View>
                   </View>

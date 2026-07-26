@@ -87,9 +87,6 @@ export default function Sidebar({
   const [connectionStatus, setConnectionStatus] = useState<string | null>(null);
   const [connectionLoading, setConnectionLoading] = useState(false);
 
-  // Developer / data state
-  const [mockDataLoading, setMockDataLoading] = useState(false);
-  const [mockDataStatus, setMockDataStatus] = useState<string | null>(null);
   const [fileTree, setFileTree] = useState<{ path: string; size?: number }[]>([]);
   const [showFileTree, setShowFileTree] = useState(false);
   const [fileTreeLoading, setFileTreeLoading] = useState(false);
@@ -265,33 +262,6 @@ export default function Sidebar({
     setTimeout(() => setSyncStatus(null), 3000);
   };
 
-  const handleLoadMockData = async () => {
-    setMockDataLoading(true);
-    setMockDataStatus(null);
-    try {
-      const { tasks, trackers } = await api.loadMockData();
-      setMockDataStatus(`✓ Loaded ${tasks} tasks + ${trackers} trackers`);
-      if (onDataChanged) onDataChanged();
-    } catch (e: any) {
-      setMockDataStatus('Failed: ' + e.message);
-    }
-    setMockDataLoading(false);
-    setTimeout(() => setMockDataStatus(null), 5000);
-  };
-
-  const handleRemoveMockData = async () => {
-    setMockDataLoading(true);
-    setMockDataStatus(null);
-    try {
-      const { tasks, trackers } = await api.removeMockData();
-      setMockDataStatus(`✓ Removed ${tasks} tasks + ${trackers} trackers`);
-      if (onDataChanged) onDataChanged();
-    } catch (e: any) {
-      setMockDataStatus('Failed: ' + e.message);
-    }
-    setMockDataLoading(false);
-    setTimeout(() => setMockDataStatus(null), 5000);
-  };
 
   const handleBrowseFiles = async () => {
     setFileTreeLoading(true);
@@ -341,27 +311,36 @@ export default function Sidebar({
   const uniqTasks = tasks.filter((t, idx, self) => self.findIndex(x => x.id === t.id) === idx);
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  const isTaskBacklog = (t: Task) => !t.recurrence && (t.target === "backlog" || (t.due && t.due < todayStr));
-  const isTaskCurrent = (t: Task) => {
-    if (isTaskBacklog(t)) return false;
-    if (t.due && t.due > todayStr) return false;
-    return t.target === "today" || t.due === todayStr || (!t.due && t.target === "today");
+  const isTaskOverdue = (t: Task) => {
+    if (t.done || !t.due) return false;
+    const nowObj = new Date();
+    const dueObj = new Date(t.due + "T00:00:00");
+    if (t.dueTime && t.dueTime.trim() !== '') {
+      const [h, m] = t.dueTime.split(":").map(Number);
+      if (!isNaN(h) && !isNaN(m)) dueObj.setHours(h, m, 0, 0);
+    } else {
+      dueObj.setHours(23, 59, 59, 999);
+    }
+    return nowObj.getTime() > dueObj.getTime();
   };
 
-  const todayBadgeCount = uniqTasks.filter((t) => !t.done && !isTaskBacklog(t) && isTaskCurrent(t)).length;
+  const isTaskCurrent = (t: Task) => {
+    if (t.target === "backlog") return false;
+    if (t.due && t.due > todayStr && !isTaskOverdue(t)) return false;
+    return t.target === "today" || (!!t.due && (t.due <= todayStr || isTaskOverdue(t))) || (!t.due && t.target === "today");
+  };
+
+  const todayBadgeCount = uniqTasks.filter((t) => !t.done && isTaskCurrent(t)).length;
   const inboxBadgeCount = uniqTasks.filter((t) => !t.done && t.project === 'Inbox').length;
   const allBadgeCount = uniqTasks.filter((t) => !t.done).length;
-  const backlogBadgeCount = uniqTasks.filter((t) => !t.done && isTaskBacklog(t)).length;
 
   const views = [
     { id: 'today', label: "Today's Tasks", icon: '☀️', badge: todayBadgeCount },
     { id: 'inbox', label: 'Inbox', icon: '📥', badge: inboxBadgeCount },
     { id: 'all', label: 'All', icon: '📋', badge: allBadgeCount },
     { id: 'scheduled', label: 'Scheduled', icon: '📅' },
-    { id: 'timetracking', label: 'Time Tracking', icon: '⏱️' },
     { id: 'stats', label: 'Deep Stats', icon: '📈' },
     { id: 'tracking', label: 'Tracking', icon: '📊' },
-    { id: 'backlog', label: 'Backlog', icon: '📦', badge: backlogBadgeCount },
   ];
 
   return (
@@ -420,6 +399,7 @@ export default function Sidebar({
           const pName = (proj && proj.name && typeof proj.name === 'string' && proj.name.trim() !== '') ? proj.name : `Project_${idx}`;
           const pColor = (proj && proj.color && typeof proj.color === 'string' && proj.color.trim() !== '') ? proj.color : '#58a6ff';
           const isActive = currentProject === pName;
+          const projectTaskCount = uniqTasks.filter((t) => !t.done && t.project === pName).length;
           return (
             <TouchableOpacity
               key={`${pName}_${idx}`}
@@ -440,6 +420,11 @@ export default function Sidebar({
               ]} numberOfLines={1}>
                 {pName}
               </Text>
+              {projectTaskCount > 0 && (
+                <View style={[styles.badgeContainer, { backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder }]}>
+                  <Text style={[styles.badgeText, { color: colors.ghText }]}>{projectTaskCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           );
         })}
@@ -777,49 +762,22 @@ export default function Sidebar({
                 </Text>
               </View>
 
-              {/* DEVELOPER / DATA */}
+              {/* LOCAL STORAGE */}
               <View style={styles.settingsSection}>
-                <Text style={[styles.settingsSectionTitle, { color: colors.ghMuted }]}>DEVELOPER / DATA</Text>
+                <Text style={[styles.settingsSectionTitle, { color: colors.ghMuted }]}>LOCAL STORAGE</Text>
                 <Text style={[styles.settingsHelp, { color: colors.ghMuted, marginBottom: 10 }]}>
-                  Manage local folder structure, populate test data, and inspect files on device.
+                  Inspect local file structure and storage on your device.
                 </Text>
-                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-                  <TouchableOpacity
-                    style={[styles.modalActionBtn, { flex: 1, minWidth: '45%', backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder, borderWidth: 1 }]}
-                    onPress={handleLoadMockData}
-                    disabled={mockDataLoading}
-                  >
-                    <Feather name={mockDataLoading ? 'loader' : 'database'} size={14} color={colors.ghText} style={{ marginRight: 6 }} />
-                    <Text style={[styles.modalActionBtnText, { color: colors.ghText }]}>
-                      {mockDataLoading ? 'Loading...' : 'Load Mock Data'}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.modalActionBtn, { flex: 1, minWidth: '45%', backgroundColor: colors.ghSurface2, borderColor: colors.ghRed, borderWidth: 1 }]}
-                    onPress={handleRemoveMockData}
-                    disabled={mockDataLoading}
-                  >
-                    <Feather name="trash-2" size={14} color={colors.ghRed} style={{ marginRight: 6 }} />
-                    <Text style={[styles.modalActionBtnText, { color: colors.ghRed }]}>
-                      Remove Mock
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.modalActionBtn, { width: '100%', backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder, borderWidth: 1, marginTop: 4 }]}
-                    onPress={handleBrowseFiles}
-                    disabled={fileTreeLoading}
-                  >
-                    <Feather name="folder" size={14} color={colors.ghText} style={{ marginRight: 6 }} />
-                    <Text style={[styles.modalActionBtnText, { color: colors.ghText }]}>
-                      {fileTreeLoading ? 'Scanning...' : 'Browse Files'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                {mockDataStatus && (
-                  <Text style={[styles.statusText, { color: mockDataStatus.includes('Failed') ? colors.ghRed : colors.ghGreen, marginBottom: 8 }]}>
-                    {mockDataStatus}
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, { width: '100%', backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder, borderWidth: 1, marginBottom: 10 }]}
+                  onPress={handleBrowseFiles}
+                  disabled={fileTreeLoading}
+                >
+                  <Feather name="folder" size={14} color={colors.ghText} style={{ marginRight: 6 }} />
+                  <Text style={[styles.modalActionBtnText, { color: colors.ghText }]}>
+                    {fileTreeLoading ? 'Scanning...' : 'Browse Files'}
                   </Text>
-                )}
+                </TouchableOpacity>
                 <Text style={[styles.syncInfo, { color: colors.ghMuted }]}>
                   Storage root: {api.getStorageRoot()}
                 </Text>

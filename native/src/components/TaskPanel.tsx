@@ -49,13 +49,28 @@ const getExecutionStatus = (task: Task, colors: any) => {
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
-  const due = new Date(task.due + "T00:00:00");
-  const today = new Date(todayStr + "T00:00:00");
-  const diffDueDays = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const dueObj = new Date(task.due + "T00:00:00");
+  if (task.dueTime && task.dueTime.trim() !== '') {
+    const [h, m] = task.dueTime.split(":").map(Number);
+    if (!isNaN(h) && !isNaN(m)) dueObj.setHours(h, m, 0, 0);
+  } else {
+    dueObj.setHours(23, 59, 59, 999);
+  }
 
-  if (diffDueDays < 0) {
+  const today = new Date(todayStr + "T00:00:00");
+  const diffDueDays = Math.round((dueObj.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+  const diffMs = dueObj.getTime() - now.getTime();
+  if (diffMs < 0) {
+    const overMs = Math.abs(diffMs);
+    const overDays = Math.floor(overMs / (1000 * 60 * 60 * 24));
+    const overHours = Math.floor((overMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const overMins = Math.floor((overMs % (1000 * 60 * 60)) / (1000 * 60));
+    let labelStr = `${overDays}d overdue`;
+    if (overDays === 0 && overHours > 0) labelStr = `${overHours}h overdue`;
+    else if (overDays === 0 && overHours === 0) labelStr = `${Math.max(1, overMins)}m overdue`;
     return {
-      label: `· Overdue by ${Math.abs(diffDueDays)}d`,
+      label: `! Overdue`,
       color: colors.ghRed || '#f85149',
       bg: "rgba(248, 81, 73, 0.08)",
       border: "rgba(248, 81, 73, 0.3)",
@@ -159,11 +174,23 @@ export default function TaskPanel({
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
-  const isTaskBacklog = (t: Task) => !t.recurrence && (t.target === "backlog" || (t.due && t.due < todayStr));
+  const isTaskOverdue = (t: Task) => {
+    if (t.done || !t.due) return false;
+    const nowObj = new Date();
+    const dueObj = new Date(t.due + "T00:00:00");
+    if (t.dueTime && t.dueTime.trim() !== '') {
+      const [h, m] = t.dueTime.split(":").map(Number);
+      if (!isNaN(h) && !isNaN(m)) dueObj.setHours(h, m, 0, 0);
+    } else {
+      dueObj.setHours(23, 59, 59, 999);
+    }
+    return nowObj.getTime() > dueObj.getTime();
+  };
+
   const isTaskCurrent = (t: Task) => {
-    if (isTaskBacklog(t)) return false;
-    if (t.due && t.due > todayStr) return false; // Future scheduled occurrences MUST disappear from Today!
-    return t.target === "today" || t.due === todayStr || (!t.due && t.target === "today");
+    if (t.target === "backlog") return false;
+    if (t.due && t.due > todayStr && !isTaskOverdue(t)) return false;
+    return t.target === "today" || (!!t.due && (t.due <= todayStr || isTaskOverdue(t))) || (!t.due && t.target === "today");
   };
 
   const baseFiltered = tasks
@@ -172,10 +199,8 @@ export default function TaskPanel({
       if (currentProject) return t.project === currentProject;
       if (currentView === "inbox") return t.project === "Inbox";
       if (currentView === "all") return true;
-      const backlog = isTaskBacklog(t);
-      if (currentView === "backlog") return backlog;
-      if (currentView === "today") return !backlog && isTaskCurrent(t);
-      return t.target === currentView && !backlog;
+      if (currentView === "today") return isTaskCurrent(t);
+      return t.target === currentView;
     })
     .sort((a, b) => {
       const getPriorityWeight = (priority?: string) => {
@@ -334,7 +359,7 @@ export default function TaskPanel({
                         },
                       ]}
                     >
-                      🔥 {task.recurrence.currentStreak}
+                      ★ {task.recurrence.currentStreak}
                     </Text>
                   )}
                 </View>
@@ -406,7 +431,7 @@ export default function TaskPanel({
   const activeTasks = baseFiltered.filter(t => !t.done);
   const completedTasks = baseFiltered.filter(t => t.done);
 
-  if (!currentProject && (currentView === "backlog" || currentView === "all")) {
+  if (!currentProject && currentView === "all") {
     const byProject = activeTasks.reduce((acc, t) => {
       if (!acc[t.project]) acc[t.project] = [];
       acc[t.project].push(t);
@@ -423,26 +448,26 @@ export default function TaskPanel({
     });
 
     if (activeTasks.length === 0 && completedTasks.length === 0) {
-      listData.push({ type: 'empty', id: 'empty-backlog', message: 'No backlog tasks found.' });
+      listData.push({ type: 'empty', id: 'empty-all', message: 'No tasks found.' });
     }
   } else if (currentProject) {
-    const backlogTasks = activeTasks.filter(isTaskBacklog);
-    const currentTasks = activeTasks.filter(isTaskCurrent);
-    const futureTasks = activeTasks.filter(t => !isTaskBacklog(t) && !isTaskCurrent(t));
+    const overdueTasks = activeTasks.filter(t => isTaskOverdue(t));
+    const currentTasks = activeTasks.filter(t => !isTaskOverdue(t) && ((!!t.due && t.due === todayStr) || (!t.due && (t.target === 'today' || !t.target))));
+    const futureTasks = activeTasks.filter(t => !isTaskOverdue(t) && !!t.due && t.due > todayStr);
 
     if (activeTasks.length === 0 && completedTasks.length === 0) {
       listData.push({ type: 'empty', id: 'empty-project', message: 'No tasks in this project.' });
     } else {
-      if (backlogTasks.length > 0) {
-        listData.push({ type: 'header', id: 'header-backlog', title: 'Backlog' });
-        backlogTasks.forEach(t => listData.push({ type: 'task', id: t.id, task: t, index: taskCounter++ }));
+      if (overdueTasks.length > 0) {
+        listData.push({ type: 'header', id: 'header-overdue', title: '! Overdue' });
+        overdueTasks.forEach(t => listData.push({ type: 'task', id: t.id, task: t, index: taskCounter++ }));
       }
       if (currentTasks.length > 0) {
-        listData.push({ type: 'header', id: 'header-current', title: 'Current' });
+        listData.push({ type: 'header', id: 'header-current', title: 'Current / Today' });
         currentTasks.forEach(t => listData.push({ type: 'task', id: t.id, task: t, index: taskCounter++ }));
       }
       if (futureTasks.length > 0) {
-        listData.push({ type: 'header', id: 'header-future', title: 'Future Date' });
+        listData.push({ type: 'header', id: 'header-future', title: 'Scheduled / Future' });
         futureTasks.forEach(t => listData.push({ type: 'task', id: t.id, task: t, index: taskCounter++ }));
       }
     }

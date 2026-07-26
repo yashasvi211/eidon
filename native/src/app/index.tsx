@@ -1322,7 +1322,11 @@ export default function AppIndex() {
         styles.addBtn,
         { backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder },
       ]}
-      onPress={() => setShowAddModal(true)}
+      onPress={() => {
+        setSelectedTaskId(null);
+        setEditingTask(null);
+        setShowAddModal(true);
+      }}
     >
       <Text style={{ color: colors.ghText, fontSize: 12, fontWeight: "600" }}>
         + Add Task
@@ -1402,15 +1406,93 @@ export default function AppIndex() {
             <View style={styles.middlePanel}>
               {renderMiddlePanel()}
 
-              {/* Mobile Detail Panel — overlaid so task list stays rendered behind it */}
-              {!isLargeScreen && !!selectedTaskId && !!activeMobileTask && (
-                <View style={styles.mobileDetailOverlay}>
+              {/* Mobile Detail Panel / AddTaskModal — overlaid so task list stays rendered behind it */}
+              {!isLargeScreen && (
+                <>
+                  {!!selectedTaskId && !!activeMobileTask && !showAddModal && !editingTask && (
+                    <View style={styles.mobileDetailOverlay}>
+                      <DetailPanel
+                        task={activeMobileTask}
+                        onClose={() => setSelectedTaskId(null)}
+                        onToggleDone={toggleDone}
+                        onUpdateTask={handleUpdateTask}
+                        onEditTask={(task) => {
+                          setSelectedTaskId(null);
+                          setShowAddModal(false);
+                          setEditingTask(task);
+                        }}
+                        isTimerRunning={isTimerRunning}
+                        timerSeconds={timerSeconds}
+                        onStartTimer={handleStartTimer}
+                        onStopTimer={handleStopTimer}
+                        activeTimerTaskId={activeTimerTaskId}
+                        activeTab={activeTab}
+                        setActiveTab={setActiveTab}
+                      />
+                    </View>
+                  )}
+                  {showAddModal && (
+                    <View style={styles.mobileDetailOverlay}>
+                      <AddTaskModal
+                        visible={showAddModal}
+                        onClose={() => setShowAddModal(false)}
+                        onAdd={handleAddTask}
+                        projects={projects}
+                      />
+                    </View>
+                  )}
+                  {editingTask !== null && (
+                    <View style={styles.mobileDetailOverlay}>
+                      <AddTaskModal
+                        visible={editingTask !== null}
+                        onClose={() => setEditingTask(null)}
+                        onAdd={(title, project, due, reminder, dueTime, priority, execStartDate, execStartTime, recurrenceConfig) => {
+                          if (editingTask) {
+                            handleSaveEditTask(editingTask, title, project, due, reminder, dueTime, priority, execStartDate, execStartTime, recurrenceConfig);
+                          }
+                        }}
+                        projects={projects}
+                        initialTask={editingTask}
+                      />
+                    </View>
+                  )}
+                </>
+              )}
+            </View>
+
+            {/* Detail Panel / AddTaskModal for Large Screens */}
+            {isLargeScreen && (
+              <View style={styles.rightPanel}>
+                {showAddModal ? (
+                  <AddTaskModal
+                    visible={showAddModal}
+                    onClose={() => setShowAddModal(false)}
+                    onAdd={handleAddTask}
+                    projects={projects}
+                  />
+                ) : editingTask !== null ? (
+                  <AddTaskModal
+                    visible={editingTask !== null}
+                    onClose={() => setEditingTask(null)}
+                    onAdd={(title, project, due, reminder, dueTime, priority, execStartDate, execStartTime, recurrenceConfig) => {
+                      if (editingTask) {
+                        handleSaveEditTask(editingTask, title, project, due, reminder, dueTime, priority, execStartDate, execStartTime, recurrenceConfig);
+                      }
+                    }}
+                    projects={projects}
+                    initialTask={editingTask}
+                  />
+                ) : selectedTask ? (
                   <DetailPanel
-                    task={activeMobileTask}
+                    task={selectedTask}
                     onClose={() => setSelectedTaskId(null)}
                     onToggleDone={toggleDone}
                     onUpdateTask={handleUpdateTask}
-                    onEditTask={(task) => setEditingTask(task)}
+                    onEditTask={(task) => {
+                      setSelectedTaskId(null);
+                      setShowAddModal(false);
+                      setEditingTask(task);
+                    }}
                     isTimerRunning={isTimerRunning}
                     timerSeconds={timerSeconds}
                     onStartTimer={handleStartTimer}
@@ -1419,27 +1501,7 @@ export default function AppIndex() {
                     activeTab={activeTab}
                     setActiveTab={setActiveTab}
                   />
-                </View>
-              )}
-            </View>
-
-            {/* Detail Panel for Large Screens */}
-            {isLargeScreen && (
-              <View style={styles.rightPanel}>
-                <DetailPanel
-                  task={selectedTask}
-                  onClose={() => setSelectedTaskId(null)}
-                  onToggleDone={toggleDone}
-                  onUpdateTask={handleUpdateTask}
-                  onEditTask={(task) => setEditingTask(task)}
-                  isTimerRunning={isTimerRunning}
-                  timerSeconds={timerSeconds}
-                  onStartTimer={handleStartTimer}
-                  onStopTimer={handleStopTimer}
-                  activeTimerTaskId={activeTimerTaskId}
-                  activeTab={activeTab}
-                  setActiveTab={setActiveTab}
-                />
+                ) : null}
               </View>
             )}
           </View>
@@ -1490,25 +1552,6 @@ export default function AppIndex() {
           </Animated.View>
         </View>
       )}
-
-      <AddTaskModal
-        visible={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onAdd={handleAddTask}
-        projects={projects}
-      />
-
-      <AddTaskModal
-        visible={editingTask !== null}
-        onClose={() => setEditingTask(null)}
-        onAdd={(title, project, due, reminder, dueTime, priority, execStartDate, execStartTime, recurrenceConfig) => {
-          if (editingTask) {
-            handleSaveEditTask(editingTask, title, project, due, reminder, dueTime, priority, execStartDate, execStartTime, recurrenceConfig);
-          }
-        }}
-        projects={projects}
-        initialTask={editingTask}
-      />
 
       <AddTrackerModal
         visible={showAddTrackerModal}

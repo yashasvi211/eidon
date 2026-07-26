@@ -2,12 +2,29 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, Modal, StyleSheet,
   useColorScheme, KeyboardAvoidingView, Platform, ScrollView,
-  Animated as RNAnimated
+  Animated as RNAnimated, useWindowDimensions
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+  Easing,
+  runOnJS,
+  interpolate,
+  Extrapolation,
+} from "react-native-reanimated";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { Colors } from '@/constants/theme';
 import { Feather } from '@expo/vector-icons';
 import { validateReminder } from '@/services/notifications';
 import { getValidOffsets, getValidRepeats, generateSchedulePreview, countTotalReminders, Preset } from '@/services/reminderUtils';
+
+const DISMISS_THRESHOLD = 120;
+const OPEN_SPRING = { damping: 28, stiffness: 220, mass: 0.9 };
+const SNAP_SPRING = { damping: 24, stiffness: 300, mass: 0.7 };
+const EXIT_DURATION = 250;
+const EXIT_EASING = Easing.bezierFn(0.4, 0, 1, 1);
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -74,6 +91,8 @@ import SelectModal from './sub_components/SelectModal';
 export default function AddTaskModal({ visible, onClose, onAdd, projects, initialTask }: AddTaskModalProps) {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
+  const { width, height } = useWindowDimensions();
+  const isLargeScreen = width >= 768;
 
   // Form state
   const [title, setTitle] = useState('');
@@ -145,43 +164,67 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
   }, [dueDateTimeMs, remindBefore, repeatEvery]);
 
   // ── Animations ──
-  const scaleAnim = useRef(new RNAnimated.Value(0.9)).current;
-  const opacityAnim = useRef(new RNAnimated.Value(0)).current;
+  const translateY = useSharedValue(isLargeScreen ? 0 : height);
+  const dragY = useSharedValue(0);
 
   useEffect(() => {
     if (visible) {
       reset();
-      scaleAnim.setValue(0.9);
-      opacityAnim.setValue(0);
-      RNAnimated.parallel([
-        RNAnimated.spring(scaleAnim, {
-          toValue: 1,
-          tension: 20,
-          friction: 10,
-          useNativeDriver: true,
-        }),
-        RNAnimated.timing(opacityAnim, {
-          toValue: 1,
-          duration: 350,
-          useNativeDriver: true,
-        }),
-      ]).start();
+      if (!isLargeScreen) {
+        translateY.value = height;
+        translateY.value = withSpring(0, OPEN_SPRING);
+      } else {
+        translateY.value = 0;
+      }
     }
-  }, [visible, initialTask]);
+  }, [visible, initialTask, isLargeScreen]);
+
+  const panGesture = useMemo(() => {
+    return Gesture.Pan()
+      .activeOffsetY([10, -10])
+      .failOffsetX([-15, 15])
+      .onUpdate((e) => {
+        dragY.value = Math.max(0, e.translationY);
+      })
+      .onEnd((e) => {
+        if (e.translationY > DISMISS_THRESHOLD || e.velocityY > 800) {
+          translateY.value = withTiming(height, {
+            duration: EXIT_DURATION,
+            easing: EXIT_EASING,
+          }, () => {
+            runOnJS(onClose)();
+          });
+          dragY.value = withTiming(0, { duration: EXIT_DURATION });
+        } else {
+          dragY.value = withSpring(0, SNAP_SPRING);
+        }
+      });
+  }, [height, onClose]);
+
+  const rootAnimatedStyle = useAnimatedStyle(() => {
+    if (isLargeScreen) return {};
+    return {
+      transform: [{ translateY: translateY.value + dragY.value }],
+      opacity: interpolate(
+        translateY.value + dragY.value,
+        [0, height * 0.5],
+        [1, 0.85],
+        Extrapolation.CLAMP,
+      ),
+    };
+  }, [isLargeScreen, height]);
 
   const animateClose = (callback: () => void) => {
-    RNAnimated.parallel([
-      RNAnimated.timing(scaleAnim, {
-        toValue: 0.9,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-      RNAnimated.timing(opacityAnim, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }),
-    ]).start(callback);
+    if (!isLargeScreen) {
+      translateY.value = withTiming(height, {
+        duration: EXIT_DURATION,
+        easing: EXIT_EASING,
+      }, () => {
+        runOnJS(callback)();
+      });
+    } else {
+      callback();
+    }
   };
 
   // ── Handlers ──
@@ -342,16 +385,65 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
   }
 
   const canSubmit = title.trim().length > 0 && (isRecurring || due !== null) && !hasDateButNoTime && !hasTimeButNoDate && !isPastDue && !hasPartialExec && !isExecInvalid;
-  return (
-    <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <RNAnimated.View style={[styles.overlay, { opacity: opacityAnim }]}>
-          <RNAnimated.View style={[styles.modal, { backgroundColor: colors.ghSurface, borderColor: colors.ghBorder, transform: [{ scale: scaleAnim }] }]}>
-            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-              <Text style={[styles.modalTitle, { color: colors.ghText }]}>
-                {initialTask ? 'Edit Task' : 'Add Task'}
-              </Text>
 
+  if (!visible) return null;
+
+  const dragArea = (
+    <>
+      {!isLargeScreen && (
+        <View style={styles.dragHandleContainer}>
+          <View style={[styles.dragHandle, { backgroundColor: colors.ghBorder2 }]} />
+        </View>
+      )}
+      <View style={[styles.header, { borderBottomColor: colors.ghBorder }]}>
+        <Text style={[styles.headerTitle, { color: colors.ghText }]} numberOfLines={1}>
+          {initialTask ? 'Edit Task' : 'Add Task'}
+        </Text>
+        <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
+          <Text style={{ color: colors.ghMuted, fontSize: 20 }}>×</Text>
+        </TouchableOpacity>
+      </View>
+    </>
+  );
+
+  return (
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      {!isLargeScreen && (
+        <View style={styles.backdropContainer}>
+          <TouchableOpacity
+            style={styles.backdrop}
+            activeOpacity={1}
+            onPress={handleClose}
+          />
+        </View>
+      )}
+      <Animated.View
+        style={[
+          styles.panelContainer,
+          {
+            backgroundColor: colors.ghBg,
+            borderLeftColor: colors.ghBorder,
+            borderLeftWidth: isLargeScreen ? 1 : 0,
+            borderTopLeftRadius: isLargeScreen ? 0 : 16,
+            borderTopRightRadius: isLargeScreen ? 0 : 16,
+          },
+          rootAnimatedStyle,
+        ]}
+      >
+        {!isLargeScreen ? (
+          <GestureDetector gesture={panGesture}>
+            <Animated.View>{dragArea}</Animated.View>
+          </GestureDetector>
+        ) : (
+          dragArea
+        )}
+
+        <ScrollView
+          style={styles.scrollContent}
+          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
               {/* ── Title ── */}
               <Text style={[styles.label, { color: colors.ghMuted }]}>Title</Text>
               <TextInput
@@ -360,7 +452,6 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
                 placeholderTextColor={colors.ghMuted}
                 value={title}
                 onChangeText={setTitle}
-                autoFocus
               />
 
               {/* ── Project ── */}
@@ -690,7 +781,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
                       onPress={() => setStreakEnabled(v => !v)}
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                        <Text style={{ fontSize: 18 }}>🔥</Text>
+                        <Text style={{ fontSize: 18, color: '#f0883e', fontWeight: '800' }}>★</Text>
                         <View>
                           <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: '600' }}>Enable Streak Tracking</Text>
                           <Text style={{ color: colors.ghMuted, fontSize: 11, marginTop: 1 }}>Track your consistency over time</Text>
@@ -704,7 +795,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
                     {/* Info note about recurring */}
                     <View style={{ backgroundColor: `${colors.ghBlue}08`, borderWidth: 1, borderColor: `${colors.ghBlue}20`, borderRadius: 8, padding: 10 }}>
                       <Text style={{ color: colors.ghMuted, fontSize: 11, lineHeight: 16 }}>
-                        📋 The task resets for the next period when you complete it or when the due date passes. {streakEnabled ? '\n🔥 Streak breaks if you miss a period.' : ''}
+                        📋 The task resets for the next period when you complete it or when the due date passes. {streakEnabled ? '\n★ Streak breaks if you miss a period.' : ''}
                       </Text>
                     </View>
                   </View>
@@ -730,10 +821,9 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
                 <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>Add Task</Text>
               </TouchableOpacity>
             </View>
-          </ScrollView>
-        </RNAnimated.View>
-        </RNAnimated.View>
-      </KeyboardAvoidingView>
+        </ScrollView>
+      </Animated.View>
+
       <ConfirmationModal
         visible={showConfirm}
         onClose={() => setShowConfirm(false)}
@@ -763,8 +853,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
         onSelect={(val) => setRepeatEvery(val === 0 ? null : val)}
         colors={colors}
       />
-
-    </Modal>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -773,20 +862,52 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
 
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
+  dragHandleContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 8,
+    paddingBottom: 4,
   },
-  modal: {
+  dragHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+  },
+  backdropContainer: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+  },
+  backdrop: {
     width: '100%',
-    maxWidth: 400,
-    maxHeight: '85%',
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 24,
+    height: '100%',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  panelContainer: {
+    flex: 1,
+    borderLeftWidth: 1,
+    flexDirection: 'column',
+    overflow: 'hidden',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    minHeight: 48,
+  },
+  headerTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    flex: 1,
+    marginRight: 10,
+  },
+  closeBtn: {
+    padding: 5,
+  },
+  scrollContent: {
+    flex: 1,
   },
   calendarModal: {
     width: '100%',
