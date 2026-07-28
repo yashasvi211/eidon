@@ -39,7 +39,7 @@ export interface ReminderConfig {
 }
 
 export interface TaskRecurrenceConfig {
-  frequency: 'daily' | 'weekly' | 'monthly';
+  frequency: string;
   streakEnabled: boolean;
 }
 
@@ -85,6 +85,7 @@ import AnalogClockModal from './sub_components/AnalogClockModal';
 import CalendarModal from './sub_components/CalendarModal';
 import ConfirmationModal from './sub_components/ConfirmationModal';
 import SelectModal from './sub_components/SelectModal';
+import DurationPickerModal from './sub_components/DurationPickerModal';
 
 // ─── Main Modal ────────────────────────────────────────────────────────────────
 
@@ -105,6 +106,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
 
   const [calendarMode, setCalendarMode] = useState<'due' | 'execStart' | null>(null);
   const [clockMode, setClockMode] = useState<'due' | 'execStart' | null>(null);
+  const [showDurationPicker, setShowDurationPicker] = useState(false);
   
   const [showConfirm, setShowConfirm] = useState(false);
   const [priority, setPriority] = useState<'High' | 'Moderate' | 'Low'>('Low');
@@ -116,7 +118,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
 
   // Recurrence state
   const [isRecurring, setIsRecurring] = useState(false);
-  const [recurrenceFrequency, setRecurrenceFrequency] = useState<'daily' | 'weekly' | 'monthly'>('daily');
+  const [recurrenceFrequency, setRecurrenceFrequency] = useState<string>('daily');
   const [streakEnabled, setStreakEnabled] = useState(false);
   
   // Dropdown states
@@ -262,6 +264,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
     }
     setCalendarMode(null);
     setClockMode(null);
+    setShowDurationPicker(false);
     setShowConfirm(false);
     setShowOffsetDropdown(false);
     setShowRepeatDropdown(false);
@@ -531,24 +534,26 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
                     </Text>
                   </TouchableOpacity>
                 ))}
-                <TextInput
+                <TouchableOpacity
                   style={[
                     styles.chip,
                     {
-                      color: colors.ghText,
-                      fontSize: 12,
                       borderColor: (est && !['15m', '30m', '1h', '2h', '4h'].includes(est)) ? colors.ghPurple : colors.ghBorder,
                       backgroundColor: (est && !['15m', '30m', '1h', '2h', '4h'].includes(est)) ? colors.ghPurple + '18' : 'transparent',
                       minWidth: 75,
-                      paddingVertical: 4,
-                      textAlign: 'center'
                     }
                   ]}
-                  placeholder="Custom..."
-                  placeholderTextColor={colors.ghMuted}
-                  value={['15m', '30m', '1h', '2h', '4h'].includes(est) ? '' : est}
-                  onChangeText={setEst}
-                />
+                  onPress={() => setShowDurationPicker(true)}
+                >
+                  <Text style={{ 
+                    color: (est && !['15m', '30m', '1h', '2h', '4h'].includes(est)) ? colors.ghPurple : colors.ghMuted, 
+                    fontSize: 12, 
+                    fontWeight: '500',
+                    textAlign: 'center'
+                  }}>
+                    {(est && !['15m', '30m', '1h', '2h', '4h'].includes(est)) ? est : 'Custom...'}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               {/* ── Due Date & Time ── */}
@@ -653,6 +658,15 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
               </View>
 
               {/* Calendar & Clock Modals */}
+              <DurationPickerModal
+                visible={showDurationPicker}
+                onClose={() => setShowDurationPicker(false)}
+                onSelectDuration={(dur) => setEst(dur)}
+                initialDurationStr={est}
+                colors={colors}
+                title="Custom Estimated Time"
+              />
+
               <CalendarModal
                 visible={calendarMode !== null}
                 onClose={() => setCalendarMode(null)}
@@ -821,6 +835,33 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
                             </Text>
                           </TouchableOpacity>
                         ))}
+                        <TextInput
+                          style={[
+                            styles.chip,
+                            {
+                              color: colors.ghText,
+                              fontSize: 12,
+                              fontWeight: '600',
+                              borderColor: recurrenceFrequency.startsWith('custom_') ? colors.ghBlue : colors.ghBorder,
+                              backgroundColor: recurrenceFrequency.startsWith('custom_') ? `${colors.ghBlue}18` : 'transparent',
+                              minWidth: 90,
+                              paddingVertical: 4,
+                              textAlign: 'center'
+                            }
+                          ]}
+                          placeholder="Custom (days)"
+                          placeholderTextColor={colors.ghMuted}
+                          keyboardType="numeric"
+                          value={recurrenceFrequency.startsWith('custom_') ? recurrenceFrequency.replace('custom_', '') : ''}
+                          onChangeText={(text) => {
+                            if (text === '') {
+                              setRecurrenceFrequency('custom_');
+                            } else {
+                              const parsed = parseInt(text.replace(/[^0-9]/g, ''), 10);
+                              if (!isNaN(parsed)) setRecurrenceFrequency(`custom_${parsed}`);
+                            }
+                          }}
+                        />
                       </View>
                     </View>
 
@@ -851,8 +892,10 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
                 )}
               </View>
 
+        </ScrollView>
+
             {/* ── Actions ── */}
-            <View style={styles.actions}>
+            <View style={[styles.actions, { paddingHorizontal: 16, paddingBottom: 24, marginBottom: 8, marginTop: 0, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.ghBorder }]}>
               <TouchableOpacity style={[styles.btn, { borderColor: colors.ghBorder }]} onPress={handleClose}>
                 <Text style={{ color: colors.ghMuted, fontSize: 13, fontWeight: '500' }}>Cancel</Text>
               </TouchableOpacity>
@@ -870,7 +913,6 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
                 <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>Add Task</Text>
               </TouchableOpacity>
             </View>
-        </ScrollView>
       </Animated.View>
 
       <ConfirmationModal

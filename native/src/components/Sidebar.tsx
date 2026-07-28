@@ -365,7 +365,7 @@ export default function Sidebar({
     { id: 'all', label: 'All', icon: '📋', badge: allBadgeCount },
     { id: 'scheduled', label: 'Scheduled', icon: '📅' },
     { id: 'stats', label: 'Deep Stats', icon: '📈' },
-    { id: 'tracking', label: 'Tracking', icon: '📊' },
+    // { id: 'tracking', label: 'Tracking', icon: '📊' },
   ];
 
   return (

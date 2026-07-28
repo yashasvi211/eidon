@@ -52,15 +52,18 @@ import * as EidonAlarm from "../../modules/expo-eidon-alarm";
 // ─── Recurrence Helpers ──────────────────────────────────────────────────────
 
 /** Given a YYYY-MM-DD date string and a frequency, return the next period's due date string */
-function advanceRecurringTaskDue(currentDue: string, frequency: 'daily' | 'weekly' | 'monthly'): string {
+function advanceRecurringTaskDue(currentDue: string, frequency: string): string {
   const [y, m, d] = currentDue.split('-').map(Number);
   const date = new Date(y, m - 1, d);
   if (frequency === 'daily') {
     date.setDate(date.getDate() + 1);
   } else if (frequency === 'weekly') {
     date.setDate(date.getDate() + 7);
-  } else {
+  } else if (frequency === 'monthly') {
     date.setMonth(date.getMonth() + 1);
+  } else if (frequency.startsWith('custom_')) {
+    const days = parseInt(frequency.split('_')[1], 10) || 1;
+    date.setDate(date.getDate() + days);
   }
   const ny = date.getFullYear();
   const nm = String(date.getMonth() + 1).padStart(2, '0');
