@@ -292,6 +292,18 @@ export default function Sidebar({
     setSyncLoading(false);
   };
 
+  const handleSyncFromDropbox = async () => {
+    setSyncLoading(true);
+    setSyncStatus(null);
+    const result = await api.syncFromDropbox();
+    setSyncStatus(result.message);
+    if (result.success) {
+      setLastSyncTime(Date.now());
+      if (onDataChanged) onDataChanged();
+    }
+    setSyncLoading(false);
+  };
+
   const handleModalSaveProject = () => {
     if (!modalNewProjectName.trim()) return;
     onAddProject(modalNewProjectName.trim(), modalNewProjectColor);
@@ -324,8 +336,21 @@ export default function Sidebar({
     return nowObj.getTime() > dueObj.getTime();
   };
 
+  const isExecStartReached = (t: Task) => {
+    if (!t.execStartDate) return false;
+    const execObj = new Date(t.execStartDate + "T00:00:00");
+    if (t.execStartTime && t.execStartTime.trim() !== '') {
+      const [h, m] = t.execStartTime.split(":").map(Number);
+      if (!isNaN(h) && !isNaN(m)) execObj.setHours(h, m, 0, 0);
+    } else {
+      execObj.setHours(0, 0, 0, 0);
+    }
+    return Date.now() >= execObj.getTime();
+  };
+
   const isTaskCurrent = (t: Task) => {
     if (t.target === "backlog") return false;
+    if (isExecStartReached(t)) return true;
     if (t.due && t.due > todayStr && !isTaskOverdue(t)) return false;
     return t.target === "today" || (!!t.due && (t.due <= todayStr || isTaskOverdue(t))) || (!t.due && t.target === "today");
   };
@@ -705,7 +730,18 @@ export default function Sidebar({
                     >
                       <Feather name="upload-cloud" size={14} color="#fff" style={{ marginRight: 6 }} />
                       <Text style={[styles.modalActionBtnText, { color: '#fff' }]}>
-                        {syncLoading ? '...' : 'Upload'}
+                        {syncLoading ? '...' : 'Upload to Dropbox'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.modalActionBtn, { flex: 1, backgroundColor: colors.ghGreen || '#3fb950' }]}
+                      onPress={handleSyncFromDropbox}
+                      disabled={syncLoading || !dropboxToken.trim()}
+                    >
+                      <Feather name="download-cloud" size={14} color="#fff" style={{ marginRight: 6 }} />
+                      <Text style={[styles.modalActionBtnText, { color: '#fff' }]}>
+                        {syncLoading ? '...' : 'Sync from Dropbox'}
                       </Text>
                     </TouchableOpacity>
                   </View>

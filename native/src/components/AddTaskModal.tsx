@@ -18,7 +18,7 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { Colors } from '@/constants/theme';
 import { Feather } from '@expo/vector-icons';
 import { validateReminder } from '@/services/notifications';
-import { getValidOffsets, getValidRepeats, generateSchedulePreview, countTotalReminders, Preset } from '@/services/reminderUtils';
+import { getValidOffsets, getValidRepeats, generateSchedulePreview, countTotalReminders, Preset, formatEstimateDisplay } from '@/services/reminderUtils';
 
 const DISMISS_THRESHOLD = 120;
 const OPEN_SPRING = { damping: 28, stiffness: 220, mass: 0.9 };
@@ -46,7 +46,7 @@ export interface TaskRecurrenceConfig {
 interface AddTaskModalProps {
   visible: boolean;
   onClose: () => void;
-  onAdd: (title: string, project: string, due?: string, reminder?: ReminderConfig, dueTime?: string, priority?: 'High' | 'Moderate' | 'Low', execStartDate?: string, execStartTime?: string, recurrence?: TaskRecurrenceConfig) => void;
+  onAdd: (title: string, project: string, due?: string, reminder?: ReminderConfig, dueTime?: string, priority?: 'High' | 'Moderate' | 'Low', execStartDate?: string, execStartTime?: string, recurrence?: TaskRecurrenceConfig, est?: string) => void;
   projects: Project[];
   initialTask?: any;
 }
@@ -108,6 +108,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
   
   const [showConfirm, setShowConfirm] = useState(false);
   const [priority, setPriority] = useState<'High' | 'Moderate' | 'Low'>('Low');
+  const [est, setEst] = useState('');
 
   // Reminder state
   const [remindBefore, setRemindBefore] = useState<number | null>(null);   // ms
@@ -243,6 +244,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
       setIsRecurring(!!initialTask.recurrence);
       setRecurrenceFrequency(initialTask.recurrence?.frequency || 'daily');
       setStreakEnabled(initialTask.recurrence?.streakEnabled || false);
+      setEst(initialTask.est || '');
     } else {
       setTitle('');
       setProject('Inbox');
@@ -251,6 +253,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
       setRemindBefore(null);
       setRepeatEvery(null);
       setPriority('Low');
+      setEst('');
       setExecStartDate(null);
       setExecStartTime(null);
       setIsRecurring(false);
@@ -287,7 +290,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
       : undefined;
 
     animateClose(() => {
-      onAdd(title.trim(), project, due || undefined, reminder, dueTime || undefined, priority, execStartDate || undefined, execStartTime || undefined, recurrenceConfig);
+      onAdd(title.trim(), project, due || undefined, reminder, dueTime || undefined, priority, execStartDate || undefined, execStartTime || undefined, recurrenceConfig, formatEstimateDisplay(est) || undefined);
       reset();
       onClose();
     });
@@ -500,6 +503,52 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
                     </Text>
                   </TouchableOpacity>
                 ))}
+              </View>
+
+              {/* ── Estimated Time ── */}
+              <Text style={[styles.label, { color: colors.ghMuted, marginTop: 16 }]}>Estimated Time</Text>
+              <View style={[styles.chipRow, { flexWrap: 'wrap', gap: 6 }]}>
+                {[
+                  { label: '15m', val: '15m' },
+                  { label: '30m', val: '30m' },
+                  { label: '1h', val: '1h' },
+                  { label: '2h', val: '2h' },
+                  { label: '4h', val: '4h' },
+                ].map((item) => (
+                  <TouchableOpacity
+                    key={item.val}
+                    style={[
+                      styles.chip,
+                      {
+                        borderColor: est === item.val ? colors.ghPurple : colors.ghBorder,
+                        backgroundColor: est === item.val ? colors.ghPurple + '18' : 'transparent',
+                      },
+                    ]}
+                    onPress={() => setEst(est === item.val ? '' : item.val)}
+                  >
+                    <Text style={{ color: est === item.val ? colors.ghPurple : colors.ghMuted, fontSize: 12, fontWeight: '500' }}>
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <TextInput
+                  style={[
+                    styles.chip,
+                    {
+                      color: colors.ghText,
+                      fontSize: 12,
+                      borderColor: (est && !['15m', '30m', '1h', '2h', '4h'].includes(est)) ? colors.ghPurple : colors.ghBorder,
+                      backgroundColor: (est && !['15m', '30m', '1h', '2h', '4h'].includes(est)) ? colors.ghPurple + '18' : 'transparent',
+                      minWidth: 75,
+                      paddingVertical: 4,
+                      textAlign: 'center'
+                    }
+                  ]}
+                  placeholder="Custom..."
+                  placeholderTextColor={colors.ghMuted}
+                  value={['15m', '30m', '1h', '2h', '4h'].includes(est) ? '' : est}
+                  onChangeText={setEst}
+                />
               </View>
 
               {/* ── Due Date & Time ── */}

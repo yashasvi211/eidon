@@ -21,6 +21,20 @@ function getDueEndOfDay(dueDateStr: string): number {
 }
 
 /**
+ * Format a 24h time string (e.g. "14:30" or "09:00") into 12h AM/PM format ("2:30 PM", "9:00 AM").
+ */
+function formatTime12h(time24: string): string {
+  if (!time24) return '';
+  const [hStr, mStr] = time24.split(':');
+  let h = parseInt(hStr, 10);
+  const m = parseInt(mStr, 10);
+  if (isNaN(h) || isNaN(m)) return time24;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${h}:${m.toString().padStart(2, '0')} ${ampm}`;
+}
+
+/**
  * Format a time duration in ms to a human-readable string.
  */
 function formatDuration(ms: number): string {
@@ -82,7 +96,7 @@ export function checkReminders(tasks: Task[]): ReminderNotification[] {
         taskTitle: task.title,
         dueDate: task.due,
         message: task.dueTime
-          ? `Due at ${task.dueTime} (${formatDuration(timeLeft)} left)`
+          ? `Due at ${formatTime12h(task.dueTime)} (${formatDuration(timeLeft)} left)`
           : `Due in ${formatDuration(dueEndOfDay - now)}`,
       });
     } else if (task.reminder.repeatEvery && task.reminder.repeatEvery > 0) {
@@ -95,7 +109,7 @@ export function checkReminders(tasks: Task[]): ReminderNotification[] {
           taskTitle: task.title,
           dueDate: task.due,
           message: task.dueTime
-            ? `Due at ${task.dueTime} (${formatDuration(timeLeft)} left) — reminder`
+            ? `Due at ${formatTime12h(task.dueTime)} (${formatDuration(timeLeft)} left) — reminder`
             : `Due in ${formatDuration(dueEndOfDay - now)} — reminder`,
         });
       }
@@ -207,7 +221,7 @@ export async function syncTaskNotifications(task: Task): Promise<{ success: bool
   while (scheduleTime < targetDueTime && count < 10) {
     const timeLeft = Math.max(0, targetDueTime - scheduleTime);
     const message = task.dueTime
-      ? `Due at ${task.dueTime} (${formatDuration(timeLeft)} left)` + (count > 0 ? ' — reminder' : '')
+      ? `Due at ${formatTime12h(task.dueTime)} (${formatDuration(timeLeft)} left)` + (count > 0 ? ' — reminder' : '')
       : `Due in ${formatDuration(dueEndOfDay - scheduleTime)}` + (count > 0 ? ' — reminder' : '');
 
     try {

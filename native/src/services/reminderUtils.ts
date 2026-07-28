@@ -85,3 +85,43 @@ export function countTotalReminders(dueDateTimeMs: number, offsetMs: number, rep
   const duration = dueDateTimeMs - startMs;
   return Math.ceil(duration / repeatMs);
 }
+
+export function formatEstimateDisplay(est?: string): string {
+  if (!est || !est.trim()) return "";
+  const s = est.trim().toLowerCase();
+  
+  let totalMinutes = 0;
+  
+  const colonMatch = s.match(/^(\d+):(\d+)$/);
+  if (colonMatch) {
+    totalMinutes = parseInt(colonMatch[1], 10) * 60 + parseInt(colonMatch[2], 10);
+  } else {
+    const hMatch = s.match(/(\d+(?:\.\d+)?)\s*(?:h|hr|hour)/);
+    const mMatch = s.match(/(\d+)\s*(?:m|min|minute)/);
+    
+    if (hMatch || mMatch) {
+      if (hMatch) totalMinutes += Math.round(parseFloat(hMatch[1]) * 60);
+      if (mMatch) totalMinutes += parseInt(mMatch[1], 10);
+    } else {
+      const num = parseFloat(s);
+      if (!isNaN(num)) {
+        if (num <= 12) {
+          totalMinutes = Math.round(num * 60);
+        } else {
+          totalMinutes = Math.round(num);
+        }
+      } else {
+        return est.trim();
+      }
+    }
+  }
+  
+  if (totalMinutes <= 0) return est.trim();
+  
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
+}

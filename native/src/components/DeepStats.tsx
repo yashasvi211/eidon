@@ -15,12 +15,19 @@ const fmtSeconds = (s: number) => {
 };
 
 const parseEstimate = (est?: string) => {
-  if (!est) return 0;
+  if (!est || !est.trim()) return 0;
   let total = 0;
-  const hMatch = est.match(/(\d+\.?\d*)h/);
-  const mMatch = est.match(/(\d+)m/);
+  const hMatch = est.match(/(\d+(?:\.\d+)?)\s*(?:h|hr|hour)/i);
+  const mMatch = est.match(/(\d+)\s*(?:m|min|minute)/i);
   if (hMatch) total += parseFloat(hMatch[1]) * 3600;
-  if (mMatch) total += parseInt(mMatch[1]) * 60;
+  if (mMatch) total += parseInt(mMatch[1], 10) * 60;
+  if (!hMatch && !mMatch) {
+    const num = parseFloat(est);
+    if (!isNaN(num)) {
+      if (num <= 12) total += num * 3600;
+      else total += num * 60;
+    }
+  }
   return total;
 };
 

@@ -187,8 +187,21 @@ export default function TaskPanel({
     return nowObj.getTime() > dueObj.getTime();
   };
 
+  const isExecStartReached = (t: Task) => {
+    if (!t.execStartDate) return false;
+    const execObj = new Date(t.execStartDate + "T00:00:00");
+    if (t.execStartTime && t.execStartTime.trim() !== '') {
+      const [h, m] = t.execStartTime.split(":").map(Number);
+      if (!isNaN(h) && !isNaN(m)) execObj.setHours(h, m, 0, 0);
+    } else {
+      execObj.setHours(0, 0, 0, 0);
+    }
+    return Date.now() >= execObj.getTime();
+  };
+
   const isTaskCurrent = (t: Task) => {
     if (t.target === "backlog") return false;
+    if (isExecStartReached(t)) return true;
     if (t.due && t.due > todayStr && !isTaskOverdue(t)) return false;
     return t.target === "today" || (!!t.due && (t.due <= todayStr || isTaskOverdue(t))) || (!t.due && t.target === "today");
   };
@@ -452,8 +465,8 @@ export default function TaskPanel({
     }
   } else if (currentProject) {
     const overdueTasks = activeTasks.filter(t => isTaskOverdue(t));
-    const currentTasks = activeTasks.filter(t => !isTaskOverdue(t) && ((!!t.due && t.due === todayStr) || (!t.due && (t.target === 'today' || !t.target))));
-    const futureTasks = activeTasks.filter(t => !isTaskOverdue(t) && !!t.due && t.due > todayStr);
+    const currentTasks = activeTasks.filter(t => !isTaskOverdue(t) && (isExecStartReached(t) || (!!t.due && t.due === todayStr) || (!t.due && (t.target === 'today' || !t.target))));
+    const futureTasks = activeTasks.filter(t => !isTaskOverdue(t) && !isExecStartReached(t) && !!t.due && t.due > todayStr);
 
     if (activeTasks.length === 0 && completedTasks.length === 0) {
       listData.push({ type: 'empty', id: 'empty-project', message: 'No tasks in this project.' });

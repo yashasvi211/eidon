@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { countTotalReminders, generateSchedulePreview } from "../services/reminderUtils";
+import { countTotalReminders, generateSchedulePreview, formatEstimateDisplay } from "../services/reminderUtils";
 import {
   View,
   Text,
@@ -77,7 +77,8 @@ export interface AuditEntry {
     | "subtask_uncompleted"
     | "subtask_added"
     | "time_logged"
-    | "reminder_triggered";
+    | "reminder_triggered"
+    | "notes_updated";
   details?: {
     subtaskTitle?: string;
     oldDue?: string;
@@ -88,6 +89,7 @@ export interface AuditEntry {
     duration?: number;
     reminderResponse?: string;
     reminderTriggerTime?: number;
+    notePreview?: string;
   };
 }
 
@@ -361,6 +363,7 @@ const AUDIT_ICONS: {
   subtask_added: { iconName: "plus-square", library: "Feather", label: "Subtask added", color: "#58a6ff" },
   time_logged: { iconName: "clock", library: "Feather", label: "Manual time logged", color: "#8a2be2" },
   reminder_triggered: { iconName: "bell", library: "Feather", label: "Reminder triggered", color: "#58a6ff" },
+  notes_updated: { iconName: "file-text", library: "Feather", label: "Notes updated", color: "#58a6ff" },
 };
 
 
@@ -454,13 +457,16 @@ export default function DetailPanel({
   >("details");
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [sessionNote, setSessionNote] = useState("");
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [editedNotesText, setEditedNotesText] = useState("");
 
   const doneAnim = useSharedValue(task?.done ? 1 : 0);
   useEffect(() => {
     if (task) {
       doneAnim.value = withTiming(task.done ? 1 : 0, { duration: 350 });
+      setIsEditingNotes(false);
     }
-  }, [task?.done]);
+  }, [task?.done, task?.id]);
 
   const totalReminders = useMemo(() => {
     if (!task || !task.due || !task.reminder || task.reminder.remindBefore === null) return 0;
@@ -846,6 +852,25 @@ export default function DetailPanel({
     });
   };
 
+  const handleSaveNotes = () => {
+    const newNotes = editedNotesText.trim();
+    if (newNotes === (task.notes || '')) {
+      setIsEditingNotes(false);
+      return;
+    }
+    const audit: AuditEntry = {
+      timestamp: Date.now(),
+      action: "notes_updated",
+      details: { notePreview: newNotes || "(cleared)" },
+    };
+    onUpdateTask({
+      ...task,
+      notes: newNotes || undefined,
+      auditLog: [...(task.auditLog || []), audit],
+    });
+    setIsEditingNotes(false);
+  };
+
   const handleStartTimerAuthentication = async () => {
     try {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
@@ -1223,7 +1248,7 @@ export default function DetailPanel({
                         fontWeight: "600",
                       }}
                     >
-                      {task.est}
+                      {formatEstimateDisplay(task.est)}
                     </Text>
                   </View>
                 ) : null}
@@ -1299,7 +1324,6 @@ export default function DetailPanel({
                   completedAtStr = formatCustomDate(new Date(task.completedAt));
                 }
 
-                let activeTimeStr = "-";
                 let overdueTimeStr = "-";
                 let timeLeftStr = "-";
 
@@ -1323,23 +1347,8 @@ export default function DetailPanel({
                     const overDays = Math.floor(overMs / (1000 * 60 * 60 * 24));
                     const overHours = Math.floor((overMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
                     const overMins = Math.floor((overMs % (1000 * 60 * 60)) / (1000 * 60));
-                    overdueTimeStr = `${overDays}d ${overHours}h`;
-                    if (overDays === 0 && overHours === 0) overdueTimeStr = `${Math.max(1, overMins)}m`;
-                    else if (overDays === 0 && overHours > 0) overdueTimeStr = `${overHours}h ${overMins}m`;
-                  }
-
-                  if (task.execStartDate) {
-                    const execObj = new Date(task.execStartDate + "T00:00:00");
-                    if (task.execStartTime) {
-                      const [h, m] = task.execStartTime.split(":").map(Number);
-                      execObj.setHours(h, m, 0, 0);
-                    }
-                    if (nowTime >= execObj.getTime() && diffMs >= 0) {
-                      const activeMs = nowTime - execObj.getTime();
-                      const actDays = Math.floor(activeMs / (1000 * 60 * 60 * 24));
-                      const actHours = Math.floor((activeMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                      activeTimeStr = `${actDays}d ${actHours}h`;
-                    }
+                    const overSecs = Math.floor((overMs / 1000) % 60);
+                    overdueTimeStr = `${overDays}d ${overHours}h ${overMins}m ${overSecs}s`;
                   }
                 }
 
@@ -1349,7 +1358,6 @@ export default function DetailPanel({
                   "Execution Start": { name: "play-circle", color: colors.ghBlue },
                   "Due": { name: "calendar", color: colors.ghBlue },
                   "Time Left": { name: "clock", color: colors.ghBlue },
-                  "Active Time": { name: "activity", color: "#56d4dd" },
                   "Overdue Time": { name: "alert-circle", color: colors.ghRed },
                 };
 
@@ -1369,7 +1377,6 @@ export default function DetailPanel({
                 rows.push({ label: "Execution Start", value: execStartStr, color: colors.ghText });
                 rows.push({ label: "Due", value: dueStr, color: colors.ghText });
                 if (timeLeftStr !== "-") rows.push({ label: "Time Left", value: timeLeftStr, color: colors.ghBlue || "#58a6ff" });
-                if (activeTimeStr !== "-") rows.push({ label: "Active Time", value: activeTimeStr, color: "#56d4dd" });
                 if (overdueTimeStr !== "-") rows.push({ label: "Overdue Time", value: overdueTimeStr, color: colors.ghRed || '#f85149' });
 
                 return (
@@ -1380,9 +1387,10 @@ export default function DetailPanel({
               })()}
             </View>
 
-            {task.notes ? (
-              <View style={{ backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 14, marginBottom: 16 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+            {/* NOTES Card after Attributes */}
+            <View style={{ backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 14, marginBottom: 16 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <View style={{ backgroundColor: "rgba(139, 148, 158, 0.12)", width: 28, height: 28, borderRadius: 7, alignItems: "center", justifyContent: "center", marginRight: 8 }}>
                     <Feather name="file-text" size={13} color={colors.ghMuted} />
                   </View>
@@ -1390,11 +1398,70 @@ export default function DetailPanel({
                     NOTES
                   </Text>
                 </View>
-                <Text style={[styles.notesText, { color: colors.ghText }]}>
-                  {task.notes}
-                </Text>
+                {!isEditingNotes ? (
+                  <TouchableOpacity
+                    style={{ padding: 4 }}
+                    onPress={() => {
+                      setEditedNotesText(task.notes || '');
+                      setIsEditingNotes(true);
+                    }}
+                  >
+                    <Feather name="edit-2" size={14} color={colors.ghMuted} />
+                  </TouchableOpacity>
+                ) : null}
               </View>
-            ) : null}
+
+              {!isEditingNotes ? (
+                <View>
+                  {task.notes && task.notes.trim() ? (
+                    <Text style={[styles.notesText, { color: colors.ghText }]}>
+                      {task.notes}
+                    </Text>
+                  ) : (
+                    <Text style={{ color: colors.ghMuted, fontSize: 13, fontStyle: "italic" }}>
+                      No notes added yet. Click the edit icon to add notes...
+                    </Text>
+                  )}
+                </View>
+              ) : (
+                <View>
+                  <TextInput
+                    style={{
+                      backgroundColor: colors.ghBg,
+                      borderWidth: 1,
+                      borderColor: colors.ghBlue,
+                      borderRadius: 8,
+                      padding: 12,
+                      color: colors.ghText,
+                      fontSize: 14,
+                      minHeight: 100,
+                      textAlignVertical: "top",
+                      marginBottom: 10
+                    }}
+                    value={editedNotesText}
+                    onChangeText={setEditedNotesText}
+                    placeholder="Add notes, descriptions, or links for this task..."
+                    placeholderTextColor={colors.ghMuted}
+                    multiline
+                    autoFocus
+                  />
+                  <View style={{ flexDirection: "row", justifyContent: "flex-end", gap: 8 }}>
+                    <TouchableOpacity
+                      style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, backgroundColor: colors.ghSurface2, borderWidth: 1, borderColor: colors.ghBorder }}
+                      onPress={() => setIsEditingNotes(false)}
+                    >
+                      <Text style={{ color: colors.ghMuted, fontSize: 12 }}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={{ paddingHorizontal: 14, paddingVertical: 6, borderRadius: 6, backgroundColor: colors.ghBlue }}
+                      onPress={handleSaveNotes}
+                    >
+                      <Text style={{ color: "#fff", fontSize: 12, fontWeight: "600" }}>Save</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </View>
 
           </TabPage>
 
@@ -1795,6 +1862,8 @@ export default function DetailPanel({
                     detailsText = entry.details?.reminderResponse
                       ? `Response: "${entry.details.reminderResponse}"`
                       : "(no response)";
+                  } else if (entry.action === "notes_updated") {
+                    detailsText = entry.details?.notePreview ? `"${entry.details.notePreview}"` : "(empty)";
                   }
 
                   return (

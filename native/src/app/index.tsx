@@ -33,6 +33,7 @@ import AddTrackerModal from "../components/AddTrackerModal";
 import { Tracker } from "../types/tracking";
 import AddTaskModal from "../components/AddTaskModal";
 import type { ReminderConfig, TaskRecurrenceConfig } from "../components/AddTaskModal";
+import { formatEstimateDisplay } from "../services/reminderUtils";
 import NotificationBanner, { NotificationData } from "../components/NotificationBanner";
 import FullScreenReminder from "../components/FullScreenReminder";
 import { syncTaskNotifications, cancelTaskNotifications } from "../services/notifications";
@@ -813,101 +814,20 @@ export default function AppIndex() {
 
   const handleUpdateTask = (updatedTask: Task) => {
     const oldTask = tasks.find((t) => t.id === updatedTask.id);
-    if (!oldTask) {
-      setTasks((prev) =>
-        prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)),
-      );
-      return;
-    }
-
     const previousTasks = tasks;
+
     setTasks((prev) =>
       prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)),
     );
 
-    // Sync task fields updates
-    const fieldsChanged =
-      oldTask.title !== updatedTask.title ||
-      oldTask.due !== updatedTask.due ||
-      oldTask.dueTime !== updatedTask.dueTime ||
-      oldTask.est !== updatedTask.est ||
-      oldTask.notes !== updatedTask.notes ||
-      oldTask.project !== updatedTask.project ||
-      oldTask.target !== updatedTask.target ||
-      oldTask.done !== updatedTask.done ||
-      oldTask.completedAt !== updatedTask.completedAt ||
-      JSON.stringify(oldTask.recurrence) !== JSON.stringify(updatedTask.recurrence);
-
-    const syncPromises: Promise<any>[] = [];
-
-    if (fieldsChanged) {
-      syncPromises.push(
-        api.updateTask(updatedTask.id, {
-          title: updatedTask.title,
-          project: updatedTask.project,
-          due: updatedTask.due,
-          dueTime: updatedTask.dueTime,
-          est: updatedTask.est,
-          notes: updatedTask.notes,
-          done: updatedTask.done,
-          completedAt: updatedTask.completedAt,
-          target: updatedTask.target,
-          reminder: updatedTask.reminder,
-          recurrence: updatedTask.recurrence,
-        })
-      );
-    }
-
-    // Sync subtask additions/updates/deletions
-    const oldSubtasks = oldTask.subtasks || [];
-    const newSubtasks = updatedTask.subtasks || [];
-
-    // Find added subtasks
-    const addedSubtasks = newSubtasks.filter(
-      (n) => !oldSubtasks.some((o) => o.id === n.id)
-    );
-    for (const sub of addedSubtasks) {
-      syncPromises.push(api.createSubtask(updatedTask.id, sub));
-    }
-
-    // Find modified subtasks
-    const modifiedSubtasks = newSubtasks.filter((n) => {
-      const oldSub = oldSubtasks.find((o) => o.id === n.id);
-      return oldSub && (oldSub.done !== n.done || oldSub.title !== n.title);
-    });
-    for (const sub of modifiedSubtasks) {
-      syncPromises.push(
-        api.updateSubtask(updatedTask.id, sub.id, {
-          title: sub.title,
-          done: sub.done,
-        })
-      );
-    }
-
-    // Find deleted subtasks
-    const deletedSubtasks = oldSubtasks.filter(
-      (o) => !newSubtasks.some((n) => n.id === o.id)
-    );
-    for (const sub of deletedSubtasks) {
-      syncPromises.push(api.deleteSubtask(updatedTask.id, sub.id));
-    }
-
-    // Sync audit log additions
-    const oldAudit = oldTask.auditLog || [];
-    const newAudit = updatedTask.auditLog || [];
-    const addedAudit = newAudit.slice(oldAudit.length);
-    for (const entry of addedAudit) {
-      syncPromises.push(api.createAuditLog(updatedTask.id, entry));
-    }
-
-    if (syncPromises.length > 0) {
-      Promise.all(syncPromises).catch((err: any) => {
+    if (!oldTask || JSON.stringify(oldTask) !== JSON.stringify(updatedTask)) {
+      api.updateTask(updatedTask.id, updatedTask).catch((err: any) => {
         console.error("Failed to save task updates:", err);
         setTasks(previousTasks);
         showErrorAlert("Save Failed", `Could not save.\n\n${err?.message || err}`);
       });
     }
-    
+
     handleSyncNotifications(updatedTask);
   };
 
@@ -943,6 +863,7 @@ export default function AppIndex() {
     execStartDate?: string,
     execStartTime?: string,
     recurrenceConfig?: TaskRecurrenceConfig,
+    est?: string,
   ) => {
     // For a new recurring task with no due date set, auto-assign today's date
     let taskDue = due;
@@ -967,6 +888,7 @@ export default function AppIndex() {
       project,
       due: taskDue,
       dueTime,
+      est: formatEstimateDisplay(est) || undefined,
       done: false,
       target:
         currentView === "backlog"
@@ -1017,6 +939,7 @@ export default function AppIndex() {
     execStartDate?: string,
     execStartTime?: string,
     recurrenceConfig?: TaskRecurrenceConfig,
+    est?: string,
   ) => {
     const recurrence: RecurrenceConfig | undefined = recurrenceConfig
       ? {
@@ -1035,6 +958,7 @@ export default function AppIndex() {
       due,
       dueTime,
       priority,
+      est: formatEstimateDisplay(est) || undefined,
       execStartDate,
       execStartTime,
       reminder: reminderConfig
@@ -1446,9 +1370,9 @@ export default function AppIndex() {
                       <AddTaskModal
                         visible={editingTask !== null}
                         onClose={() => setEditingTask(null)}
-                        onAdd={(title, project, due, reminder, dueTime, priority, execStartDate, execStartTime, recurrenceConfig) => {
+                        onAdd={(title, project, due, reminder, dueTime, priority, execStartDate, execStartTime, recurrenceConfig, est) => {
                           if (editingTask) {
-                            handleSaveEditTask(editingTask, title, project, due, reminder, dueTime, priority, execStartDate, execStartTime, recurrenceConfig);
+                            handleSaveEditTask(editingTask, title, project, due, reminder, dueTime, priority, execStartDate, execStartTime, recurrenceConfig, est);
                           }
                         }}
                         projects={projects}
@@ -1474,9 +1398,9 @@ export default function AppIndex() {
                   <AddTaskModal
                     visible={editingTask !== null}
                     onClose={() => setEditingTask(null)}
-                    onAdd={(title, project, due, reminder, dueTime, priority, execStartDate, execStartTime, recurrenceConfig) => {
+                    onAdd={(title, project, due, reminder, dueTime, priority, execStartDate, execStartTime, recurrenceConfig, est) => {
                       if (editingTask) {
-                        handleSaveEditTask(editingTask, title, project, due, reminder, dueTime, priority, execStartDate, execStartTime, recurrenceConfig);
+                        handleSaveEditTask(editingTask, title, project, due, reminder, dueTime, priority, execStartDate, execStartTime, recurrenceConfig, est);
                       }
                     }}
                     projects={projects}

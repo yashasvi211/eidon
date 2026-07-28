@@ -266,6 +266,42 @@ async function loadAll() {
     for (const file of files) {
       const task = await readJson<Task>(EIDON_DIR + folder + '/' + file);
       if (task) {
+        // Self-healing: backfill missing sessions from auditLog entries if needed
+        if (task.auditLog && task.auditLog.length > 0) {
+          if (!task.sessions) task.sessions = [];
+          let backfilled = false;
+
+          for (const entry of task.auditLog) {
+            if (entry.action === 'time_logged' || entry.action === 'timer_stopped') {
+              const durationSec = entry.details?.duration;
+              if (durationSec && durationSec > 0) {
+                const endMs = entry.timestamp;
+                const startMs = endMs - (durationSec * 1000);
+
+                const exists = task.sessions.some(s =>
+                  Math.abs(s.end - endMs) < 5000 || Math.abs(s.start - startMs) < 5000
+                );
+
+                if (!exists) {
+                  const newSess: Session = {
+                    id: `sess_audit_${entry.timestamp}`,
+                    start: startMs,
+                    end: endMs,
+                    note: entry.details?.note,
+                  };
+                  task.sessions.push(newSess);
+                  backfilled = true;
+                }
+              }
+            }
+          }
+
+          if (backfilled) {
+            task.sessions.sort((a, b) => b.start - a.start);
+            await writeJson(EIDON_DIR + folder + '/' + file, task);
+          }
+        }
+
         if (!seenTaskIds.has(task.id)) {
           seenTaskIds.add(task.id);
           cache.tasks.push(task);
@@ -453,7 +489,12 @@ export const api = {
   async updateTask(taskId: string, updates: Partial<Task>): Promise<void> {
     await loadAll();
     const idx = cache.tasks.findIndex(t => t.id === taskId);
-    if (idx === -1) return;
+    if (idx === -1) {
+      if (updates.id && updates.title) {
+        await api.createTask(updates as Task);
+      }
+      return;
+    }
     const oldTask = cache.tasks[idx];
     const updated = { ...oldTask, ...updates };
     cache.tasks[idx] = updated;
@@ -462,7 +503,7 @@ export const api = {
       const oldPath = taskFilePath(oldTask.project || 'Inbox', taskId);
       const newFolder = projectFolder(updates.project);
       await ensureDir(EIDON_DIR + newFolder + '/');
-      await FileSystem.deleteAsync(oldPath, { idempotent: true });
+      await FileSystem.deleteAsync(oldPath, { idempotent: true }).catch(() => {});
       await writeJson(taskFilePath(updates.project, taskId), updated);
     } else {
       await writeJson(taskFilePath(updated.project || 'Inbox', taskId), updated);
@@ -483,21 +524,22 @@ export const api = {
 
   // ── SUBTASKS ─────────────────────────────────────────────────────────────────
 
-  async createSubtask(taskId: string, subtask: { id: string; title: string; done?: boolean }): Promise<void> {
+  async createSubtask(taskId: string, subtask: { id: string; title: string; done?: boolean; description?: string }): Promise<void> {
     const task = cache.tasks.find(t => t.id === taskId);
     if (!task) return;
     if (!task.subtasks) task.subtasks = [];
-    task.subtasks.push({ id: subtask.id, title: subtask.title, done: subtask.done || false });
+    task.subtasks.push({ id: subtask.id, title: subtask.title, done: subtask.done || false, description: subtask.description });
     await writeJson(taskFilePath(task.project || 'Inbox', taskId), task);
   },
 
-  async updateSubtask(taskId: string, subtaskId: string, updates: { title?: string; done?: boolean }): Promise<void> {
+  async updateSubtask(taskId: string, subtaskId: string, updates: { title?: string; done?: boolean; description?: string }): Promise<void> {
     const task = cache.tasks.find(t => t.id === taskId);
     if (!task?.subtasks) return;
     const sub = task.subtasks.find(s => s.id === subtaskId);
     if (!sub) return;
     if (updates.title !== undefined) sub.title = updates.title;
     if (updates.done !== undefined) sub.done = updates.done;
+    if (updates.description !== undefined) sub.description = updates.description;
     await writeJson(taskFilePath(task.project || 'Inbox', taskId), task);
   },
 
@@ -775,7 +817,7 @@ export const api = {
         try {
           const items = await FileSystem.readDirectoryAsync(dir);
           for (const item of items) {
-            if (item.startsWith('.')) continue;
+            if (item.startsWith('.') && item !== '.meta.json') continue;
             const fullPath = dir + item;
             const info = await FileSystem.getInfoAsync(fullPath);
             if (info.isDirectory) {
@@ -827,6 +869,111 @@ export const api = {
       }
     } catch (err: any) {
       return { success: false, message: err.message || 'Upload failed' };
+    }
+  },
+
+  async syncFromDropbox(): Promise<{ success: boolean; message: string }> {
+    await loadAll();
+    await refreshAccessTokenIfNeeded();
+    const token = cache.settings.dropboxToken;
+    if (!token) return { success: false, message: 'No Dropbox token configured.' };
+
+    let remoteRoot = cache.settings.dropboxPath || '/eidon';
+    if (remoteRoot.endsWith('.json')) {
+      remoteRoot = remoteRoot.substring(0, remoteRoot.lastIndexOf('/')) || '/eidon';
+    }
+    if (remoteRoot.endsWith('/')) remoteRoot = remoteRoot.slice(0, -1);
+
+    try {
+      const listResponse = await fetch('https://api.dropboxapi.com/2/files/list_folder', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ path: remoteRoot === '' ? '' : remoteRoot, recursive: true }),
+      });
+
+      if (!listResponse.ok) {
+        const errText = await listResponse.text();
+        return { success: false, message: `Dropbox list failed (${listResponse.status})` };
+      }
+
+      let listData = await listResponse.json();
+      let entries: any[] = listData.entries || [];
+
+      while (listData.has_more && listData.cursor) {
+        const contResponse = await fetch('https://api.dropboxapi.com/2/files/list_folder/continue', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ cursor: listData.cursor }),
+        });
+        if (contResponse.ok) {
+          listData = await contResponse.json();
+          entries = entries.concat(listData.entries || []);
+        } else {
+          break;
+        }
+      }
+
+      const jsonFiles = entries.filter((e: any) => e['.tag'] === 'file' && e.path_display && e.path_display.endsWith('.json'));
+      if (jsonFiles.length === 0) {
+        return { success: false, message: 'No JSON files found in Dropbox to sync.' };
+      }
+
+      let downloadedCount = 0;
+      let lastError = '';
+
+      for (const entry of jsonFiles) {
+        try {
+          const downloadResp = await fetch('https://content.dropboxapi.com/2/files/download', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Dropbox-API-Arg': JSON.stringify({ path: entry.path_display }),
+            },
+          });
+
+          if (downloadResp.ok) {
+            const content = await downloadResp.text();
+            let relPath = entry.path_display;
+            if (remoteRoot && relPath.toLowerCase().startsWith(remoteRoot.toLowerCase())) {
+              relPath = relPath.substring(remoteRoot.length);
+            }
+            if (!relPath.startsWith('/')) relPath = '/' + relPath;
+
+            const localPath = `${EIDON_DIR}${relPath}`;
+            const lastSlash = localPath.lastIndexOf('/');
+            if (lastSlash > 0) {
+              const dirPath = localPath.substring(0, lastSlash);
+              try {
+                await FileSystem.makeDirectoryAsync(dirPath, { intermediates: true });
+              } catch {}
+            }
+            await FileSystem.writeAsStringAsync(localPath, content);
+            downloadedCount++;
+          } else {
+            lastError = `Failed downloading ${entry.name} (${downloadResp.status})`;
+          }
+        } catch (e: any) {
+          lastError = e.message || 'Download error';
+        }
+      }
+
+      if (downloadedCount > 0) {
+        cache.settings.lastSyncTime = Date.now();
+        await writeJson(SETTINGS_FILE, cache.settings);
+        cache.loaded = false;
+        await loadAll();
+        return { success: true, message: `Synced ${downloadedCount} files from Dropbox to app storage` };
+      } else {
+        return { success: false, message: `Sync failed: ${lastError || 'No files downloaded'}` };
+      }
+    } catch (err: any) {
+      return { success: false, message: err.message || 'Sync from Dropbox failed' };
     }
   },
 
