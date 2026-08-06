@@ -350,22 +350,33 @@ export default function Sidebar({
 
   const isTaskCurrent = (t: Task) => {
     if (t.target === "backlog") return false;
-    if (isExecStartReached(t)) return true;
-    if (t.due && t.due > todayStr && !isTaskOverdue(t)) return false;
-    return t.target === "today" || (!!t.due && (t.due <= todayStr || isTaskOverdue(t))) || (!t.due && t.target === "today");
+    if (!t.due) return false;
+    if (isTaskOverdue(t)) return false;
+    if (t.execStartDate) {
+      return isExecStartReached(t);
+    }
+    return t.due === todayStr;
+  };
+
+  const isTaskBacklog = (t: Task) => {
+    if (t.target === "backlog") return true;
+    if (!t.due) return true;
+    if (isTaskOverdue(t)) return true;
+    return false;
   };
 
   const todayBadgeCount = uniqTasks.filter((t) => !t.done && isTaskCurrent(t)).length;
+  const backlogBadgeCount = uniqTasks.filter((t) => !t.done && isTaskBacklog(t)).length;
   const inboxBadgeCount = uniqTasks.filter((t) => !t.done && t.project === 'Inbox').length;
   const allBadgeCount = uniqTasks.filter((t) => !t.done).length;
 
   const views = [
+    { id: 'all', label: 'All Tasks', icon: '📋', badge: allBadgeCount },
     { id: 'today', label: "Today's Tasks", icon: '☀️', badge: todayBadgeCount },
-    { id: 'inbox', label: 'Inbox', icon: '📥', badge: inboxBadgeCount },
-    { id: 'all', label: 'All', icon: '📋', badge: allBadgeCount },
+    { id: 'backlog', label: 'Backlog', icon: '📦', badge: backlogBadgeCount },
     { id: 'scheduled', label: 'Scheduled', icon: '📅' },
     { id: 'stats', label: 'Deep Stats', icon: '📈' },
-    // { id: 'tracking', label: 'Tracking', icon: '📊' },
+    { id: 'inbox', label: 'Inbox', icon: '📥', badge: inboxBadgeCount },
   ];
 
   return (
