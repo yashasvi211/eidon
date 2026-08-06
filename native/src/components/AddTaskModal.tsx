@@ -41,6 +41,7 @@ export interface ReminderConfig {
 export interface TaskRecurrenceConfig {
   frequency: string;
   streakEnabled: boolean;
+  days?: number[];
 }
 
 interface AddTaskModalProps {
@@ -120,6 +121,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceFrequency, setRecurrenceFrequency] = useState<string>('daily');
   const [streakEnabled, setStreakEnabled] = useState(false);
+  const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
   
   // Dropdown states
   const [showOffsetDropdown, setShowOffsetDropdown] = useState(false);
@@ -246,6 +248,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
       setIsRecurring(!!initialTask.recurrence);
       setRecurrenceFrequency(initialTask.recurrence?.frequency || 'daily');
       setStreakEnabled(initialTask.recurrence?.streakEnabled || false);
+      setRecurrenceDays(initialTask.recurrence?.days || []);
       setEst(initialTask.est || '');
     } else {
       setTitle('');
@@ -261,6 +264,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
       setIsRecurring(false);
       setRecurrenceFrequency('daily');
       setStreakEnabled(false);
+      setRecurrenceDays([]);
     }
     setCalendarMode(null);
     setClockMode(null);
@@ -289,7 +293,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
     }
 
     const recurrenceConfig: TaskRecurrenceConfig | undefined = isRecurring
-      ? { frequency: recurrenceFrequency, streakEnabled }
+      ? { frequency: recurrenceFrequency, streakEnabled, days: recurrenceDays.length > 0 ? recurrenceDays : undefined }
       : undefined;
 
     animateClose(() => {
@@ -390,7 +394,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
     }
   }
 
-  const canSubmit = title.trim().length > 0 && (isRecurring || due !== null) && !hasDateButNoTime && !hasTimeButNoDate && !isPastDue && !hasPartialExec && !isExecInvalid;
+  const canSubmit = title.trim().length > 0 && !hasDateButNoTime && !hasTimeButNoDate && !isPastDue && !hasPartialExec && !isExecInvalid;
 
   if (!visible) return null;
 
@@ -828,42 +832,73 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
                           <TouchableOpacity
                             key={freq}
                             style={[styles.chip, { borderColor: recurrenceFrequency === freq ? colors.ghBlue : colors.ghBorder, backgroundColor: recurrenceFrequency === freq ? `${colors.ghBlue}18` : 'transparent' }]}
-                            onPress={() => setRecurrenceFrequency(freq)}
+                            onPress={() => {
+                              if (recurrenceFrequency !== freq) {
+                                setRecurrenceFrequency(freq);
+                                setRecurrenceDays([]);
+                              }
+                            }}
                           >
                             <Text style={{ color: recurrenceFrequency === freq ? colors.ghBlue : colors.ghMuted, fontSize: 12, fontWeight: '600', textTransform: 'capitalize' }}>
                               {freq}
                             </Text>
                           </TouchableOpacity>
                         ))}
-                        <TextInput
-                          style={[
-                            styles.chip,
-                            {
-                              color: colors.ghText,
-                              fontSize: 12,
-                              fontWeight: '600',
-                              borderColor: recurrenceFrequency.startsWith('custom_') ? colors.ghBlue : colors.ghBorder,
-                              backgroundColor: recurrenceFrequency.startsWith('custom_') ? `${colors.ghBlue}18` : 'transparent',
-                              minWidth: 90,
-                              paddingVertical: 4,
-                              textAlign: 'center'
-                            }
-                          ]}
-                          placeholder="Custom (days)"
-                          placeholderTextColor={colors.ghMuted}
-                          keyboardType="numeric"
-                          value={recurrenceFrequency.startsWith('custom_') ? recurrenceFrequency.replace('custom_', '') : ''}
-                          onChangeText={(text) => {
-                            if (text === '') {
-                              setRecurrenceFrequency('custom_');
-                            } else {
-                              const parsed = parseInt(text.replace(/[^0-9]/g, ''), 10);
-                              if (!isNaN(parsed)) setRecurrenceFrequency(`custom_${parsed}`);
-                            }
-                          }}
-                        />
+
                       </View>
                     </View>
+
+                    {/* Weekly Days Selector */}
+                    {recurrenceFrequency === 'weekly' && (
+                      <View>
+                        <Text style={[styles.label, { color: colors.ghMuted }]}>On these days</Text>
+                        <View style={styles.chipRow}>
+                          {DAY_LABELS.map((day, idx) => {
+                             const isSelected = recurrenceDays.includes(idx);
+                             return (
+                               <TouchableOpacity
+                                 key={day}
+                                 style={[styles.chip, { borderColor: isSelected ? colors.ghBlue : colors.ghBorder, backgroundColor: isSelected ? `${colors.ghBlue}18` : 'transparent' }]}
+                                 onPress={() => {
+                                   if (isSelected) setRecurrenceDays(recurrenceDays.filter(d => d !== idx));
+                                   else setRecurrenceDays([...recurrenceDays, idx]);
+                                 }}
+                               >
+                                 <Text style={{ color: isSelected ? colors.ghBlue : colors.ghMuted, fontSize: 12, fontWeight: '600' }}>
+                                   {day}
+                                 </Text>
+                               </TouchableOpacity>
+                             )
+                          })}
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Monthly Days Selector */}
+                    {recurrenceFrequency === 'monthly' && (
+                      <View>
+                        <Text style={[styles.label, { color: colors.ghMuted }]}>On these dates</Text>
+                        <View style={[styles.chipRow, { gap: 4 }]}>
+                          {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => {
+                             const isSelected = recurrenceDays.includes(day);
+                             return (
+                               <TouchableOpacity
+                                 key={day}
+                                 style={[styles.chip, { width: 32, height: 32, paddingHorizontal: 0, paddingVertical: 0, alignItems: 'center', justifyContent: 'center', borderColor: isSelected ? colors.ghBlue : colors.ghBorder, backgroundColor: isSelected ? `${colors.ghBlue}18` : 'transparent' }]}
+                                 onPress={() => {
+                                   if (isSelected) setRecurrenceDays(recurrenceDays.filter(d => d !== day));
+                                   else setRecurrenceDays([...recurrenceDays, day]);
+                                 }}
+                               >
+                                 <Text style={{ color: isSelected ? colors.ghBlue : colors.ghMuted, fontSize: 12, fontWeight: '600' }}>
+                                   {day}
+                                 </Text>
+                               </TouchableOpacity>
+                             )
+                          })}
+                        </View>
+                      </View>
+                    )}
 
                     {/* Streak Tracking Toggle */}
                     <TouchableOpacity
@@ -910,7 +945,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
                 onPress={() => setShowConfirm(true)}
                 disabled={!canSubmit}
               >
-                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>Add Task</Text>
+                <Text style={{ color: '#fff', fontSize: 13, fontWeight: '600' }}>{initialTask ? 'Update Task' : 'Add Task'}</Text>
               </TouchableOpacity>
             </View>
       </Animated.View>
@@ -919,9 +954,9 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
         visible={showConfirm}
         onClose={() => setShowConfirm(false)}
         onConfirm={handleSubmit}
-        title="Create Task"
-        description={`Are you sure you want to add "${title}"?`}
-        successText="Task Created Successfully!"
+        title={initialTask ? "Update Task" : "Create Task"}
+        description={`Are you sure you want to ${initialTask ? "update" : "add"} "${title}"?`}
+        successText={initialTask ? "Task Updated Successfully!" : "Task Created Successfully!"}
         colors={colors}
       />
 

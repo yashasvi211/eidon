@@ -312,6 +312,22 @@ export default function TaskPanel({
                     </Text>
                   )}
 
+                  {/* Muted Tag */}
+                  {task.muted && (
+                    <Text
+                      style={[
+                        styles.taskTag,
+                        {
+                          color: '#8b949e',
+                          borderColor: 'rgba(139,148,158,0.3)',
+                          backgroundColor: 'rgba(139,148,158,0.08)',
+                        },
+                      ]}
+                    >
+                      — Muted
+                    </Text>
+                  )}
+
                   {/* Deadline / Status Tag */}
                   {dlInfo && (
                     <Text

@@ -48,6 +48,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { api } from "../services/api";
 import * as EidonAlarm from "../../modules/expo-eidon-alarm";
+import ConfirmationModal from "../components/sub_components/ConfirmationModal";
 
 // ─── Recurrence Helpers ──────────────────────────────────────────────────────
 
@@ -279,6 +280,7 @@ export default function AppIndex() {
   const [trackers, setTrackers] = useState<Tracker[]>([]);
   const [selectedTracker, setSelectedTracker] = useState<Tracker | null>(null);
   const [showAddTrackerModal, setShowAddTrackerModal] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
 
   useEffect(() => {
     if (currentView !== "tracking") {
@@ -835,25 +837,7 @@ export default function AppIndex() {
   };
 
   const handleDeleteTask = (taskId: string) => {
-    Alert.alert("Delete Task", "Are you sure you want to delete this task?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => {
-          const previousTasks = tasks;
-          setTasks(tasks.filter(t => t.id !== taskId));
-          if (selectedTaskId === taskId) {
-            setSelectedTaskId(null);
-          }
-          api.deleteTask(taskId).catch((err: any) => {
-            console.error("Failed to delete task:", err);
-            setTasks(previousTasks);
-            showErrorAlert("Delete Failed", `Could not delete.\n\n${err?.message || err}`);
-          });
-        }
-      }
-    ]);
+    setTaskToDelete(taskId);
   };
 
   const handleAddTask = (
@@ -968,6 +952,13 @@ export default function AppIndex() {
         ? { ...reminderConfig, lastNotifiedAt: taskToEdit.reminder?.lastNotifiedAt || 0, dismissed: taskToEdit.reminder?.dismissed || false }
         : undefined,
       recurrence,
+      auditLog: [
+        ...(taskToEdit.auditLog || []),
+        {
+          timestamp: Date.now(),
+          action: "task_updated",
+        },
+      ],
     };
     handleUpdateTask(updatedTask);
   };
@@ -1343,6 +1334,7 @@ export default function AppIndex() {
                         onClose={() => setSelectedTaskId(null)}
                         onToggleDone={toggleDone}
                         onUpdateTask={handleUpdateTask}
+                        onDeleteTask={handleDeleteTask}
                         onEditTask={(task) => {
                           setSelectedTaskId(null);
                           setShowAddModal(false);
@@ -1415,6 +1407,7 @@ export default function AppIndex() {
                     onClose={() => setSelectedTaskId(null)}
                     onToggleDone={toggleDone}
                     onUpdateTask={handleUpdateTask}
+                    onDeleteTask={handleDeleteTask}
                     onEditTask={(task) => {
                       setSelectedTaskId(null);
                       setShowAddModal(false);
@@ -1567,6 +1560,31 @@ export default function AppIndex() {
           setFullScreenNotification(null);
         }}
         colors={colors}
+      />
+      <ConfirmationModal
+        visible={!!taskToDelete}
+        onClose={() => setTaskToDelete(null)}
+        onConfirm={() => {
+          if (taskToDelete) {
+            const taskId = taskToDelete;
+            const previousTasks = tasks;
+            setTasks(tasks.filter(t => t.id !== taskId));
+            if (selectedTaskId === taskId) {
+              setSelectedTaskId(null);
+            }
+            api.deleteTask(taskId).catch((err: any) => {
+              console.error("Failed to delete task:", err);
+              setTasks(previousTasks);
+              showErrorAlert("Delete Failed", `Could not delete.\n\n${err?.message || err}`);
+            });
+            setTaskToDelete(null);
+          }
+        }}
+        title="Delete Task"
+        description="Are you sure you want to delete this task?"
+        warningNote="Note: This task will be moved to the .trash folder."
+        colors={colors}
+        successText="Task Deleted!"
       />
     </View>
   );

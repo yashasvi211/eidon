@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
   Modal,
   Animated as RNAnimated,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../constants/theme";
@@ -36,6 +37,7 @@ import LogTimeModal from "./sub_components/LogTimeModal";
 import SwipeButton from "./sub_components/SwipeButton";
 import ConfirmationModal from "./sub_components/ConfirmationModal";
 import AddSubtaskModal from "./sub_components/AddSubtaskModal";
+import TaskOptionsModal from "./sub_components/TaskOptionsModal";
 
 // Pull-down dismiss threshold: if user drags past this many pixels, we close
 const DISMISS_THRESHOLD = 120;
@@ -78,7 +80,8 @@ export interface AuditEntry {
     | "subtask_added"
     | "time_logged"
     | "reminder_triggered"
-    | "notes_updated";
+    | "notes_updated"
+    | "task_updated";
   details?: {
     subtaskTitle?: string;
     oldDue?: string;
@@ -140,6 +143,7 @@ export interface Task {
   execStartDate?: string;
   execStartTime?: string;
   recurrence?: RecurrenceConfig;  // If set, this is a recurring task
+  muted?: boolean;               // If true, suppress all notifications for this task
 }
 
 interface DetailPanelProps {
@@ -148,6 +152,7 @@ interface DetailPanelProps {
   onToggleDone: (id: string) => void;
   onUpdateTask: (updated: Task) => void;
   onEditTask?: (task: Task) => void;
+  onDeleteTask?: (id: string) => void;
   isTimerRunning: boolean;
   timerSeconds: number;
   onStartTimer: (id: string) => void;
@@ -364,6 +369,7 @@ const AUDIT_ICONS: {
   time_logged: { iconName: "clock", library: "Feather", label: "Manual time logged", color: "#8a2be2" },
   reminder_triggered: { iconName: "bell", library: "Feather", label: "Reminder triggered", color: "#58a6ff" },
   notes_updated: { iconName: "file-text", library: "Feather", label: "Notes updated", color: "#58a6ff" },
+  task_updated: { iconName: "edit", library: "Feather", label: "Task updated", color: "#58a6ff" },
 };
 
 
@@ -436,6 +442,7 @@ export default function DetailPanel({
   onToggleDone,
   onUpdateTask,
   onEditTask,
+  onDeleteTask,
   isTimerRunning,
   timerSeconds,
   onStartTimer,
@@ -456,6 +463,7 @@ export default function DetailPanel({
     "details" | "checklist" | "timetracking" | "history"
   >("details");
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
+  const [optionsModalVisible, setOptionsModalVisible] = useState(false);
   const [sessionNote, setSessionNote] = useState("");
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [editedNotesText, setEditedNotesText] = useState("");
@@ -930,13 +938,28 @@ export default function DetailPanel({
         </View>
       )}
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.ghBorder }]}>
+      <View style={[styles.header, { borderBottomColor: colors.ghBorder, paddingRight: 10 }]}>
         <Text
           style={[styles.headerTitle, { color: colors.ghText }]}
           numberOfLines={1}
         >
           {task.title}
         </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {(onEditTask || onDeleteTask) && (
+            <TouchableOpacity 
+              style={{ padding: 8, marginRight: isLargeScreen ? 8 : 0 }} 
+              onPress={() => setOptionsModalVisible(true)}
+            >
+              <Feather name="more-vertical" size={20} color={colors.ghMuted} />
+            </TouchableOpacity>
+          )}
+          {isLargeScreen && (
+            <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
+              <Text style={{ color: colors.ghMuted, fontSize: 24, lineHeight: 24 }}>×</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     </>
   );
@@ -1991,6 +2014,24 @@ export default function DetailPanel({
         colors={colors}
       />
 
+      <TaskOptionsModal
+        visible={optionsModalVisible}
+        onClose={() => setOptionsModalVisible(false)}
+        isMuted={!!task.muted}
+        onUpdate={() => {
+          setOptionsModalVisible(false);
+          if (onEditTask) onEditTask(task);
+        }}
+        onDelete={() => {
+          setOptionsModalVisible(false);
+          if (onDeleteTask) onDeleteTask(task.id);
+        }}
+        onToggleMute={() => {
+          setOptionsModalVisible(false);
+          onUpdateTask({ ...task, muted: !task.muted });
+        }}
+        colors={colors}
+      />
     </Animated.View>
   );
 
@@ -2008,7 +2049,6 @@ const styles = StyleSheet.create({
     flex: 1,
     borderLeftWidth: 1,
     flexDirection: "column",
-    overflow: "hidden",
   },
   dragHandleContainer: {
     alignItems: "center",

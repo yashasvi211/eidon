@@ -514,8 +514,16 @@ export const api = {
     await loadAll();
     const task = cache.tasks.find(t => t.id === taskId);
     if (!task) return;
-    for (const proj of cache.projectMeta) {
-      const path = taskFilePath(proj.name, taskId);
+
+    // Move to .trash folder
+    const proj = task.project || 'Inbox';
+    const folder = projectFolder(proj);
+    const trashDir = EIDON_DIR + folder + '/.trash/';
+    await ensureDir(trashDir);
+    await writeJson(trashDir + taskId + '.json', task);
+
+    for (const projMeta of cache.projectMeta) {
+      const path = taskFilePath(projMeta.name, taskId);
       await FileSystem.deleteAsync(path, { idempotent: true }).catch(() => {});
     }
     await FileSystem.deleteAsync(taskFilePath('Inbox', taskId), { idempotent: true }).catch(() => {});

@@ -59,11 +59,9 @@ export function checkReminders(tasks: Task[]): ReminderNotification[] {
     if (task.done) continue;
     if (!task.due || !task.reminder) continue;
     if (task.reminder.dismissed) continue;
+    if (task.muted) continue;
 
     const dueEndOfDay = getDueEndOfDay(task.due);
-
-    // Due date has completely passed (end of day) — stop all reminders
-    if (now >= dueEndOfDay) continue;
 
     let targetDueTime: number;
     if (task.dueTime) {
@@ -83,34 +81,38 @@ export function checkReminders(tasks: Task[]): ReminderNotification[] {
     // Not yet in the reminder window
     if (now < reminderStartTime) continue;
 
-    // If exact due time has passed, and they did specify a time, stop reminding for it.
-    if (task.dueTime && now >= targetDueTime) continue;
-
     const lastNotified = task.reminder.lastNotifiedAt || 0;
+
+    const isDayOverdue = now > dueEndOfDay;
+    const dayOverdueTime = Math.abs(dueEndOfDay - now);
 
     if (lastNotified === 0) {
       // First notification — always fire
-      const timeLeft = Math.max(0, targetDueTime - now);
+      const timeLeft = targetDueTime - now;
+      const isOverdue = timeLeft < 0;
+      const absTimeLeft = Math.abs(timeLeft);
       notifications.push({
         taskId: task.id,
         taskTitle: task.title,
         dueDate: task.due,
         message: task.dueTime
-          ? `Due at ${formatTime12h(task.dueTime)} (${formatDuration(timeLeft)} left)`
-          : `Due in ${formatDuration(dueEndOfDay - now)}`,
+          ? (isOverdue ? `Overdue by ${formatDuration(absTimeLeft)}` : `Due at ${formatTime12h(task.dueTime)} (${formatDuration(absTimeLeft)} left)`)
+          : (isDayOverdue ? `Overdue by ${formatDuration(dayOverdueTime)}` : `Due in ${formatDuration(dueEndOfDay - now)}`),
       });
     } else if (task.reminder.repeatEvery && task.reminder.repeatEvery > 0) {
       // Repeating — check if enough time has passed since last notification
       const elapsed = now - lastNotified;
       if (elapsed >= task.reminder.repeatEvery) {
-        const timeLeft = Math.max(0, targetDueTime - now);
+        const timeLeft = targetDueTime - now;
+        const isOverdue = timeLeft < 0;
+        const absTimeLeft = Math.abs(timeLeft);
         notifications.push({
           taskId: task.id,
           taskTitle: task.title,
           dueDate: task.due,
           message: task.dueTime
-            ? `Due at ${formatTime12h(task.dueTime)} (${formatDuration(timeLeft)} left) — reminder`
-            : `Due in ${formatDuration(dueEndOfDay - now)} — reminder`,
+            ? (isOverdue ? `Overdue by ${formatDuration(absTimeLeft)} — reminder` : `Due at ${formatTime12h(task.dueTime)} (${formatDuration(absTimeLeft)} left) — reminder`)
+            : (isDayOverdue ? `Overdue by ${formatDuration(dayOverdueTime)} — reminder` : `Due in ${formatDuration(dueEndOfDay - now)} — reminder`),
         });
       }
     }
@@ -175,14 +177,12 @@ export async function cancelTaskNotifications(taskId: string) {
 export async function syncTaskNotifications(task: Task): Promise<{ success: boolean; error?: string }> {
   await cancelTaskNotifications(task.id);
 
-  if (task.done || !task.due || !task.reminder || task.reminder.dismissed) {
+  if (task.done || !task.due || !task.reminder || task.reminder.dismissed || task.muted) {
     return { success: true };
   }
 
   const now = Date.now();
   const dueEndOfDay = getDueEndOfDay(task.due);
-
-  if (now >= dueEndOfDay) return { success: true };
 
   let targetDueTime: number;
   if (task.dueTime) {
@@ -196,9 +196,6 @@ export async function syncTaskNotifications(task: Task): Promise<{ success: bool
 
   const reminderStartTime = targetDueTime - task.reminder.remindBefore;
   
-  // If exact due time has passed, stop reminding
-  if (task.dueTime && now >= targetDueTime) return { success: true };
-
   let scheduleTime = reminderStartTime;
   
   // If the reminder start time is in the past, maybe skip to the next repeat or schedule right now
@@ -207,7 +204,7 @@ export async function syncTaskNotifications(task: Task): Promise<{ success: bool
     if (!task.reminder.repeatEvery) {
       scheduleTime = now + SAFETY_BUFFER;
     } else {
-      while (scheduleTime <= now + SAFETY_BUFFER && scheduleTime < targetDueTime) {
+      while (scheduleTime <= now + SAFETY_BUFFER) {
         scheduleTime += task.reminder.repeatEvery;
       }
     }
@@ -218,11 +215,16 @@ export async function syncTaskNotifications(task: Task): Promise<{ success: bool
 
   // Schedule up to 10 repeating notifications
   let count = 0;
-  while (scheduleTime < targetDueTime && count < 10) {
-    const timeLeft = Math.max(0, targetDueTime - scheduleTime);
+  while (count < 10) {
+    const timeLeft = targetDueTime - scheduleTime;
+    const isOverdue = timeLeft < 0;
+    const absTimeLeft = Math.abs(timeLeft);
+    const isDayOverdue = scheduleTime > dueEndOfDay;
+    const dayOverdueTime = Math.abs(dueEndOfDay - scheduleTime);
+
     const message = task.dueTime
-      ? `Due at ${formatTime12h(task.dueTime)} (${formatDuration(timeLeft)} left)` + (count > 0 ? ' — reminder' : '')
-      : `Due in ${formatDuration(dueEndOfDay - scheduleTime)}` + (count > 0 ? ' — reminder' : '');
+      ? (isOverdue ? `Overdue by ${formatDuration(absTimeLeft)}` : `Due at ${formatTime12h(task.dueTime)} (${formatDuration(absTimeLeft)} left)`) + (count > 0 ? ' — reminder' : '')
+      : (isDayOverdue ? `Overdue by ${formatDuration(dayOverdueTime)}` : `Due in ${formatDuration(dueEndOfDay - scheduleTime)}`) + (count > 0 ? ' — reminder' : '');
 
     try {
       if (useNativeAlarm) {

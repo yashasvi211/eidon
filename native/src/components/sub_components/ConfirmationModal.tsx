@@ -200,7 +200,7 @@ export default function ConfirmationModal({ visible, onClose, onConfirm, title, 
               {warningNote && (
                 <View style={styles.warningContainer}>
                   <Feather name="alert-triangle" size={14} color="#f85149" style={{ marginRight: 6 }} />
-                  <Text style={[styles.warningText, { color: "#f85149" }]}>{warningNote}</Text>
+                  <Text style={[styles.warningText, { color: "#f85149", flex: 1 }]}>{warningNote}</Text>
                 </View>
               )}
 
