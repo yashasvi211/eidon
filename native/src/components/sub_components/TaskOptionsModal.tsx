@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Pressable } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 interface TaskOptionsModalProps {
@@ -21,13 +21,22 @@ export default function TaskOptionsModal({
   isMuted,
   colors,
 }: TaskOptionsModalProps) {
-  if (!visible) return null;
-
+  // Always keep <Modal> mounted and drive visibility with the `visible` prop.
+  // Returning null when hidden unmounts the native modal and makes re-open flaky
+  // (especially after open → close → open).
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity activeOpacity={1} style={[styles.sheet, { backgroundColor: colors.ghSurface, borderColor: colors.ghBorder }]}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent
+    >
+      <View style={styles.overlay}>
+        {/* Backdrop — tap outside sheet to dismiss */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
+        <View style={[styles.sheet, { backgroundColor: colors.ghSurface, borderColor: colors.ghBorder }]}>
           {/* Handle */}
           <View style={styles.handleContainer}>
             <View style={[styles.handle, { backgroundColor: colors.ghBorder2 || colors.ghBorder }]} />
@@ -98,9 +107,8 @@ export default function TaskOptionsModal({
           >
             <Text style={[styles.cancelText, { color: colors.ghMuted }]}>Cancel</Text>
           </TouchableOpacity>
-
-        </TouchableOpacity>
-      </TouchableOpacity>
+        </View>
+      </View>
     </Modal>
   );
 }

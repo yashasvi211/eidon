@@ -675,11 +675,11 @@ export default function DetailPanel({
     }
   }, [isLargeScreen]);
 
-  // Pull-down-to-close pan gesture (mobile only)
-  // - activeOffsetY: only activate after 10px vertical movement
-  // - failOffsetX: cancel if horizontal movement exceeds 15px (let ScrollView handle it)
-  const panGesture = useMemo(() => {
-    return Gesture.Pan()
+  // Pull-down-to-close pan gesture (mobile only).
+  // Factory: RNGH allows one gesture instance per GestureDetector, so handle +
+  // title each get their own pan. The 3-dots button is never inside either.
+  const makePanGesture = () =>
+    Gesture.Pan()
       .activeOffsetY([10, -10])
       .failOffsetX([-15, 15])
       .onUpdate((e) => {
@@ -688,7 +688,6 @@ export default function DetailPanel({
       })
       .onEnd((e) => {
         if (e.translationY > DISMISS_THRESHOLD || e.velocityY > 800) {
-          // Dismiss: animate down off-screen
           translateY.value = withTiming(height, {
             duration: EXIT_DURATION,
             easing: EXIT_EASING,
@@ -697,11 +696,12 @@ export default function DetailPanel({
           });
           dragY.value = withTiming(0, { duration: EXIT_DURATION });
         } else {
-          // Snap back
           dragY.value = withSpring(0, SNAP_SPRING);
         }
       });
-  }, [height, onClose]);
+
+  const panOnHandle = useMemo(() => makePanGesture(), [height, onClose]);
+  const panOnTitle = useMemo(() => makePanGesture(), [height, onClose]);
 
   // Horizontal scroll for tab swiping (mobile)
   const scrollX = useSharedValue(0);
@@ -766,10 +766,11 @@ export default function DetailPanel({
     }
   };
 
-  // Reset tab and scroll position on task change
+  // Reset tab, scroll, and options modal on task change
   useEffect(() => {
     setActiveTab("details");
     setSessionNote("");
+    setOptionsModalVisible(false);
     if (scrollViewRef.current && tabBarWidth > 0) {
       scrollViewRef.current.scrollTo({ x: 0, animated: false });
     }
@@ -928,40 +929,29 @@ export default function DetailPanel({
     });
   };
 
-  // The drag-handle + header area that responds to pull-down gesture
-  const dragArea = (
-    <>
-      {/* Drag handle indicator (mobile only) */}
-      {!isLargeScreen && (
-        <View style={styles.dragHandleContainer}>
-          <View style={[styles.dragHandle, { backgroundColor: colors.ghBorder2 }]} />
-        </View>
-      )}
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.ghBorder, paddingRight: 10 }]}>
-        <Text
-          style={[styles.headerTitle, { color: colors.ghText }]}
-          numberOfLines={1}
+  // Header actions must live OUTSIDE the pan GestureDetector.
+  // If the 3-dots sits inside the pull-to-dismiss pan, the pan steals the
+  // first touch and the menu only opens after multiple taps.
+  const headerActions = (
+    <View style={styles.headerActions}>
+      {(onEditTask || onDeleteTask) && (
+        <TouchableOpacity
+          style={styles.optionsBtn}
+          onPress={() => setOptionsModalVisible(true)}
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          activeOpacity={0.6}
+          accessibilityRole="button"
+          accessibilityLabel="Task options"
         >
-          {task.title}
-        </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          {(onEditTask || onDeleteTask) && (
-            <TouchableOpacity 
-              style={{ padding: 8, marginRight: isLargeScreen ? 8 : 0 }} 
-              onPress={() => setOptionsModalVisible(true)}
-            >
-              <Feather name="more-vertical" size={20} color={colors.ghMuted} />
-            </TouchableOpacity>
-          )}
-          {isLargeScreen && (
-            <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
-              <Text style={{ color: colors.ghMuted, fontSize: 24, lineHeight: 24 }}>×</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    </>
+          <Feather name="more-vertical" size={20} color={colors.ghMuted} />
+        </TouchableOpacity>
+      )}
+      {isLargeScreen && (
+        <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
+          <Text style={{ color: colors.ghMuted, fontSize: 24, lineHeight: 24 }}>×</Text>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 
   const panelContent = (
@@ -978,13 +968,39 @@ export default function DetailPanel({
         rootAnimatedStyle,
       ]}
     >
-      {/* On mobile, wrap drag area with GestureDetector for pull-down-to-close */}
+      {/* Mobile: pan on handle + title only. 3-dots is a flex sibling (no overlap)
+          so the pan never steals the first tap. */}
       {!isLargeScreen ? (
-        <GestureDetector gesture={panGesture}>
-          <Animated.View>{dragArea}</Animated.View>
-        </GestureDetector>
+        <View style={[styles.headerBlock, { borderBottomColor: colors.ghBorder }]}>
+          <GestureDetector gesture={panOnHandle}>
+            <Animated.View style={styles.dragHandleContainer}>
+              <View style={[styles.dragHandle, { backgroundColor: colors.ghBorder2 }]} />
+            </Animated.View>
+          </GestureDetector>
+          <View style={styles.headerRow}>
+            <GestureDetector gesture={panOnTitle}>
+              <Animated.View style={styles.headerTitleWrap}>
+                <Text
+                  style={[styles.headerTitle, { color: colors.ghText }]}
+                  numberOfLines={1}
+                >
+                  {task.title}
+                </Text>
+              </Animated.View>
+            </GestureDetector>
+            {headerActions}
+          </View>
+        </View>
       ) : (
-        dragArea
+        <View style={[styles.header, { borderBottomColor: colors.ghBorder, paddingRight: 10 }]}>
+          <Text
+            style={[styles.headerTitle, { color: colors.ghText }]}
+            numberOfLines={1}
+          >
+            {task.title}
+          </Text>
+          {headerActions}
+        </View>
       )}
 
       {/* Tabs */}
@@ -2061,6 +2077,35 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
   },
+  // Mobile header: pan on handle/title; 3-dots is a non-overlapping flex sibling
+  headerBlock: {
+    borderBottomWidth: 1,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    minHeight: 40,
+    paddingBottom: 8,
+  },
+  headerTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+    paddingLeft: 15,
+    paddingRight: 8,
+    justifyContent: "center",
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingRight: 6,
+    flexShrink: 0,
+  },
+  optionsBtn: {
+    width: 44,
+    height: 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -2073,6 +2118,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 14,
     fontWeight: "700",
+    flexShrink: 1,
     flex: 1,
     marginRight: 10,
   },
