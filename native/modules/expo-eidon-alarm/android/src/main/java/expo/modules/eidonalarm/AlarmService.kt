@@ -116,18 +116,20 @@ class AlarmService : Service() {
 
         startForeground(NOTIFICATION_ID, notification)
 
-        // 4. ALSO directly launch the activity (don't rely solely on fullScreenIntent)
-        //    This is the key fix — fullScreenIntent only auto-launches under certain conditions
-        //    (device locked, USE_FULL_SCREEN_INTENT granted). We force-launch the activity ourselves.
+        // 4. Launch MainActivity only when the keyguard is not locked.
+        //    Never bring the full app over the lock screen — that made the whole UI
+        //    usable while the phone was still locked. Alarm sound/notification still run;
+        //    fullScreenIntent delivers the high-priority notification on the lock screen.
         try {
             if (launchIntent != null) {
-                // Dismiss keyguard if locked
                 val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    // On O+ we can request dismissal but the activity flags handle it
+                val isLocked = keyguardManager.isKeyguardLocked
+                if (!isLocked) {
+                    applicationContext.startActivity(launchIntent)
+                    Log.d("EidonAlarm", "Launched MainActivity for alarm (device unlocked)")
+                } else {
+                    Log.d("EidonAlarm", "Skipped direct activity launch — keyguard locked")
                 }
-                applicationContext.startActivity(launchIntent)
-                Log.d("EidonAlarm", "Directly launched MainActivity for alarm")
             }
         } catch (e: Exception) {
             Log.e("EidonAlarm", "Failed to directly launch activity", e)

@@ -5,11 +5,12 @@ const withAlarmManifest = (config) => {
     const androidManifest = config.modResults.manifest;
     
     // Add Permissions
+    // Do NOT add DISABLE_KEYGUARD / showWhenLocked / turnScreenOn — those make the
+    // whole MainActivity usable over the lock screen (not just during alarms).
     const permissionsToAdd = [
       'android.permission.SCHEDULE_EXACT_ALARM',
       'android.permission.USE_EXACT_ALARM',
       'android.permission.WAKE_LOCK',
-      'android.permission.DISABLE_KEYGUARD',
       'android.permission.FOREGROUND_SERVICE',
       'android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED',
       'android.permission.USE_FULL_SCREEN_INTENT',
@@ -52,12 +53,13 @@ const withAlarmManifest = (config) => {
       });
     }
 
-    // Update MainActivity flags for full screen intent (showWhenLocked, turnScreenOn)
+    // Explicitly clear any leftover lock-screen activity flags so prebuild cannot
+    // leave MainActivity interactive while the device is locked.
     if (application.activity) {
       const mainActivity = application.activity.find((a) => a.$['android:name'] === '.MainActivity');
       if (mainActivity) {
-        mainActivity.$['android:showWhenLocked'] = 'true';
-        mainActivity.$['android:turnScreenOn'] = 'true';
+        delete mainActivity.$['android:showWhenLocked'];
+        delete mainActivity.$['android:turnScreenOn'];
       }
     }
 
