@@ -76,7 +76,9 @@ export function checkReminders(tasks: Task[]): ReminderNotification[] {
     }
 
     // When should reminders start? (may be in the past → fire immediately)
-    const reminderStartTime = targetDueTime - task.reminder.remindBefore;
+    const reminderStartTime = task.reminder.remindBefore !== undefined 
+      ? targetDueTime - task.reminder.remindBefore 
+      : targetDueTime;
 
     // Not yet in the reminder window
     if (now < reminderStartTime) continue;
@@ -85,12 +87,12 @@ export function checkReminders(tasks: Task[]): ReminderNotification[] {
 
     const isDayOverdue = now > dueEndOfDay;
     const dayOverdueTime = Math.abs(dueEndOfDay - now);
+    const timeLeft = targetDueTime - now;
+    const isOverdue = timeLeft < 0;
+    const absTimeLeft = Math.abs(timeLeft);
 
     if (lastNotified === 0) {
       // First notification — always fire
-      const timeLeft = targetDueTime - now;
-      const isOverdue = timeLeft < 0;
-      const absTimeLeft = Math.abs(timeLeft);
       notifications.push({
         taskId: task.id,
         taskTitle: task.title,
@@ -99,13 +101,22 @@ export function checkReminders(tasks: Task[]): ReminderNotification[] {
           ? (isOverdue ? `Overdue by ${formatDuration(absTimeLeft)}` : `Due at ${formatTime12h(task.dueTime)} (${formatDuration(absTimeLeft)} left)`)
           : (isDayOverdue ? `Overdue by ${formatDuration(dayOverdueTime)}` : `Due in ${formatDuration(dueEndOfDay - now)}`),
       });
-    } else if (task.reminder.repeatEvery && task.reminder.repeatEvery > 0) {
-      // Repeating — check if enough time has passed since last notification
+    } else {
       const elapsed = now - lastNotified;
-      if (elapsed >= task.reminder.repeatEvery) {
-        const timeLeft = targetDueTime - now;
-        const isOverdue = timeLeft < 0;
-        const absTimeLeft = Math.abs(timeLeft);
+      let shouldNotify = false;
+
+      if (isOverdue && task.reminder.notifyOverdue) {
+        const overdueInterval = task.reminder.overdueRepeatEvery || 86400000;
+        if (elapsed >= overdueInterval) {
+          shouldNotify = true;
+        }
+      } else if (!isOverdue && task.reminder.repeatEvery && task.reminder.repeatEvery > 0) {
+        if (elapsed >= task.reminder.repeatEvery) {
+          shouldNotify = true;
+        }
+      }
+
+      if (shouldNotify) {
         notifications.push({
           taskId: task.id,
           taskTitle: task.title,
@@ -194,28 +205,51 @@ export async function syncTaskNotifications(task: Task): Promise<{ success: bool
     targetDueTime = new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
   }
 
-  const reminderStartTime = targetDueTime - task.reminder.remindBefore;
-  
-  let scheduleTime = reminderStartTime;
-  
-  // If the reminder start time is in the past, maybe skip to the next repeat or schedule right now
-  const SAFETY_BUFFER = 2000;
-  if (scheduleTime <= now + SAFETY_BUFFER) {
-    if (!task.reminder.repeatEvery) {
-      scheduleTime = now + SAFETY_BUFFER;
-    } else {
-      while (scheduleTime <= now + SAFETY_BUFFER) {
-        scheduleTime += task.reminder.repeatEvery;
-      }
-    }
-  }
-
   const settings = await api.getSettings();
   const useNativeAlarm = Platform.OS === 'android' && settings.reminderStyle === 'fullscreen';
 
-  // Schedule up to 10 repeating notifications
-  let count = 0;
-  while (count < 10) {
+  const triggerTimes: number[] = [];
+
+  if (task.reminder.remindBefore !== undefined) {
+    let t = targetDueTime - task.reminder.remindBefore;
+    for (let i = 0; i < 10; i++) {
+      triggerTimes.push(t);
+      if (!task.reminder.repeatEvery || task.reminder.repeatEvery <= 0) break;
+      t += task.reminder.repeatEvery;
+      if (t >= targetDueTime && !task.reminder.notifyOverdue) break;
+    }
+  }
+
+  if (task.reminder.notifyOverdue) {
+    let t = targetDueTime;
+    const interval = task.reminder.overdueRepeatEvery || 86400000;
+    
+    if (t < now) {
+      const missedIntervals = Math.floor((now - t) / interval);
+      t = t + (missedIntervals + 1) * interval;
+    }
+
+    for (let i = 0; i < 10; i++) {
+      if (!triggerTimes.includes(t)) {
+        triggerTimes.push(t);
+      }
+      t += interval;
+    }
+  }
+
+  const SAFETY_BUFFER = 2000;
+  let validTimes = triggerTimes
+    .filter(t => t > now + SAFETY_BUFFER)
+    .sort((a, b) => a - b);
+    
+  validTimes = validTimes.slice(0, 10);
+
+  if (useNativeAlarm && validTimes.length > 0) {
+    validTimes = [validTimes[0]];
+  }
+
+  for (let count = 0; count < validTimes.length; count++) {
+    const scheduleTime = validTimes[count];
     const timeLeft = targetDueTime - scheduleTime;
     const isOverdue = timeLeft < 0;
     const absTimeLeft = Math.abs(timeLeft);
@@ -228,8 +262,6 @@ export async function syncTaskNotifications(task: Task): Promise<{ success: bool
 
     try {
       if (useNativeAlarm) {
-        // Just schedule the first one with AlarmManager for the true alarm experience.
-        // AlarmManager will wake the device, so we only need the exact next trigger.
         if (count === 0) {
           EidonAlarm.scheduleAlarm(task.id, scheduleTime);
         }
@@ -252,12 +284,6 @@ export async function syncTaskNotifications(task: Task): Promise<{ success: bool
       console.error('Failed to schedule notification', err);
       return { success: false, error: err?.message || String(err) };
     }
-
-    count++;
-    if (!task.reminder.repeatEvery || task.reminder.repeatEvery <= 0 || useNativeAlarm) {
-      break; // Native alarms loop internally until dismissed, no need to schedule 10!
-    }
-    scheduleTime += task.reminder.repeatEvery;
   }
 
   return { success: true };

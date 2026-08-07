@@ -311,10 +311,11 @@ export default function Sidebar({
   };
 
   const seenProjNames = new Set<string>();
+  const WORKSPACE_VIEWS = new Set(['inbox', 'all', 'today', 'archive', 'backlog', 'scheduled', 'stats', 'timetracking', 'tracking']);
   const uniqProjects = (projects || []).filter(Boolean).filter(p => {
     if (!p || !p.name) return false;
     const lower = p.name.trim().toLowerCase();
-    if (lower === 'inbox') return false;
+    if (WORKSPACE_VIEWS.has(lower)) return false;
     if (seenProjNames.has(lower)) return false;
     seenProjNames.add(lower);
     return true;
@@ -358,14 +359,19 @@ export default function Sidebar({
     return t.due === todayStr;
   };
 
+  const isTaskArchive = (t: Task) => {
+    if (!t.due) return true;
+    return false;
+  };
+
   const isTaskBacklog = (t: Task) => {
     if (t.target === "backlog") return true;
-    if (!t.due) return true;
     if (isTaskOverdue(t)) return true;
     return false;
   };
 
   const todayBadgeCount = uniqTasks.filter((t) => !t.done && isTaskCurrent(t)).length;
+  const archiveBadgeCount = uniqTasks.filter((t) => !t.done && isTaskArchive(t)).length;
   const backlogBadgeCount = uniqTasks.filter((t) => !t.done && isTaskBacklog(t)).length;
   const inboxBadgeCount = uniqTasks.filter((t) => !t.done && t.project === 'Inbox').length;
   const allBadgeCount = uniqTasks.filter((t) => !t.done).length;
@@ -373,6 +379,7 @@ export default function Sidebar({
   const views = [
     { id: 'all', label: 'All Tasks', icon: '📋', badge: allBadgeCount },
     { id: 'today', label: "Today's Tasks", icon: '☀️', badge: todayBadgeCount },
+    { id: 'archive', label: 'Archive', icon: '📁', badge: archiveBadgeCount },
     { id: 'backlog', label: 'Backlog', icon: '📦', badge: backlogBadgeCount },
     { id: 'scheduled', label: 'Scheduled', icon: '📅' },
     { id: 'stats', label: 'Deep Stats', icon: '📈' },

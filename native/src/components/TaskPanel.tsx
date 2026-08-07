@@ -209,9 +209,13 @@ export default function TaskPanel({
     return t.due === todayStr;
   };
 
+  const isTaskArchive = (t: Task) => {
+    if (!t.due) return true;
+    return false;
+  };
+
   const isTaskBacklog = (t: Task) => {
     if (t.target === "backlog") return true;
-    if (!t.due) return true;
     if (isTaskOverdue(t)) return true;
     return false;
   };
@@ -223,6 +227,7 @@ export default function TaskPanel({
       if (currentView === "inbox") return t.project === "Inbox";
       if (currentView === "all") return true;
       if (currentView === "today") return isTaskCurrent(t);
+      if (currentView === "archive") return isTaskArchive(t);
       if (currentView === "backlog") return isTaskBacklog(t);
       return t.target === currentView;
     })
@@ -493,8 +498,8 @@ export default function TaskPanel({
   } else if (currentProject) {
     const overdueTasks = activeTasks.filter(t => isTaskOverdue(t));
     const currentTasks = activeTasks.filter(t => isTaskCurrent(t));
-    const backlogTasks = activeTasks.filter(t => !isTaskOverdue(t) && isTaskBacklog(t));
-    const futureTasks = activeTasks.filter(t => !isTaskOverdue(t) && !isTaskCurrent(t) && !isTaskBacklog(t));
+    const archiveTasks = activeTasks.filter(t => isTaskArchive(t));
+    const futureTasks = activeTasks.filter(t => !isTaskOverdue(t) && !isTaskCurrent(t) && !isTaskArchive(t));
 
     if (activeTasks.length === 0 && completedTasks.length === 0) {
       listData.push({ type: 'empty', id: 'empty-project', message: 'No tasks in this project.' });
@@ -507,9 +512,9 @@ export default function TaskPanel({
         listData.push({ type: 'header', id: 'header-current', title: 'Current / Today' });
         currentTasks.forEach(t => listData.push({ type: 'task', id: t.id, task: t, index: taskCounter++ }));
       }
-      if (backlogTasks.length > 0) {
-        listData.push({ type: 'header', id: 'header-backlog', title: 'Backlog' });
-        backlogTasks.forEach(t => listData.push({ type: 'task', id: t.id, task: t, index: taskCounter++ }));
+      if (archiveTasks.length > 0) {
+        listData.push({ type: 'header', id: 'header-archive', title: 'Archive (No Deadline)' });
+        archiveTasks.forEach(t => listData.push({ type: 'task', id: t.id, task: t, index: taskCounter++ }));
       }
       if (futureTasks.length > 0) {
         listData.push({ type: 'header', id: 'header-future', title: 'Scheduled / Future' });

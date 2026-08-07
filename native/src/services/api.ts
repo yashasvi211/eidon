@@ -111,8 +111,9 @@ async function listFolders(dir: string): Promise<string[]> {
   try {
     const items = await FileSystem.readDirectoryAsync(dir);
     const result: string[] = [];
+    const SYSTEM_FOLDERS = new Set(['tracking', 'all', 'today', 'archive', 'backlog', 'scheduled', 'stats', 'timetracking']);
     for (const item of items) {
-      if (item.startsWith('.') || item === 'tracking') continue;
+      if (item.startsWith('.') || SYSTEM_FOLDERS.has(item.trim().toLowerCase())) continue;
       const info = await FileSystem.getInfoAsync(dir + item);
       if (info.isDirectory) result.push(item);
     }
@@ -131,9 +132,15 @@ async function listJsonFiles(dir: string): Promise<string[]> {
   }
 }
 
+const WORKSPACE_VIEWS = new Set(['all', 'today', 'archive', 'backlog', 'scheduled', 'stats', 'timetracking', 'tracking']);
+
 // project name → safe folder name (replace slashes etc)
 function projectFolder(project: string): string {
-  return project.trim().replace(/[/\\:*?"<>|]/g, '_') || 'Inbox';
+  const trimmed = (project || '').trim();
+  if (!trimmed || WORKSPACE_VIEWS.has(trimmed.toLowerCase())) {
+    return 'Inbox';
+  }
+  return trimmed.replace(/[/\\:*?"<>|]/g, '_');
 }
 
 function taskFilePath(project: string, taskId: string): string {
@@ -239,6 +246,32 @@ async function loadAll() {
 
   // Run migration if old file exists
   await migrateLegacyDb();
+
+  // Clean up any legacy invalid workspace folders on disk (e.g. eidon/today/, eidon/Archive/)
+  try {
+    const rawItems = await FileSystem.readDirectoryAsync(EIDON_DIR);
+    for (const item of rawItems) {
+      if (item.startsWith('.')) continue;
+      const lower = item.trim().toLowerCase();
+      if (WORKSPACE_VIEWS.has(lower)) {
+        const legacyFolderPath = EIDON_DIR + item + '/';
+        const info = await FileSystem.getInfoAsync(legacyFolderPath);
+        if (info.isDirectory) {
+          const files = await listJsonFiles(legacyFolderPath);
+          for (const file of files) {
+            const task = await readJson<Task>(legacyFolderPath + file);
+            if (task) {
+              if (!task.project || WORKSPACE_VIEWS.has(task.project.trim().toLowerCase())) {
+                task.project = 'Inbox';
+              }
+              await writeJson(EIDON_DIR + 'Inbox/' + file, task);
+            }
+          }
+          await FileSystem.deleteAsync(legacyFolderPath, { idempotent: true }).catch(() => {});
+        }
+      }
+    }
+  } catch (e) {}
 
   // Settings
   const settings = await readJson<AppSettings>(SETTINGS_FILE);
@@ -478,10 +511,13 @@ export const api = {
     if (!task.id) return;
     const already = cache.tasks.some(t => t.id === task.id);
     if (already) return;
-    const proj = (task as Task).project || 'Inbox';
+    const full = task as Task;
+    if (!full.project || WORKSPACE_VIEWS.has(full.project.trim().toLowerCase())) {
+      full.project = 'Inbox';
+    }
+    const proj = full.project;
     const folder = projectFolder(proj);
     await ensureDir(EIDON_DIR + folder + '/');
-    const full = task as Task;
     await writeJson(taskFilePath(proj, full.id), full);
     cache.tasks.push(full);
   },
@@ -820,6 +856,20 @@ export const api = {
     if (remoteRoot.endsWith('/')) remoteRoot = remoteRoot.slice(0, -1);
 
     try {
+      // Delete legacy/invalid workspace view folders from Dropbox if present
+      for (const viewName of ['today', 'Archive', 'archive', 'backlog', 'scheduled', 'stats', 'all']) {
+        try {
+          await fetch(`${DROPBOX_API}/2/files/delete_v2`, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ path: `${remoteRoot}/${viewName}` }),
+          });
+        } catch (e) {}
+      }
+
       const filesToUpload: { localPath: string; relPath: string }[] = [];
       const scanDirForUpload = async (dir: string, prefix: string) => {
         try {

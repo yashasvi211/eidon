@@ -97,8 +97,10 @@ export interface AuditEntry {
 }
 
 export interface TaskReminder {
-  remindBefore: number;       // ms before due date to start reminding
+  remindBefore?: number;      // ms before due date to start reminding
   repeatEvery?: number;       // ms between repeat notifications (optional)
+  notifyOverdue?: boolean;
+  overdueRepeatEvery?: number;
   lastNotifiedAt?: number;    // timestamp of last notification fired
   dismissed?: boolean;        // user dismissed all reminders for this task
   lastNotificationStatus?: 'success' | 'failed';

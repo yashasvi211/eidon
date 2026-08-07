@@ -34,8 +34,10 @@ interface Project {
 }
 
 export interface ReminderConfig {
-  remindBefore: number;    // ms before due date
+  remindBefore?: number;    // ms before due date
   repeatEvery?: number;    // ms between repeat notifications
+  notifyOverdue?: boolean;
+  overdueRepeatEvery?: number;
 }
 
 export interface TaskRecurrenceConfig {
@@ -50,6 +52,7 @@ interface AddTaskModalProps {
   onAdd: (title: string, project: string, due?: string, reminder?: ReminderConfig, dueTime?: string, priority?: 'High' | 'Moderate' | 'Low', execStartDate?: string, execStartTime?: string, recurrence?: TaskRecurrenceConfig, est?: string) => void;
   projects: Project[];
   initialTask?: any;
+  defaultProject?: string | null;
 }
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
@@ -61,6 +64,18 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 const DAY_LABELS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
+const OVERDUE_REPEAT_OPTIONS = [
+  { label: 'Every 2 mins', value: 120000 },
+  { label: 'Every 3 hours', value: 10800000 },
+  { label: 'Every 6 hours', value: 21600000 },
+  { label: 'Every 12 hours', value: 43200000 },
+  { label: 'Every 1 day', value: 86400000 },
+  { label: 'Every 2 days', value: 172800000 },
+  { label: 'Every 3 days', value: 259200000 },
+  { label: 'Every 1 week', value: 604800000 },
+  { label: 'Every 2 weeks', value: 1209600000 },
+];
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -90,7 +105,7 @@ import DurationPickerModal from './sub_components/DurationPickerModal';
 
 // ─── Main Modal ────────────────────────────────────────────────────────────────
 
-export default function AddTaskModal({ visible, onClose, onAdd, projects, initialTask }: AddTaskModalProps) {
+export default function AddTaskModal({ visible, onClose, onAdd, projects, initialTask, defaultProject }: AddTaskModalProps) {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'unspecified' ? 'light' : scheme];
   const { width, height } = useWindowDimensions();
@@ -101,14 +116,14 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
   const [project, setProject] = useState('Inbox');
   const [due, setDue] = useState<string | null>(null);
   const [dueTime, setDueTime] = useState<string | null>(null);
-  
+
   const [execStartDate, setExecStartDate] = useState<string | null>(null);
   const [execStartTime, setExecStartTime] = useState<string | null>(null);
 
   const [calendarMode, setCalendarMode] = useState<'due' | 'execStart' | null>(null);
   const [clockMode, setClockMode] = useState<'due' | 'execStart' | null>(null);
   const [showDurationPicker, setShowDurationPicker] = useState(false);
-  
+
   const [showConfirm, setShowConfirm] = useState(false);
   const [priority, setPriority] = useState<'High' | 'Moderate' | 'Low'>('Low');
   const [est, setEst] = useState('');
@@ -116,23 +131,30 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
   // Reminder state
   const [remindBefore, setRemindBefore] = useState<number | null>(null);   // ms
   const [repeatEvery, setRepeatEvery] = useState<number | null>(null);     // ms
+  const [notifyOverdue, setNotifyOverdue] = useState(false);
+  const [overdueRepeatEvery, setOverdueRepeatEvery] = useState<number | null>(null);
 
   // Recurrence state
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceFrequency, setRecurrenceFrequency] = useState<string>('daily');
   const [streakEnabled, setStreakEnabled] = useState(false);
   const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
-  
+
   // Dropdown states
   const [showOffsetDropdown, setShowOffsetDropdown] = useState(false);
   const [showRepeatDropdown, setShowRepeatDropdown] = useState(false);
+  const [showOverdueRepeatDropdown, setShowOverdueRepeatDropdown] = useState(false);
 
   // ── Derived ──
 
-  // Ensure Inbox is always first in the project list
+  // Ensure Inbox is always first in the project list and filter out workspace view names
   const allProjects = useMemo(() => {
-    const hasInbox = projects.some(p => p.name === 'Inbox');
-    return hasInbox ? projects : [INBOX_PROJECT, ...projects];
+    const WORKSPACE_VIEWS = new Set(['all', 'today', 'archive', 'backlog', 'scheduled', 'stats', 'timetracking', 'tracking']);
+    const validProjects = (projects || []).filter(
+      p => p && p.name && typeof p.name === 'string' && !WORKSPACE_VIEWS.has(p.name.trim().toLowerCase())
+    );
+    const hasInbox = validProjects.some(p => p.name.trim().toLowerCase() === 'inbox');
+    return hasInbox ? validProjects : [INBOX_PROJECT, ...validProjects];
   }, [projects]);
 
   const dueDateTimeMs = useMemo(() => {
@@ -235,13 +257,16 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
   // ── Handlers ──
 
   const reset = () => {
+    const initialProjectName = defaultProject || 'Inbox';
     if (initialTask) {
       setTitle(initialTask.title);
-      setProject(initialTask.target || 'Inbox');
+      setProject(initialTask.project || initialTask.target || initialProjectName);
       setDue(initialTask.due || null);
       setDueTime(initialTask.dueTime || null);
       setRemindBefore(initialTask.reminder?.remindBefore ?? null);
       setRepeatEvery(initialTask.reminder?.repeatEvery ?? null);
+      setNotifyOverdue(initialTask.reminder?.notifyOverdue ?? false);
+      setOverdueRepeatEvery(initialTask.reminder?.overdueRepeatEvery ?? null);
       setPriority(initialTask.priority || 'Low');
       setExecStartDate(initialTask.execStartDate || null);
       setExecStartTime(initialTask.execStartTime || null);
@@ -252,11 +277,13 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
       setEst(initialTask.est || '');
     } else {
       setTitle('');
-      setProject('Inbox');
+      setProject(initialProjectName);
       setDue(null);
       setDueTime(null);
       setRemindBefore(null);
       setRepeatEvery(null);
+      setNotifyOverdue(false);
+      setOverdueRepeatEvery(null);
       setPriority('Low');
       setEst('');
       setExecStartDate(null);
@@ -272,6 +299,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
     setShowConfirm(false);
     setShowOffsetDropdown(false);
     setShowRepeatDropdown(false);
+    setShowOverdueRepeatDropdown(false);
   };
 
   const handleClose = () => {
@@ -285,10 +313,19 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
     if (!title.trim()) return;
 
     let reminder: ReminderConfig | undefined;
-    if (due && remindBefore !== null) {
-      reminder = { remindBefore };
-      if (repeatEvery !== null) {
-        reminder.repeatEvery = repeatEvery;
+    if (due && (remindBefore !== null || notifyOverdue)) {
+      reminder = {};
+      if (remindBefore !== null) {
+        reminder.remindBefore = remindBefore;
+        if (repeatEvery !== null) {
+          reminder.repeatEvery = repeatEvery;
+        }
+      }
+      if (notifyOverdue) {
+        reminder.notifyOverdue = true;
+        if (overdueRepeatEvery !== null) {
+          reminder.overdueRepeatEvery = overdueRepeatEvery;
+        }
       }
     }
 
@@ -364,6 +401,8 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
     setExecStartTime(null);
     setRemindBefore(null);
     setRepeatEvery(null);
+    setNotifyOverdue(false);
+    setOverdueRepeatEvery(null);
     setCalendarMode(null);
     setClockMode(null);
   };
@@ -786,6 +825,56 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
               </View>
 
 
+              {/* ── Overdue Reminders ── */}
+              {due && (
+                <View style={{ marginTop: 20 }}>
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.ghBg, borderWidth: 1, borderColor: notifyOverdue ? (colors.ghRed || '#f85149') : colors.ghBorder, borderRadius: 10, padding: 14 }}
+                    onPress={() => {
+                      setNotifyOverdue(v => !v);
+                      if (!notifyOverdue && overdueRepeatEvery === null) {
+                        setOverdueRepeatEvery(86400000); // Default to 1 day
+                      }
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: notifyOverdue ? `${colors.ghRed || '#f85149'}20` : `${colors.ghMuted}12`, alignItems: 'center', justifyContent: 'center' }}>
+                        <Feather name="alert-circle" size={14} color={notifyOverdue ? (colors.ghRed || '#f85149') : colors.ghMuted} />
+                      </View>
+                      <View>
+                        <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: '600' }}>Overdue Notification</Text>
+                        <Text style={{ color: colors.ghMuted, fontSize: 11, marginTop: 1 }}>Notify me when task is overdue</Text>
+                      </View>
+                    </View>
+                    <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: notifyOverdue ? (colors.ghRed || '#f85149') : colors.ghBorder, backgroundColor: notifyOverdue ? (colors.ghRed || '#f85149') : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
+                      {notifyOverdue && <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>✓</Text>}
+                    </View>
+                  </TouchableOpacity>
+
+                  {notifyOverdue && (
+                    <View style={{ marginTop: 12, marginLeft: 38 }}>
+                      <Text style={[styles.label, { color: colors.ghMuted, marginTop: 0 }]}>Repeat Notification</Text>
+                      <TouchableOpacity
+                        style={[
+                          styles.dateBtn,
+                          {
+                            borderColor: colors.ghBorder,
+                            backgroundColor: colors.ghBg,
+                            marginTop: 6,
+                          },
+                        ]}
+                        onPress={() => setShowOverdueRepeatDropdown(true)}
+                      >
+                        <Text style={{ color: colors.ghText, fontSize: 13, flex: 1 }} numberOfLines={1}>
+                          {OVERDUE_REPEAT_OPTIONS.find(o => o.value === overdueRepeatEvery)?.label || 'Select...'}
+                        </Text>
+                        <Feather name="chevron-down" size={16} color={colors.ghMuted} />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              )}
+
               {/* ── Total Reminders ── */}
               {due && remindBefore !== null && schedulePreview.length > 0 && (
                 <View style={[styles.summaryBox, { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.ghBg, borderColor: colors.ghBorder, marginTop: 16 }]}>
@@ -977,6 +1066,16 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
         options={availableRepeatOptions}
         selectedValue={repeatEvery || 0}
         onSelect={(val) => setRepeatEvery(val === 0 ? null : val)}
+        colors={colors}
+      />
+
+      <SelectModal
+        visible={showOverdueRepeatDropdown}
+        onClose={() => setShowOverdueRepeatDropdown(false)}
+        title="Overdue Repeat"
+        options={OVERDUE_REPEAT_OPTIONS}
+        selectedValue={overdueRepeatEvery || 0}
+        onSelect={(val) => setOverdueRepeatEvery(val)}
         colors={colors}
       />
     </KeyboardAvoidingView>

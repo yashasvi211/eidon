@@ -878,11 +878,13 @@ export default function AppIndex() {
       est: formatEstimateDisplay(est) || undefined,
       done: false,
       target:
-        currentView === "backlog"
-          ? "backlog"
-          : currentView === "scheduled"
-            ? "scheduled"
-            : "today",
+        currentView === "archive"
+          ? "archive"
+          : currentView === "backlog"
+            ? "backlog"
+            : currentView === "scheduled"
+              ? "scheduled"
+              : "today",
       subtasks: [],
       sessions: [],
       createdAt: Date.now(),
@@ -1256,19 +1258,21 @@ export default function AppIndex() {
     currentProject ||
     (currentView === "today"
       ? "Today"
-      : currentView === "backlog"
-        ? "Backlog"
-        : currentView === "scheduled"
-          ? "Scheduled"
-          : currentView === "stats"
-            ? "Deep Stats"
-            : currentView === "timetracking"
-              ? "Time Tracking"
-              : currentView === "tracking"
-                ? selectedTracker
-                  ? `${selectedTracker.emoji} ${selectedTracker.name}`
-                  : "Tracking"
-                : currentView.charAt(0).toUpperCase() + currentView.slice(1));
+      : currentView === "archive"
+        ? "Archive"
+        : currentView === "backlog"
+          ? "Backlog"
+          : currentView === "scheduled"
+            ? "Scheduled"
+            : currentView === "stats"
+              ? "Deep Stats"
+              : currentView === "timetracking"
+                ? "Time Tracking"
+                : currentView === "tracking"
+                  ? selectedTracker
+                    ? `${selectedTracker.emoji} ${selectedTracker.name}`
+                    : "Tracking"
+                  : currentView.charAt(0).toUpperCase() + currentView.slice(1));
 
   const handleTouchStart = (e: any) => {
     touchStartX.current = e.nativeEvent.pageX;
@@ -1357,6 +1361,7 @@ export default function AppIndex() {
                         onClose={() => setShowAddModal(false)}
                         onAdd={handleAddTask}
                         projects={projects}
+                        defaultProject={currentProject}
                       />
                     </View>
                   )}
@@ -1372,6 +1377,7 @@ export default function AppIndex() {
                         }}
                         projects={projects}
                         initialTask={editingTask}
+                        defaultProject={currentProject}
                       />
                     </View>
                   )}
@@ -1388,6 +1394,7 @@ export default function AppIndex() {
                     onClose={() => setShowAddModal(false)}
                     onAdd={handleAddTask}
                     projects={projects}
+                    defaultProject={currentProject}
                   />
                 ) : editingTask !== null ? (
                   <AddTaskModal
@@ -1400,6 +1407,7 @@ export default function AppIndex() {
                     }}
                     projects={projects}
                     initialTask={editingTask}
+                    defaultProject={currentProject}
                   />
                 ) : selectedTask ? (
                   <DetailPanel
@@ -1572,6 +1580,7 @@ export default function AppIndex() {
             if (selectedTaskId === taskId) {
               setSelectedTaskId(null);
             }
+            cancelTaskNotifications(taskId).catch(err => console.error("Failed to cancel notifications:", err));
             api.deleteTask(taskId).catch((err: any) => {
               console.error("Failed to delete task:", err);
               setTasks(previousTasks);
