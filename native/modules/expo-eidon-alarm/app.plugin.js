@@ -28,6 +28,26 @@ const withAlarmManifest = (config) => {
 
     const application = androidManifest.application[0];
 
+    // Add large icon for Expo Notifications (system banner).
+    // NOTE: must point to a real bitmap (PNG) drawable, not an adaptive icon
+    // (mipmap XML) — expo-notifications decodes the large icon via
+    // BitmapFactory.decodeResource, which returns null for adaptive icon XML
+    // and the app icon would be missing from the banner.
+    application['meta-data'] = application['meta-data'] || [];
+    const largeIconMeta = 'expo.modules.notifications.large_notification_icon';
+    const largeIconRes = '@drawable/large_notification_icon';
+    const existingLarge = application['meta-data'].find((m) => m.$['android:name'] === largeIconMeta);
+    if (existingLarge) {
+      existingLarge.$['android:resource'] = largeIconRes;
+    } else {
+      application['meta-data'].push({
+        $: {
+          'android:name': largeIconMeta,
+          'android:resource': largeIconRes
+        }
+      });
+    }
+
     // Add Receiver
     application.receiver = application.receiver || [];
     const receiverName = 'expo.modules.eidonalarm.AlarmReceiver';
@@ -71,7 +91,7 @@ const fs = require('fs');
 const path = require('path');
 const { withDangerousMod } = require('@expo/config-plugins');
 
-const withAlarmSound = (config) => {
+const withNativeAssets = (config) => {
   return withDangerousMod(config, [
     'android',
     async (config) => {
@@ -92,6 +112,21 @@ const withAlarmSound = (config) => {
         console.warn(`[expo-eidon-alarm] Warning: Sound file not found at ${soundSource}`);
       }
 
+      // Copy the app icon into res/drawable as a real bitmap PNG so it can be
+      // used as the expo-notifications large icon (BitmapFactory cannot decode
+      // adaptive icon XML). Used by the banner drop-down notification.
+      const drawableDir = path.join(resDir, 'drawable');
+      if (!fs.existsSync(drawableDir)) {
+        fs.mkdirSync(drawableDir, { recursive: true });
+      }
+      const iconSource = path.join(projectRoot, 'assets', 'images', 'icon.png');
+      const iconDest = path.join(drawableDir, 'large_notification_icon.png');
+      if (fs.existsSync(iconSource)) {
+        fs.copyFileSync(iconSource, iconDest);
+      } else {
+        console.warn(`[expo-eidon-alarm] Warning: Icon file not found at ${iconSource}`);
+      }
+
       return config;
     },
   ]);
@@ -99,6 +134,6 @@ const withAlarmSound = (config) => {
 
 module.exports = (config) => {
   config = withAlarmManifest(config);
-  config = withAlarmSound(config);
+  config = withNativeAssets(config);
   return config;
 };

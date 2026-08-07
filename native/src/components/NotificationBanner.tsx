@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, useColorScheme } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, useColorScheme, Image } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -94,9 +94,10 @@ export default function NotificationBanner({ notification, onDismiss, onPress }:
         activeOpacity={0.7}
       >
         <View style={styles.iconContainer}>
-          <View style={[styles.iconCircle, { backgroundColor: colors.ghBlue + '15' }]}>
-            <Feather name="bell" size={16} color={colors.ghBlue} />
-          </View>
+          <Image 
+            source={require('../../assets/images/icon.png')} 
+            style={[styles.iconCircle, { backgroundColor: colors.ghBlue + '15' }]} 
+          />
         </View>
         
         <View style={styles.textContainer}>
