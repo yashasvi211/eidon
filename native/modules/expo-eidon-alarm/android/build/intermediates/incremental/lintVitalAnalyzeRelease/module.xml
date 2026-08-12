@@ -1,6 +1,6 @@
 <lint-module
     format="1"
-    dir="/run/media/anuj/Drive/Projects/eidon/native/modules/expo-eidon-alarm/android"
+    dir="/home/anuj/Drive/Projects/eidon/native/modules/expo-eidon-alarm/android"
     name=":expo-eidon-alarm"
     type="LIBRARY"
     maven="expo.modules.eidonalarm:expo-eidon-alarm:0.1.0"

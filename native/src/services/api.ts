@@ -479,6 +479,89 @@ export const api = {
     cache.projectMeta.push(project);
   },
 
+  async updateProject(oldName: string, newName: string, newColor: string): Promise<void> {
+    await loadAll();
+    const oldFolder = projectFolder(oldName);
+    const newFolder = projectFolder(newName);
+    
+    const oldDir = EIDON_DIR + oldFolder + '/';
+    const newDir = EIDON_DIR + newFolder + '/';
+
+    if (oldFolder !== newFolder) {
+      const oldDirInfo = await FileSystem.getInfoAsync(oldDir);
+      
+      if (oldDirInfo.exists) {
+        const newDirInfo = await FileSystem.getInfoAsync(newDir);
+        // If it's a case-only rename on a case-insensitive FS, moveAsync directly might fail or work depending on the OS.
+        // It's safer to move to a temp folder first, then to the final folder if case-only change.
+        if (oldFolder.toLowerCase() === newFolder.toLowerCase()) {
+           const tempDir = EIDON_DIR + 'temp_' + Date.now() + '/';
+           await FileSystem.moveAsync({ from: oldDir, to: tempDir });
+           await FileSystem.moveAsync({ from: tempDir, to: newDir });
+        } else {
+           if (!newDirInfo.exists) {
+             await FileSystem.moveAsync({ from: oldDir, to: newDir });
+           } else {
+             const files = await listJsonFiles(oldDir);
+             for (const file of files) {
+               await FileSystem.moveAsync({ from: oldDir + file, to: newDir + file });
+             }
+             await FileSystem.deleteAsync(oldDir, { idempotent: true });
+           }
+        }
+      } else {
+        await ensureDir(newDir);
+      }
+      
+      // Update tasks on disk
+      const files = await listJsonFiles(newDir);
+      for (const file of files) {
+        if (file === 'project_meta.json') continue;
+        const task = await readJson<Task>(newDir + file);
+        if (task) {
+           task.project = newName;
+           await writeJson(newDir + file, task);
+        }
+      }
+      
+      // Update tasks in cache
+      cache.tasks = cache.tasks.map(t => {
+        if (t.project === oldName) {
+           return { ...t, project: newName };
+        }
+        return t;
+      });
+    } else {
+      // Just updating color or case without folder change
+      // Still need to update tasks in cache & disk if the string name case changed
+      if (oldName !== newName) {
+        const files = await listJsonFiles(newDir);
+        for (const file of files) {
+          if (file === 'project_meta.json') continue;
+          const task = await readJson<Task>(newDir + file);
+          if (task) {
+             task.project = newName;
+             await writeJson(newDir + file, task);
+          }
+        }
+        cache.tasks = cache.tasks.map(t => {
+          if (t.project === oldName) {
+             return { ...t, project: newName };
+          }
+          return t;
+        });
+      }
+    }
+    
+    await writeProjectMeta(newFolder, { name: newName, color: newColor });
+    cache.projectMeta = cache.projectMeta.map(p => {
+      if (p.name.toLowerCase() === oldName.toLowerCase()) {
+         return { name: newName, color: newColor };
+      }
+      return p;
+    });
+  },
+
   async deleteProject(projectName: string): Promise<void> {
     await loadAll();
     const folder = projectFolder(projectName);

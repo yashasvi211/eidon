@@ -35,7 +35,7 @@ import AddTaskModal from "../components/AddTaskModal";
 import type { ReminderConfig, TaskRecurrenceConfig } from "../components/AddTaskModal";
 import { formatEstimateDisplay } from "../services/reminderUtils";
 import NotificationBanner, { NotificationData } from "../components/NotificationBanner";
-import FullScreenReminder from "../components/FullScreenReminder";
+
 import { syncTaskNotifications, cancelTaskNotifications } from "../services/notifications";
 import * as Notifications from 'expo-notifications';
 import Animated, {
@@ -297,13 +297,7 @@ export default function AppIndex() {
   useEffect(() => { tasksRef.current = tasks; }, [tasks]);
 
   // Reminder settings state
-  const [reminderStyle, setReminderStyle] = useState<'banner' | 'fullscreen'>('banner');
   const [reminderRequireAuth, setReminderRequireAuth] = useState(false);
-  const [fullScreenNotification, setFullScreenNotification] = useState<NotificationData | null>(null);
-  const reminderStyleRef = useRef<'banner' | 'fullscreen'>('banner');
-
-  // Keep ref in sync
-  useEffect(() => { reminderStyleRef.current = reminderStyle; }, [reminderStyle]);
 
   // Pop next notification from queue when current one is dismissed
   useEffect(() => {
@@ -313,33 +307,6 @@ export default function AppIndex() {
     }
   }, [activeNotification, notificationQueue]);
 
-  // Check for native Alarm Fired (Deep Android Alarm)
-  useEffect(() => {
-    if (Platform.OS !== 'android') return;
-    
-    const interval = setInterval(async () => {
-      const enqueuedTaskId = EidonAlarm.getEnqueuedAlarm();
-      if (enqueuedTaskId) {
-        // Find task
-        const task = tasksRef.current.find(t => t.id === enqueuedTaskId);
-        const currentSettings = await api.getSettings();
-        
-        setFullScreenNotification(prev => {
-          if (prev?.taskId === enqueuedTaskId) return prev;
-          return {
-            taskId: enqueuedTaskId,
-            taskTitle: task?.title || 'Reminder',
-            message: 'Time to focus!',
-            dueDate: task?.due || '',
-          };
-        });
-        setReminderStyle('fullscreen');
-        setReminderRequireAuth(currentSettings.reminderRequireAuth || false);
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, []);
 
   const handleSyncNotifications = async (task: Task) => {
     try {
@@ -398,11 +365,6 @@ export default function AppIndex() {
         await handleSyncNotifications(updatedTask);
       }
 
-      // Show in-app reminder based on style setting
-      // Read fresh settings to ensure we use the latest reminderStyle
-      const currentSettings = await api.getSettings();
-      const currentStyle = currentSettings.reminderStyle || 'banner';
-
       const { title, body } = request.content;
       const task = tasksRef.current.find(t => t.id === taskId);
       const newNotification: NotificationData = {
@@ -412,19 +374,8 @@ export default function AppIndex() {
         dueDate: task?.due || '',
       };
 
-      if (currentStyle === 'fullscreen') {
-        // Full-screen alarm mode — don't fire if one is already active
-        setFullScreenNotification(prev => {
-          if (prev) return prev; // Already showing a reminder, skip this one
-          return newNotification;
-        });
-        // Also sync the local state
-        setReminderStyle(currentSettings.reminderStyle || 'banner');
-        setReminderRequireAuth(currentSettings.reminderRequireAuth || false);
-      } else {
-        // Banner mode (existing behavior)
-        setNotificationQueue(prev => [...prev, newNotification]);
-      }
+      // Banner mode (existing behavior)
+      setNotificationQueue(prev => [...prev, newNotification]);
     });
 
     const responseSubscription = Notifications.addNotificationResponseReceivedListener(async response => {
@@ -454,28 +405,7 @@ export default function AppIndex() {
         await handleSyncNotifications(updatedTask);
       }
 
-      // Check settings to see if we should show the full screen reminder
-      const currentSettings = await api.getSettings();
-      const currentStyle = currentSettings.reminderStyle || 'banner';
-
-      if (currentStyle === 'fullscreen') {
-        const { title, body } = request.content;
-        const task = tasksRef.current.find(t => t.id === taskId);
-        // Don't fire if an alarm is already active
-        setFullScreenNotification(prev => {
-          if (prev) return prev;
-          return {
-            taskId,
-            taskTitle: title || task?.title || 'Reminder',
-            message: body || '',
-            dueDate: task?.due || '',
-          };
-        });
-        setReminderStyle(currentSettings.reminderStyle || 'banner');
-        setReminderRequireAuth(currentSettings.reminderRequireAuth || false);
-      } else {
-        setSelectedTaskId(taskId);
-      }
+      setSelectedTaskId(taskId);
     });
 
     return () => {
@@ -529,7 +459,6 @@ export default function AppIndex() {
         if (fetchedSettings) {
           setIsSleeping(fetchedSettings.isSleeping);
           setSleepStartTime(fetchedSettings.sleepStartTime);
-          setReminderStyle(fetchedSettings.reminderStyle || 'banner');
           setReminderRequireAuth(fetchedSettings.reminderRequireAuth || false);
         }
 
@@ -629,47 +558,7 @@ export default function AppIndex() {
     return () => sub.remove();
   }, []);
 
-  // Check Android alarm permissions when reminderStyle changes to fullscreen
-  useEffect(() => {
-    if (Platform.OS !== 'android' || reminderStyle !== 'fullscreen') return;
 
-    const checkPermissions = async () => {
-      try {
-        const hasOverlay = EidonAlarm.canDrawOverlays();
-        const hasExactAlarm = EidonAlarm.canScheduleExactAlarms();
-
-        if (!hasOverlay) {
-          Alert.alert(
-            'Permission Required',
-            'To show full-screen reminders even when the app is closed, Eidon needs the "Display over other apps" permission.\n\nPlease enable it in the next screen.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Open Settings',
-                onPress: () => EidonAlarm.openOverlaySettings(),
-              },
-            ]
-          );
-        } else if (!hasExactAlarm) {
-          Alert.alert(
-            'Permission Required',
-            'To schedule precise alarm reminders, Eidon needs the "Alarms & reminders" permission.\n\nPlease enable it in the next screen.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              {
-                text: 'Open Settings',
-                onPress: () => EidonAlarm.openExactAlarmSettings(),
-              },
-            ]
-          );
-        }
-      } catch (e) {
-        console.warn('Permission check failed:', e);
-      }
-    };
-
-    checkPermissions();
-  }, [reminderStyle]);
 
   // Start auto-sync if enabled
   useEffect(() => {
@@ -1098,6 +987,41 @@ export default function AppIndex() {
       });
   };
 
+  const handleUpdateProject = (oldName: string, newName: string, color: string) => {
+    const previousProjects = projects;
+    const previousTasks = tasks;
+    const previousCurrentProject = currentProject;
+    const previousCurrentView = currentView;
+
+    setProjects(projects.map(p => {
+      if (p.name === oldName) {
+        return { name: newName, color };
+      }
+      return p;
+    }));
+    
+    setTasks(tasks.map(t => {
+      if (t.project === oldName) {
+        return { ...t, project: newName };
+      }
+      return t;
+    }));
+
+    if (currentProject === oldName) {
+      setCurrentProject(newName);
+    }
+
+    api.updateProject(oldName, newName, color)
+      .catch((err: any) => {
+        console.error("Failed to update project:", err);
+        setProjects(previousProjects);
+        setTasks(previousTasks);
+        setCurrentProject(previousCurrentProject);
+        setCurrentView(previousCurrentView);
+        showErrorAlert("Save Failed", `Could not update project.\n\n${err?.message || err}`);
+      });
+  };
+
   const reloadData = async () => {
     try {
       const fetchedTasks = await api.getTasks();
@@ -1320,6 +1244,7 @@ export default function AppIndex() {
                 showCompleted={showCompleted}
                 setShowCompleted={setShowCompleted}
                 onDeleteProject={handleDeleteProject}
+                onUpdateProject={handleUpdateProject}
                 onDataChanged={reloadData}
               />
             )}
@@ -1475,6 +1400,7 @@ export default function AppIndex() {
                 showCompleted={showCompleted}
                 setShowCompleted={setShowCompleted}
                 onDeleteProject={handleDeleteProject}
+                onUpdateProject={handleUpdateProject}
               />
             </View>
           </Animated.View>
@@ -1542,33 +1468,6 @@ export default function AppIndex() {
         }}
       />
 
-      {/* Full-Screen Reminder */}
-      <FullScreenReminder
-        visible={!!fullScreenNotification}
-        notification={fullScreenNotification}
-        task={fullScreenNotification ? tasks.find(t => t.id === fullScreenNotification.taskId) || null : null}
-        requireAuth={reminderRequireAuth}
-        onDismiss={() => setFullScreenNotification(null)}
-        onComplete={async (taskId: string, reflectionText: string) => {
-          const audit: AuditEntry = {
-            timestamp: Date.now(),
-            action: 'reminder_triggered',
-            details: {
-              reminderResponse: reflectionText || undefined,
-              reminderTriggerTime: Date.now(),
-            },
-          };
-          setTasks(prev => prev.map(t => {
-            if (t.id !== taskId) return t;
-            return { ...t, auditLog: [...(t.auditLog || []), audit] };
-          }));
-          await api.createAuditLog(taskId, audit).catch(err => {
-            console.error('Failed to save reminder reflection:', err);
-          });
-          setFullScreenNotification(null);
-        }}
-        colors={colors}
-      />
       <ConfirmationModal
         visible={!!taskToDelete}
         onClose={() => setTaskToDelete(null)}

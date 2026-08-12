@@ -46,6 +46,19 @@ export function getValidOffsets(dueDateTimeMs: number, nowMs: number = Date.now(
   return REMINDER_OFFSETS.filter(p => p.value <= maxOffset);
 }
 
+/**
+ * For recurring tasks the due "date" is irrelevant — only the time-of-day matters.
+ * Returns offsets that fit within the time available from midnight up to the given time.
+ * e.g. dueTime "22:00" → 22 hours available → allows up to "12 Hours" offset, etc.
+ */
+export function getRecurringReminderOffsets(dueTime: string): Preset[] {
+  const [h, m] = dueTime.split(':').map(Number);
+  const minutesFromMidnight = h * 60 + m;
+  const maxOffsetMs = minutesFromMidnight * 60 * 1000;
+  if (maxOffsetMs <= 0) return [];
+  return REMINDER_OFFSETS.filter(p => p.value < maxOffsetMs);
+}
+
 export function getValidRepeats(reminderWindowMs: number): Preset[] {
   if (reminderWindowMs <= 0) return [{ label: 'Once', value: 0 }];
   

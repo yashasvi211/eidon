@@ -1,7 +1,7 @@
-expo.modules.eidonalarm.expo-eidon-alarm-pngs-0 /run/media/anuj/Drive/Projects/eidon/native/modules/expo-eidon-alarm/android/build/generated/res/pngs/release
-expo.modules.eidonalarm.expo-eidon-alarm-resValues-1 /run/media/anuj/Drive/Projects/eidon/native/modules/expo-eidon-alarm/android/build/generated/res/resValues/release
-expo.modules.eidonalarm.expo-eidon-alarm-mergeReleaseResources-2 /run/media/anuj/Drive/Projects/eidon/native/modules/expo-eidon-alarm/android/build/intermediates/incremental/release/mergeReleaseResources/merged.dir
-expo.modules.eidonalarm.expo-eidon-alarm-mergeReleaseResources-3 /run/media/anuj/Drive/Projects/eidon/native/modules/expo-eidon-alarm/android/build/intermediates/incremental/release/mergeReleaseResources/stripped.dir
-expo.modules.eidonalarm.expo-eidon-alarm-release-4 /run/media/anuj/Drive/Projects/eidon/native/modules/expo-eidon-alarm/android/build/intermediates/merged_res/release/mergeReleaseResources
-expo.modules.eidonalarm.expo-eidon-alarm-main-5 /run/media/anuj/Drive/Projects/eidon/native/modules/expo-eidon-alarm/android/src/main/res
-expo.modules.eidonalarm.expo-eidon-alarm-release-6 /run/media/anuj/Drive/Projects/eidon/native/modules/expo-eidon-alarm/android/src/release/res
+expo.modules.eidonalarm.expo-eidon-alarm-pngs-0 /home/anuj/Drive/Projects/eidon/native/modules/expo-eidon-alarm/android/build/generated/res/pngs/release
+expo.modules.eidonalarm.expo-eidon-alarm-resValues-1 /home/anuj/Drive/Projects/eidon/native/modules/expo-eidon-alarm/android/build/generated/res/resValues/release
+expo.modules.eidonalarm.expo-eidon-alarm-mergeReleaseResources-2 /home/anuj/Drive/Projects/eidon/native/modules/expo-eidon-alarm/android/build/intermediates/incremental/release/mergeReleaseResources/merged.dir
+expo.modules.eidonalarm.expo-eidon-alarm-mergeReleaseResources-3 /home/anuj/Drive/Projects/eidon/native/modules/expo-eidon-alarm/android/build/intermediates/incremental/release/mergeReleaseResources/stripped.dir
+expo.modules.eidonalarm.expo-eidon-alarm-release-4 /home/anuj/Drive/Projects/eidon/native/modules/expo-eidon-alarm/android/build/intermediates/merged_res/release/mergeReleaseResources
+expo.modules.eidonalarm.expo-eidon-alarm-main-5 /home/anuj/Drive/Projects/eidon/native/modules/expo-eidon-alarm/android/src/main/res
+expo.modules.eidonalarm.expo-eidon-alarm-release-6 /home/anuj/Drive/Projects/eidon/native/modules/expo-eidon-alarm/android/src/release/res

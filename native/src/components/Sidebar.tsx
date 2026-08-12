@@ -30,19 +30,17 @@ interface SidebarProps {
   showCompleted: boolean;
   setShowCompleted: (val: boolean) => void;
   onDeleteProject: (name: string) => void;
+  onUpdateProject?: (oldName: string, newName: string, color: string) => void;
   onDataChanged?: () => void;
   hideHeader?: boolean;
 }
 
 const CURATED_COLORS = [
-  '#58a6ff',
-  '#3fb950',
-  '#bc8cff',
-  '#ff7b72',
-  '#e3b341',
-  '#db61a2',
-  '#f2cc60',
-  '#8b949e',
+  '#58a6ff', '#3fb950', '#bc8cff', '#ff7b72',
+  '#e3b341', '#db61a2', '#f2cc60', '#8b949e',
+  '#79c0ff', '#56d364', '#d2a8ff', '#ffa657',
+  '#f0883e', '#a371f7', '#39d353', '#1f6feb',
+  '#238636', '#8957e5', '#da3633', '#176534',
 ];
 
 const fmtDate = (ts: number | null) => {
@@ -65,6 +63,7 @@ export default function Sidebar({
   showCompleted,
   setShowCompleted,
   onDeleteProject,
+  onUpdateProject,
   onDataChanged,
   hideHeader,
 }: SidebarProps) {
@@ -92,9 +91,16 @@ export default function Sidebar({
   const [fileTreeLoading, setFileTreeLoading] = useState(false);
 
   // Reminder settings state
-  const [reminderStyle, setReminderStyle] = useState<'banner' | 'fullscreen'>('banner');
   const [reminderRequireAuth, setReminderRequireAuth] = useState(false);
   const [alarmSound, setAlarmSound] = useState('notification_sound_1');
+
+  // Edit / Delete Project state
+  const [editingProjectName, setEditingProjectName] = useState<string | null>(null);
+  const [editProjectInput, setEditProjectInput] = useState('');
+  const [editProjectColor, setEditProjectColor] = useState('#58a6ff');
+
+  const [projectToDelete, setProjectToDelete] = useState<string | null>(null);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState('');
 
   // Animation values
   const scaleAnim = useRef(new RNAnimated.Value(0.9)).current;
@@ -148,7 +154,6 @@ export default function Sidebar({
         setSyncInterval(String(s.syncIntervalMinutes || 30));
         setAutoSyncEnabled(s.autoSyncEnabled || false);
         setLastSyncTime(s.lastSyncTime || null);
-        setReminderStyle(s.reminderStyle || 'banner');
         setReminderRequireAuth(s.reminderRequireAuth || false);
         if (Platform.OS === 'android') {
           const snd = EidonAlarm.getAlarmSound();
@@ -481,16 +486,29 @@ export default function Sidebar({
         onRequestClose={() => animateClose(() => setIsSettingsOpen(false))}
         onShow={animateOpen}
       >
-        <RNAnimated.View style={[styles.modalOverlay, { opacity: opacityAnim }]}>
-          <RNAnimated.View style={[styles.modalContent, { backgroundColor: colors.ghSurface, borderColor: colors.ghBorder, transform: [{ scale: scaleAnim }] }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: colors.ghBorder }]}>
-              <Text style={[styles.modalTitle, { color: colors.ghText }]}>Settings</Text>
+        <RNAnimated.View style={[styles.modalOverlay, { opacity: opacityAnim, padding: 0 }]}>
+          <RNAnimated.View style={[
+            styles.modalContent,
+            {
+              backgroundColor: colors.ghSurface,
+              transform: [{ scale: scaleAnim }],
+              maxWidth: '100%',
+              maxHeight: '100%',
+              flex: 1,
+              borderRadius: 0,
+              borderWidth: 0,
+              paddingTop: insets.top,
+              paddingBottom: insets.bottom,
+            }
+          ]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.ghBorder, paddingHorizontal: 24 }]}>
+              <Text style={[styles.modalTitle, { color: colors.ghText, fontSize: 28 }]}>Settings</Text>
               <TouchableOpacity onPress={() => animateClose(() => setIsSettingsOpen(false))} style={styles.closeBtn}>
-                <Feather name="x" size={20} color={colors.ghText} />
+                <Feather name="x" size={24} color={colors.ghText} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalBody} contentContainerStyle={{ paddingBottom: 20 }}>
+            <ScrollView style={styles.modalBody} contentContainerStyle={{ paddingBottom: 40, paddingTop: 10 }}>
               {/* PREFERENCES */}
               <View style={styles.settingsSection}>
                 <Text style={[styles.settingsSectionTitle, { color: colors.ghMuted }]}>PREFERENCES</Text>
@@ -513,56 +531,6 @@ export default function Sidebar({
               {/* REMINDERS */}
               <View style={styles.settingsSection}>
                 <Text style={[styles.settingsSectionTitle, { color: colors.ghMuted }]}>REMINDERS</Text>
-                
-                <Text style={[styles.settingsLabel, { color: colors.ghText, marginBottom: 8 }]}>Reminder Style</Text>
-                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 16 }}>
-                  <TouchableOpacity
-                    style={[{
-                      flex: 1,
-                      borderWidth: 1.5,
-                      borderRadius: 8,
-                      padding: 12,
-                      alignItems: 'center',
-                      borderColor: reminderStyle === 'banner' ? colors.ghBlue : colors.ghBorder,
-                      backgroundColor: reminderStyle === 'banner' ? colors.ghBlue + '12' : 'transparent',
-                    }]}
-                    onPress={() => {
-                      setReminderStyle('banner');
-                      api.updateSettings({ reminderStyle: 'banner' });
-                    }}
-                  >
-                    <Feather name="bell" size={18} color={reminderStyle === 'banner' ? colors.ghBlue : colors.ghMuted} />
-                    <Text style={{ color: reminderStyle === 'banner' ? colors.ghBlue : colors.ghMuted, fontSize: 12, fontWeight: '600', marginTop: 6 }}>
-                      Banner
-                    </Text>
-                    <Text style={{ color: colors.ghMuted, fontSize: 10, marginTop: 2, textAlign: 'center' }}>
-                      Drop-down notification
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[{
-                      flex: 1,
-                      borderWidth: 1.5,
-                      borderRadius: 8,
-                      padding: 12,
-                      alignItems: 'center',
-                      borderColor: reminderStyle === 'fullscreen' ? colors.ghBlue : colors.ghBorder,
-                      backgroundColor: reminderStyle === 'fullscreen' ? colors.ghBlue + '12' : 'transparent',
-                    }]}
-                    onPress={() => {
-                      setReminderStyle('fullscreen');
-                      api.updateSettings({ reminderStyle: 'fullscreen' });
-                    }}
-                  >
-                    <Feather name="maximize" size={18} color={reminderStyle === 'fullscreen' ? colors.ghBlue : colors.ghMuted} />
-                    <Text style={{ color: reminderStyle === 'fullscreen' ? colors.ghBlue : colors.ghMuted, fontSize: 12, fontWeight: '600', marginTop: 6 }}>
-                      Full Screen
-                    </Text>
-                    <Text style={{ color: colors.ghMuted, fontSize: 10, marginTop: 2, textAlign: 'center' }}>
-                      Alarm-style takeover
-                    </Text>
-                  </TouchableOpacity>
-                </View>
 
                 <View style={styles.settingsRow}>
                   <View style={{ flex: 1, paddingRight: 10 }}>
@@ -581,55 +549,6 @@ export default function Sidebar({
                     thumbColor="#fff"
                   />
                 </View>
-
-                {Platform.OS === 'android' && reminderStyle === 'fullscreen' && (
-                  <View style={[styles.settingsRow, { flexDirection: 'column', alignItems: 'stretch' }]}>
-                    <View style={{ marginBottom: 10 }}>
-                      <Text style={[styles.settingsLabel, { color: colors.ghText }]}>Alarm Sound</Text>
-                      <Text style={[styles.settingsHelp, { color: colors.ghMuted }]}>
-                        Choose the sound to play for full screen alarms.
-                      </Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
-                      <TouchableOpacity
-                        style={[
-                          styles.modalActionBtn,
-                          { 
-                            borderColor: alarmSound === 'notification_sound_1' ? colors.ghBlue : colors.ghBorder,
-                            backgroundColor: alarmSound === 'notification_sound_1' ? colors.ghBlue + '20' : colors.ghSurface2
-                          }
-                        ]}
-                        onPress={() => {
-                          setAlarmSound('notification_sound_1');
-                          EidonAlarm.setAlarmSound('notification_sound_1');
-                        }}
-                      >
-                        <Text style={{ color: alarmSound === 'notification_sound_1' ? colors.ghBlue : colors.ghText, fontSize: 12 }}>
-                          Default Sound
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[
-                          styles.modalActionBtn,
-                          { 
-                            borderColor: alarmSound !== 'notification_sound_1' && alarmSound ? colors.ghBlue : colors.ghBorder,
-                            backgroundColor: alarmSound !== 'notification_sound_1' && alarmSound ? colors.ghBlue + '20' : colors.ghSurface2
-                          }
-                        ]}
-                        onPress={handlePickAlarmSound}
-                      >
-                        <Text style={{ color: alarmSound !== 'notification_sound_1' && alarmSound ? colors.ghBlue : colors.ghText, fontSize: 12 }}>
-                          Upload Custom
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                    {alarmSound && alarmSound !== 'notification_sound_1' && (
-                      <Text style={{ color: colors.ghMuted, fontSize: 10, marginTop: 8 }} numberOfLines={1}>
-                        Custom: {alarmSound.split('/').pop()}
-                      </Text>
-                    )}
-                  </View>
-                )}
               </View>
 
               {/* EXPORT / IMPORT */}
@@ -886,6 +805,56 @@ export default function Sidebar({
                   uniqProjects.map((proj, idx) => {
                     const pName = (proj && proj.name && typeof proj.name === 'string' && proj.name.trim() !== '') ? proj.name : `Project_${idx}`;
                     const pColor = (proj && proj.color && typeof proj.color === 'string' && proj.color.trim() !== '') ? proj.color : '#58a6ff';
+                    
+                    if (editingProjectName === pName) {
+                      return (
+                        <View key={`edit_${pName}_${idx}`} style={[styles.modalAddProjectBox, { backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder, marginBottom: 10 }]}>
+                          <View style={styles.colorChipsRow}>
+                            {CURATED_COLORS.map((c) => (
+                              <TouchableOpacity
+                                key={`edit_c_${c}`}
+                                style={[
+                                  styles.colorChip,
+                                  { backgroundColor: c },
+                                  editProjectColor === c && { borderColor: '#fff', borderWidth: 2 }
+                                ]}
+                                onPress={() => setEditProjectColor(c)}
+                              />
+                            ))}
+                          </View>
+                          <View style={[styles.addInputWrapper, { backgroundColor: colors.ghSurface, borderColor: colors.ghBorder }]}>
+                            <View style={[styles.projectDot, { backgroundColor: editProjectColor }]} />
+                            <TextInput
+                              style={[styles.addInput, { color: colors.ghText }]}
+                              value={editProjectInput}
+                              onChangeText={setEditProjectInput}
+                              placeholder="Project name..."
+                              placeholderTextColor={colors.ghMuted}
+                            />
+                          </View>
+                          <View style={{ flexDirection: 'row', gap: 10 }}>
+                            <TouchableOpacity
+                              style={[styles.modalActionBtn, { flex: 1, backgroundColor: colors.ghSurface, borderColor: colors.ghBorder, borderWidth: 1 }]}
+                              onPress={() => setEditingProjectName(null)}
+                            >
+                              <Text style={[styles.modalActionBtnText, { color: colors.ghText }]}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.modalActionBtn, { flex: 1, backgroundColor: colors.ghBlue }]}
+                              onPress={() => {
+                                if (onUpdateProject && editProjectInput.trim()) {
+                                  onUpdateProject(pName, editProjectInput.trim(), editProjectColor);
+                                }
+                                setEditingProjectName(null);
+                              }}
+                            >
+                              <Text style={[styles.modalActionBtnText, { color: '#fff' }]}>Save</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      );
+                    }
+
                     return (
                       <View
                         key={`manage_${pName}_${idx}`}
@@ -899,7 +868,21 @@ export default function Sidebar({
                           {pName}
                         </Text>
                         <TouchableOpacity
-                          onPress={() => onDeleteProject(pName)}
+                          onPress={() => {
+                            setEditingProjectName(pName);
+                            setEditProjectInput(pName);
+                            setEditProjectColor(pColor);
+                          }}
+                          style={styles.deleteProjBtn}
+                          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                          <Feather name="edit-2" size={14} color={colors.ghMuted} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => {
+                            setProjectToDelete(pName);
+                            setDeleteConfirmationText('');
+                          }}
                           style={styles.deleteProjBtn}
                           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                         >
@@ -913,6 +896,61 @@ export default function Sidebar({
             </ScrollView>
           </RNAnimated.View>
         </RNAnimated.View>
+      </Modal>
+
+      {/* Delete Project Confirmation Modal */}
+      <Modal
+        visible={!!projectToDelete}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setProjectToDelete(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.ghSurface, borderColor: colors.ghBorder, maxWidth: 300, maxHeight: 'auto' }]}>
+            <View style={[styles.modalHeader, { paddingHorizontal: 20, paddingVertical: 16 }]}>
+              <Text style={[styles.modalTitle, { color: colors.ghText, fontSize: 18 }]}>Delete Project</Text>
+              <TouchableOpacity onPress={() => setProjectToDelete(null)} style={styles.closeBtn}>
+                <Feather name="x" size={20} color={colors.ghMuted} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ padding: 20 }}>
+              <Text style={{ color: colors.ghText, fontSize: 14, marginBottom: 12 }}>
+                Are you sure you want to delete <Text style={{ fontWeight: 'bold' }}>{projectToDelete}</Text>? This action cannot be undone and will delete all tasks in this project.
+              </Text>
+              <Text style={{ color: colors.ghMuted, fontSize: 12, marginBottom: 8 }}>
+                Type "delete" to confirm:
+              </Text>
+              <TextInput
+                style={[styles.settingsInput, { color: colors.ghText, backgroundColor: colors.ghBg, borderColor: colors.ghBorder, marginBottom: 16 }]}
+                value={deleteConfirmationText}
+                onChangeText={setDeleteConfirmationText}
+                placeholder="delete"
+                placeholderTextColor={colors.ghMuted}
+                autoCapitalize="none"
+              />
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, { flex: 1, backgroundColor: colors.ghSurface2, borderColor: colors.ghBorder, borderWidth: 1 }]}
+                  onPress={() => setProjectToDelete(null)}
+                >
+                  <Text style={[styles.modalActionBtnText, { color: colors.ghText }]}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalActionBtn, { flex: 1, backgroundColor: deleteConfirmationText.toLowerCase() === 'delete' ? colors.ghRed : colors.ghSurface2, opacity: deleteConfirmationText.toLowerCase() === 'delete' ? 1 : 0.5 }]}
+                  disabled={deleteConfirmationText.toLowerCase() !== 'delete'}
+                  onPress={() => {
+                    if (projectToDelete) {
+                      onDeleteProject(projectToDelete);
+                      setProjectToDelete(null);
+                    }
+                  }}
+                >
+                  <Text style={[styles.modalActionBtnText, { color: deleteConfirmationText.toLowerCase() === 'delete' ? '#fff' : colors.ghMuted }]}>Delete</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
       </Modal>
 
       {/* FILE BROWSER MODAL */}
