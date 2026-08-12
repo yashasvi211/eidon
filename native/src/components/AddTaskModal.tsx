@@ -117,11 +117,8 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
   const [due, setDue] = useState<string | null>(null);
   const [dueTime, setDueTime] = useState<string | null>(null);
 
-  const [execStartDate, setExecStartDate] = useState<string | null>(null);
-  const [execStartTime, setExecStartTime] = useState<string | null>(null);
-
-  const [calendarMode, setCalendarMode] = useState<'due' | 'execStart' | null>(null);
-  const [clockMode, setClockMode] = useState<'due' | 'execStart' | null>(null);
+  const [calendarMode, setCalendarMode] = useState<'due' | null>(null);
+  const [clockMode, setClockMode] = useState<'due' | null>(null);
   const [showDurationPicker, setShowDurationPicker] = useState(false);
 
   const [showConfirm, setShowConfirm] = useState(false);
@@ -133,9 +130,6 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
   const [repeatEvery, setRepeatEvery] = useState<number | null>(null);     // ms
   const [notifyOverdue, setNotifyOverdue] = useState(false);
   const [overdueRepeatEvery, setOverdueRepeatEvery] = useState<number | null>(null);
-
-  // Recurring-only reminder state (offset from daily deadline time)
-  const [recurringRemindBefore, setRecurringRemindBefore] = useState<number | null>(null);
 
   // Recurrence state
   const [isRecurring, setIsRecurring] = useState(false);
@@ -293,10 +287,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
       setRepeatEvery(initialTask.reminder?.repeatEvery ?? null);
       setNotifyOverdue(initialTask.reminder?.notifyOverdue ?? false);
       setOverdueRepeatEvery(initialTask.reminder?.overdueRepeatEvery ?? null);
-      setRecurringRemindBefore(initialTask.recurringRemindBefore ?? null);
       setPriority(initialTask.priority || 'Low');
-      setExecStartDate(initialTask.execStartDate || null);
-      setExecStartTime(initialTask.execStartTime || null);
       setIsRecurring(!!initialTask.recurrence);
       setRecurrenceFrequency(initialTask.recurrence?.frequency || 'daily');
       setStreakEnabled(initialTask.recurrence?.streakEnabled || false);
@@ -311,11 +302,8 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
       setRepeatEvery(null);
       setNotifyOverdue(false);
       setOverdueRepeatEvery(null);
-      setRecurringRemindBefore(null);
       setPriority('Low');
       setEst('');
-      setExecStartDate(null);
-      setExecStartTime(null);
       setIsRecurring(false);
       setRecurrenceFrequency('daily');
       setStreakEnabled(false);
@@ -341,34 +329,18 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
     if (!title.trim()) return;
 
     let reminder: ReminderConfig | undefined;
-    if (isRecurring) {
-      // For recurring tasks: only store recurringRemindBefore + optional overdue
-      if (recurringRemindBefore !== null || notifyOverdue) {
-        reminder = {};
-        if (recurringRemindBefore !== null) {
-          reminder.remindBefore = recurringRemindBefore;
-        }
-        if (notifyOverdue) {
-          reminder.notifyOverdue = true;
-          if (overdueRepeatEvery !== null) {
-            reminder.overdueRepeatEvery = overdueRepeatEvery;
-          }
+    if ((due || isRecurring) && (remindBefore !== null || notifyOverdue)) {
+      reminder = {};
+      if (remindBefore !== null) {
+        reminder.remindBefore = remindBefore;
+        if (repeatEvery !== null) {
+          reminder.repeatEvery = repeatEvery;
         }
       }
-    } else {
-      if (due && (remindBefore !== null || notifyOverdue)) {
-        reminder = {};
-        if (remindBefore !== null) {
-          reminder.remindBefore = remindBefore;
-          if (repeatEvery !== null) {
-            reminder.repeatEvery = repeatEvery;
-          }
-        }
-        if (notifyOverdue) {
-          reminder.notifyOverdue = true;
-          if (overdueRepeatEvery !== null) {
-            reminder.overdueRepeatEvery = overdueRepeatEvery;
-          }
+      if (notifyOverdue) {
+        reminder.notifyOverdue = true;
+        if (overdueRepeatEvery !== null) {
+          reminder.overdueRepeatEvery = overdueRepeatEvery;
         }
       }
     }
@@ -380,11 +352,9 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
     // Recurring tasks have no user-set due date — pass undefined so
     // handleAddTask auto-assigns today's date, keeping the rollover logic intact.
     const finalDue = isRecurring ? undefined : (due || undefined);
-    const finalExecStartDate = isRecurring ? undefined : (execStartDate || undefined);
-    const finalExecStartTime = isRecurring ? undefined : (execStartTime || undefined);
 
     animateClose(() => {
-      onAdd(title.trim(), project, finalDue, reminder, dueTime || undefined, priority, finalExecStartDate, finalExecStartTime, recurrenceConfig, formatEstimateDisplay(est) || undefined);
+      onAdd(title.trim(), project, finalDue, reminder, dueTime || undefined, priority, undefined, undefined, recurrenceConfig, formatEstimateDisplay(est) || undefined);
       reset();
       onClose();
     });
@@ -418,8 +388,6 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
           setRepeatEvery(null);
         }
       }
-      } else if (calendarMode === 'execStart') {
-        setExecStartDate(formattedDate);
       }
     }
   };
@@ -438,8 +406,6 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
       
       if (clockMode === 'due') {
         setDueTime(formattedTime);
-      } else if (clockMode === 'execStart') {
-        setExecStartTime(formattedTime);
       }
     }
   };
@@ -447,8 +413,6 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
   const handleClearDate = () => {
     setDue(null);
     setDueTime(null);
-    setExecStartDate(null);
-    setExecStartTime(null);
     setRemindBefore(null);
     setRepeatEvery(null);
     setNotifyOverdue(false);
@@ -460,30 +424,8 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
   const isPastDue = due !== null && dueTime !== null && dueDateTimeMs !== null && dueDateTimeMs <= Date.now();
   const hasDateButNoTime = !isRecurring && due !== null && dueTime === null;
   const hasTimeButNoDate = !isRecurring && due === null && dueTime !== null;
-  
-  const hasPartialExec = !isRecurring && (execStartDate !== null || execStartTime !== null) && 
-                         (execStartDate === null || execStartTime === null);
-                         
-  let isExecInvalid = false;
-  let execError = "";
-  if (!isRecurring && execStartDate && execStartTime) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const [y, m, d] = execStartDate.split('-').map(Number);
-    const execStart = new Date(y, m - 1, d);
-    const [sh, sm] = execStartTime.split(':').map(Number);
-    execStart.setHours(sh, sm, 0, 0);
-    
-    if (execStart.getTime() < Date.now()) {
-       isExecInvalid = true;
-       execError = "Execution start cannot be in the past";
-    } else if (dueDateTimeMs && execStart.getTime() >= dueDateTimeMs) {
-       isExecInvalid = true;
-       execError = "Execution start cannot be after or at due time";
-    }
-  }
 
-  const canSubmit = title.trim().length > 0 && !hasDateButNoTime && !hasTimeButNoDate && !isPastDue && !hasPartialExec && !isExecInvalid;
+  const canSubmit = title.trim().length > 0 && !hasDateButNoTime && !hasTimeButNoDate && !isPastDue;
 
   if (!visible) return null;
 
@@ -747,56 +689,6 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
                 </View>
               )}
 
-              {/* ── Execution Plan (one-time tasks only) ── */}
-              {!isRecurring && (
-                <View style={{ marginTop: 16 }}>
-                  <Text style={[styles.label, { color: colors.ghMuted }]}>Execution Plan</Text>
-                  
-                  <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center', marginBottom: 8 }}>
-                    <TouchableOpacity
-                      style={[
-                        styles.dateBtn,
-                        {
-                          backgroundColor: colors.ghBg,
-                          borderColor: execStartDate ? colors.ghBlue : colors.ghBorder,
-                        },
-                      ]}
-                      onPress={() => setCalendarMode('execStart')}
-                    >
-                      <Feather name="calendar" size={14} color={execStartDate ? colors.ghBlue : colors.ghMuted} />
-                      <Text style={{ color: execStartDate ? colors.ghText : colors.ghMuted, fontSize: 13, flex: 1 }} numberOfLines={1}>
-                        {execStartDate ? fmtDateDisplay(execStartDate) : 'Start Date…'}
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.dateBtn,
-                        {
-                          backgroundColor: colors.ghBg,
-                          borderColor: execStartTime ? colors.ghBlue : colors.ghBorder,
-                        },
-                      ]}
-                      onPress={() => setClockMode('execStart')}
-                    >
-                      <Feather name="clock" size={14} color={execStartTime ? colors.ghBlue : colors.ghMuted} />
-                      <Text style={{ color: execStartTime ? colors.ghText : colors.ghMuted, fontSize: 13, flex: 1 }} numberOfLines={1}>
-                        {execStartTime ? formatTime12h(execStartTime) : 'Start Time…'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                  
-                  {hasPartialExec && (
-                    <Text style={{ color: colors.ghRed || '#f85149', fontSize: 12, marginTop: 8, fontStyle: 'italic' }}>
-                      * All execution fields must be filled if one is set
-                    </Text>
-                  )}
-                  {isExecInvalid && (
-                    <Text style={{ color: colors.ghRed || '#f85149', fontSize: 12, marginTop: 8, fontStyle: 'italic' }}>
-                      * {execError}
-                    </Text>
-                  )}
-                </View>
               )}
 
               {/* Calendar & Clock Modals */}
@@ -816,13 +708,9 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
                 initialDateStr={
                   calendarMode === 'due' && due 
                     ? due.split('-').reverse().join('/') 
-                    : calendarMode === 'execStart' && execStartDate
-                      ? execStartDate.split('-').reverse().join('/')
-                      : ''
+                    : ''
                 }
                 colors={colors}
-                minDate={calendarMode === 'execStart' ? new Date().toISOString().split('T')[0] : undefined}
-                maxDate={calendarMode === 'execStart' && due ? due : undefined}
               />
 
               <AnalogClockModal
@@ -833,7 +721,6 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
                   (() => {
                     let t = null;
                     if (clockMode === 'due') t = dueTime;
-                    else if (clockMode === 'execStart') t = execStartTime;
 
                     if (t) {
                       const [h, m] = t.split(':').map(Number);
@@ -845,115 +732,69 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
                   })()
                 }
                 colors={colors}
-                title={clockMode === 'due' ? "Select Due Time" : "Select Start Time"}
-                minTime={(() => {
-                  if (clockMode === 'execStart' && execStartDate) {
-                    const today = new Date();
-                    const [y, m, d] = execStartDate.split('-').map(Number);
-                    if (today.getFullYear() === y && today.getMonth() === m - 1 && today.getDate() === d) {
-                       return `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`;
-                    }
-                  }
-                  return undefined;
-                })()}
-                maxTime={(() => {
-                  if (clockMode === 'execStart' && due && execStartDate === due && dueTime) {
-                    return dueTime;
-                  }
-                  return undefined;
-                })()}
+                title="Select Due Time"
               />
 
               {/* ── Reminders ── */}
-              {isRecurring ? (
-                // ── Recurring: single "Remind Before Deadline" picker driven by time-of-day ──
-                <View style={{ marginTop: 16 }}>
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
+                {/* Start Reminding */}
+                <View style={{ flex: 1 }}>
                   <View style={[styles.sectionHeader, { marginTop: 0 }]}>
                     <Feather name="bell" size={13} color={colors.ghMuted} />
                     <Text style={[styles.label, { color: colors.ghMuted, marginTop: 0, marginBottom: 0 }]}>
-                      Remind Before Deadline
+                      Start Reminding
                     </Text>
                   </View>
+
                   <TouchableOpacity
                     style={[
                       styles.dateBtn,
                       {
                         borderColor: colors.ghBorder,
                         backgroundColor: colors.ghBg,
-                        opacity: !dueTime ? 0.5 : 1,
+                        opacity: (!due && !isRecurring) || (isRecurring && !dueTime) ? 0.5 : 1,
                       },
                     ]}
-                    onPress={() => { if (dueTime) setShowOffsetDropdown(true); }}
-                    disabled={!dueTime || availableRecurringOffsets.length === 0}
+                    onPress={() => { if (due || (isRecurring && dueTime)) setShowOffsetDropdown(true); }}
+                    disabled={(!due && !isRecurring) || (isRecurring && !dueTime) || (isRecurring ? availableRecurringOffsets.length === 0 : availableOffsets.length === 0)}
                   >
-                    <Text style={{ color: recurringRemindBefore !== null ? colors.ghText : colors.ghMuted, fontSize: 13, flex: 1 }} numberOfLines={1}>
-                      {recurringRemindBefore !== null
-                        ? availableRecurringOffsets.find(p => p.value === recurringRemindBefore)?.label
-                        : (!dueTime ? 'Set a deadline time first' : availableRecurringOffsets.length === 0 ? 'Deadline too early' : 'Select…')}
+                    <Text style={{ color: remindBefore !== null ? colors.ghText : colors.ghMuted, fontSize: 13, flex: 1 }} numberOfLines={1}>
+                      {remindBefore !== null 
+                        ? (isRecurring ? availableRecurringOffsets : availableOffsets).find(p => p.value === remindBefore)?.label 
+                        : ((due || (isRecurring && dueTime)) && (isRecurring ? availableRecurringOffsets.length === 0 : availableOffsets.length === 0) ? 'Due too soon' : 'Select...')}
                     </Text>
                     <Feather name="chevron-down" size={16} color={colors.ghMuted} />
                   </TouchableOpacity>
                 </View>
-              ) : (
-                // ── One-time: Start Reminding + Repeat Every side-by-side ──
-                <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
-                  {/* Start Reminding */}
-                  <View style={{ flex: 1 }}>
-                    <View style={[styles.sectionHeader, { marginTop: 0 }]}>
-                      <Feather name="bell" size={13} color={colors.ghMuted} />
-                      <Text style={[styles.label, { color: colors.ghMuted, marginTop: 0, marginBottom: 0 }]}>
-                        Start Reminding
-                      </Text>
-                    </View>
 
-                    <TouchableOpacity
-                      style={[
-                        styles.dateBtn,
-                        {
-                          borderColor: colors.ghBorder,
-                          backgroundColor: colors.ghBg,
-                          opacity: !due ? 0.5 : 1,
-                        },
-                      ]}
-                      onPress={() => { if (due) setShowOffsetDropdown(true); }}
-                      disabled={!due || availableOffsets.length === 0}
-                    >
-                      <Text style={{ color: remindBefore !== null ? colors.ghText : colors.ghMuted, fontSize: 13, flex: 1 }} numberOfLines={1}>
-                        {remindBefore !== null ? availableOffsets.find(p => p.value === remindBefore)?.label : (due && availableOffsets.length === 0 ? 'Due too soon' : 'Select...')}
-                      </Text>
-                      <Feather name="chevron-down" size={16} color={colors.ghMuted} />
-                    </TouchableOpacity>
+                {/* Repeat Every */}
+                <View style={{ flex: 1 }}>
+                  <View style={[styles.sectionHeader, { marginTop: 0 }]}>
+                    <Feather name="repeat" size={13} color={colors.ghMuted} />
+                    <Text style={[styles.label, { color: colors.ghMuted, marginTop: 0, marginBottom: 0 }]}>
+                      Repeat Every
+                    </Text>
                   </View>
 
-                  {/* Repeat Every */}
-                  <View style={{ flex: 1 }}>
-                    <View style={[styles.sectionHeader, { marginTop: 0 }]}>
-                      <Feather name="repeat" size={13} color={colors.ghMuted} />
-                      <Text style={[styles.label, { color: colors.ghMuted, marginTop: 0, marginBottom: 0 }]}>
-                        Repeat Every
-                      </Text>
-                    </View>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.dateBtn,
-                        {
-                          borderColor: colors.ghBorder,
-                          backgroundColor: colors.ghBg,
-                          opacity: remindBefore === null ? 0.5 : 1,
-                        },
-                      ]}
-                      onPress={() => { if (remindBefore !== null) setShowRepeatDropdown(true); }}
-                      disabled={remindBefore === null || availableRepeatOptions.length === 0}
-                    >
-                      <Text style={{ color: repeatEvery !== null ? colors.ghText : colors.ghMuted, fontSize: 13, flex: 1 }} numberOfLines={1}>
-                        {repeatEvery !== null ? availableRepeatOptions.find(p => p.value === repeatEvery)?.label : (remindBefore !== null && availableRepeatOptions.length === 0 ? 'No repeats fit' : 'Once')}
-                      </Text>
-                      <Feather name="chevron-down" size={16} color={colors.ghMuted} />
-                    </TouchableOpacity>
-                  </View>
+                  <TouchableOpacity
+                    style={[
+                      styles.dateBtn,
+                      {
+                        borderColor: colors.ghBorder,
+                        backgroundColor: colors.ghBg,
+                        opacity: remindBefore === null ? 0.5 : 1,
+                      },
+                    ]}
+                    onPress={() => { if (remindBefore !== null) setShowRepeatDropdown(true); }}
+                    disabled={remindBefore === null || availableRepeatOptions.length === 0}
+                  >
+                    <Text style={{ color: repeatEvery !== null ? colors.ghText : colors.ghMuted, fontSize: 13, flex: 1 }} numberOfLines={1}>
+                      {repeatEvery !== null ? availableRepeatOptions.find(p => p.value === repeatEvery)?.label : (remindBefore !== null && availableRepeatOptions.length === 0 ? 'No repeats fit' : 'Once')}
+                    </Text>
+                    <Feather name="chevron-down" size={16} color={colors.ghMuted} />
+                  </TouchableOpacity>
                 </View>
-              )}
+              </View>
 
 
               {/* ── Overdue Reminders (shown when a deadline time exists) ── */}
@@ -1029,13 +870,10 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
                     if (!turning) {
                       // Turning off recurring — clear recurring-specific state
                       setStreakEnabled(false);
-                      setRecurringRemindBefore(null);
                       setDueTime(null); // due time was set as daily deadline, clear it
                     } else {
                       // Turning on recurring — clear one-time specific fields
                       setDue(null);
-                      setExecStartDate(null);
-                      setExecStartTime(null);
                       setRemindBefore(null);
                       setRepeatEvery(null);
                     }
@@ -1198,16 +1036,10 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
       <SelectModal
         visible={showOffsetDropdown}
         onClose={() => setShowOffsetDropdown(false)}
-        title={isRecurring ? "Remind Before Deadline" : "Start Reminding"}
+        title="Start Reminding"
         options={isRecurring ? availableRecurringOffsets : availableOffsets}
-        selectedValue={isRecurring ? recurringRemindBefore : remindBefore}
-        onSelect={(val) => {
-          if (isRecurring) {
-            setRecurringRemindBefore(recurringRemindBefore === val ? null : val);
-          } else {
-            handleSelectPreset(val);
-          }
-        }}
+        selectedValue={remindBefore}
+        onSelect={handleSelectPreset}
         colors={colors}
       />
 
