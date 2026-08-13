@@ -1340,16 +1340,6 @@ export default function DetailPanel({
               {(() => {
                 const createdAtStr = task.createdAt ? formatCustomDate(new Date(task.createdAt)) : "-";
                 
-                let execStartStr = "-";
-                if (task.execStartDate) {
-                  const execDate = new Date(task.execStartDate + "T00:00:00");
-                  if (task.execStartTime) {
-                    const [hh, mm] = task.execStartTime.split(":").map(Number);
-                    execDate.setHours(hh, mm, 0, 0);
-                  }
-                  execStartStr = formatCustomDate(execDate);
-                }
-                
                 let dueStr = "-";
                 if (task.due) {
                   const dueDate = new Date(task.due + "T00:00:00");
@@ -1396,7 +1386,6 @@ export default function DetailPanel({
                 const attrIconMap: { [key: string]: { name: string; color: string } } = {
                   "Created": { name: "plus-circle", color: colors.ghGreen },
                   "Completed": { name: "check-circle", color: colors.ghGreen },
-                  "Execution Start": { name: "play-circle", color: colors.ghBlue },
                   "Due": { name: "calendar", color: colors.ghBlue },
                   "Time Left": { name: "clock", color: colors.ghBlue },
                   "Overdue Time": { name: "alert-circle", color: colors.ghRed },
@@ -1415,7 +1404,6 @@ export default function DetailPanel({
                 const rows: { label: string; value: string; color: string }[] = [];
                 rows.push({ label: "Created", value: createdAtStr, color: colors.ghText });
                 if (completedAtStr) rows.push({ label: "Completed", value: completedAtStr, color: colors.ghGreen || "#3fb950" });
-                rows.push({ label: "Execution Start", value: execStartStr, color: colors.ghText });
                 rows.push({ label: "Due", value: dueStr, color: colors.ghText });
                 if (timeLeftStr !== "-") rows.push({ label: "Time Left", value: timeLeftStr, color: colors.ghBlue || "#58a6ff" });
                 if (overdueTimeStr !== "-") rows.push({ label: "Overdue Time", value: overdueTimeStr, color: colors.ghRed || '#f85149' });
@@ -2086,7 +2074,8 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    minHeight: 40,
+    minHeight: 48,
+    paddingTop: 4,
     paddingBottom: 8,
   },
   headerTitleWrap: {

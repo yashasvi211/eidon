@@ -134,7 +134,6 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
   // Recurrence state
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurrenceFrequency, setRecurrenceFrequency] = useState<string>('daily');
-  const [streakEnabled, setStreakEnabled] = useState(false);
   const [recurrenceDays, setRecurrenceDays] = useState<number[]>([]);
 
   // Dropdown states
@@ -290,7 +289,6 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
       setPriority(initialTask.priority || 'Low');
       setIsRecurring(!!initialTask.recurrence);
       setRecurrenceFrequency(initialTask.recurrence?.frequency || 'daily');
-      setStreakEnabled(initialTask.recurrence?.streakEnabled || false);
       setRecurrenceDays(initialTask.recurrence?.days || []);
       setEst(initialTask.est || '');
     } else {
@@ -306,7 +304,6 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
       setEst('');
       setIsRecurring(false);
       setRecurrenceFrequency('daily');
-      setStreakEnabled(false);
       setRecurrenceDays([]);
     }
     setCalendarMode(null);
@@ -346,7 +343,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
     }
 
     const recurrenceConfig: TaskRecurrenceConfig | undefined = isRecurring
-      ? { frequency: recurrenceFrequency, streakEnabled, days: recurrenceDays.length > 0 ? recurrenceDays : undefined }
+      ? { frequency: recurrenceFrequency, streakEnabled: true, days: recurrenceDays.length > 0 ? recurrenceDays : undefined }
       : undefined;
 
     // Recurring tasks have no user-set due date — pass undefined so
@@ -869,7 +866,6 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
                     setIsRecurring(turning);
                     if (!turning) {
                       // Turning off recurring — clear recurring-specific state
-                      setStreakEnabled(false);
                       setDueTime(null); // due time was set as daily deadline, clear it
                     } else {
                       // Turning on recurring — clear one-time specific fields
@@ -973,27 +969,11 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
                       </View>
                     )}
 
-                    {/* Streak Tracking Toggle */}
-                    <TouchableOpacity
-                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: streakEnabled ? 'rgba(240,136,62,0.06)' : colors.ghBg, borderWidth: 1, borderColor: streakEnabled ? 'rgba(240,136,62,0.4)' : colors.ghBorder, borderRadius: 10, padding: 12 }}
-                      onPress={() => setStreakEnabled(v => !v)}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                        <Text style={{ fontSize: 18, color: '#f0883e', fontWeight: '800' }}>★</Text>
-                        <View>
-                          <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: '600' }}>Enable Streak Tracking</Text>
-                          <Text style={{ color: colors.ghMuted, fontSize: 11, marginTop: 1 }}>Track your consistency over time</Text>
-                        </View>
-                      </View>
-                      <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: streakEnabled ? '#f0883e' : colors.ghBorder, backgroundColor: streakEnabled ? '#f0883e' : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
-                        {streakEnabled && <Text style={{ color: '#fff', fontSize: 12, fontWeight: '800' }}>✓</Text>}
-                      </View>
-                    </TouchableOpacity>
-
                     {/* Info note about recurring */}
                     <View style={{ backgroundColor: `${colors.ghBlue}08`, borderWidth: 1, borderColor: `${colors.ghBlue}20`, borderRadius: 8, padding: 10 }}>
                       <Text style={{ color: colors.ghMuted, fontSize: 11, lineHeight: 16 }}>
-                        📋 The task resets for the next period when you complete it or when the due date passes. {streakEnabled ? '\n★ Streak breaks if you miss a period.' : ''}
+                        📋 The task resets for the next period when you complete it or when the due date passes.
+                        {"\n"}★ Streak will be maintained. It breaks if you miss a period.
                       </Text>
                     </View>
                   </View>
