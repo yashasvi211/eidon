@@ -163,36 +163,80 @@ export function formatTime12h(time24?: string): string {
 
 /**
  * Calculates the initial due date (YYYY-MM-DD) for a recurring task.
- * If today matches the schedule, returns today's date.
- * Otherwise, returns the next closest date that matches the recurrence days.
+ * If today matches the schedule and the deadline time hasn't passed, returns today's date.
+ * If the deadline time has already passed today or today is not scheduled, returns the next closest scheduled date.
  */
-export function getInitialRecurringDueDate(frequency: string = 'daily', days?: number[], baseDate: Date = new Date()): string {
+export function getInitialRecurringDueDate(
+  frequency: string = 'daily',
+  days?: number[],
+  dueTime?: string,
+  baseDate: Date = new Date()
+): string {
   const date = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), 0, 0, 0, 0);
 
-  if (frequency === 'weekly' && days && days.length > 0) {
-    const todayDay = date.getDay();
-    if (days.includes(todayDay)) {
-      return formatDateIso(date);
-    }
-    const d = new Date(date);
-    for (let i = 1; i <= 7; i++) {
-      d.setDate(d.getDate() + 1);
-      if (days.includes(d.getDay())) {
-        return formatDateIso(d);
+  // Check if today's time-of-day deadline has already passed
+  let isTimePassedToday = false;
+  if (dueTime && dueTime.trim() !== '') {
+    const [h, m] = dueTime.split(':').map(Number);
+    if (!isNaN(h) && !isNaN(m)) {
+      const todayDeadline = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), h, m, 0, 0);
+      if (baseDate.getTime() >= todayDeadline.getTime()) {
+        isTimePassedToday = true;
       }
     }
-  } else if (frequency === 'monthly' && days && days.length > 0) {
-    const todayDate = date.getDate();
-    if (days.includes(todayDate)) {
+  }
+
+  if (frequency === 'daily') {
+    if (isTimePassedToday) {
+      date.setDate(date.getDate() + 1);
+    }
+    return formatDateIso(date);
+  }
+
+  if (frequency === 'weekly') {
+    if (days && days.length > 0) {
+      const todayDay = date.getDay();
+      if (days.includes(todayDay) && !isTimePassedToday) {
+        return formatDateIso(date);
+      }
+      const d = new Date(date);
+      for (let i = 1; i <= 7; i++) {
+        d.setDate(d.getDate() + 1);
+        if (days.includes(d.getDay())) {
+          return formatDateIso(d);
+        }
+      }
+    } else {
+      if (isTimePassedToday) {
+        date.setDate(date.getDate() + 7);
+      }
       return formatDateIso(date);
     }
-    const d = new Date(date);
-    for (let i = 1; i <= 366; i++) {
-      d.setDate(d.getDate() + 1);
-      if (days.includes(d.getDate())) {
-        return formatDateIso(d);
+  }
+
+  if (frequency === 'monthly') {
+    if (days && days.length > 0) {
+      const todayDate = date.getDate();
+      if (days.includes(todayDate) && !isTimePassedToday) {
+        return formatDateIso(date);
       }
+      const d = new Date(date);
+      for (let i = 1; i <= 366; i++) {
+        d.setDate(d.getDate() + 1);
+        if (days.includes(d.getDate())) {
+          return formatDateIso(d);
+        }
+      }
+    } else {
+      if (isTimePassedToday) {
+        date.setMonth(date.getMonth() + 1);
+      }
+      return formatDateIso(date);
     }
+  }
+
+  if (isTimePassedToday) {
+    date.setDate(date.getDate() + 1);
   }
 
   return formatDateIso(date);
@@ -301,7 +345,7 @@ export function formatRecurrenceDeadline(frequency?: string, dueTime?: string, d
 export function getRecurringNextDeadlineDate(currentDue?: string, dueTime?: string, frequency?: string, days?: number[]): Date {
   let targetDueDate = currentDue;
   if (!targetDueDate) {
-    targetDueDate = getInitialRecurringDueDate(frequency || 'daily', days);
+    targetDueDate = getInitialRecurringDueDate(frequency || 'daily', days, dueTime);
   }
   const [y, m, d] = targetDueDate.split('-').map(Number);
   const dt = new Date(y, m - 1, d, 0, 0, 0, 0);

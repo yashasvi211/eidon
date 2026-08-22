@@ -8,6 +8,7 @@ import {
   formatRecurrenceDeadline,
   getInitialRecurringDueDate,
   getRecurringNextDeadlineDate,
+  advanceRecurringTaskDue,
 } from "../services/reminderUtils";
 import {
   View,
@@ -1262,16 +1263,29 @@ export default function DetailPanel({
               const scheduleSummary = formatRecurrenceSchedule(freq, rec.days);
               const deadlineTimeFormatted = task.dueTime ? formatTime12h(task.dueTime) : null;
               
-              const effectiveDue = task.due || getInitialRecurringDueDate(freq, rec.days);
+              const effectiveDue = task.due || getInitialRecurringDueDate(freq, rec.days, task.dueTime);
               const [ny, nm, nd] = effectiveDue.split('-').map(Number);
-              const nextDueObj = new Date(ny, nm - 1, nd, 0, 0, 0, 0);
+              const activeDueObj = new Date(ny, nm - 1, nd, 0, 0, 0, 0);
               if (task.dueTime && task.dueTime.trim() !== '') {
                 const [h, m] = task.dueTime.split(':').map(Number);
-                if (!isNaN(h) && !isNaN(m)) nextDueObj.setHours(h, m, 0, 0);
+                if (!isNaN(h) && !isNaN(m)) activeDueObj.setHours(h, m, 0, 0);
               } else {
-                nextDueObj.setHours(23, 59, 59, 999);
+                activeDueObj.setHours(23, 59, 59, 999);
               }
-              const nextDeadlineFormatted = formatCustomDate(nextDueObj);
+              const isOverdue = nowTime > activeDueObj.getTime() && !task.done;
+              const activeDeadlineFormatted = formatCustomDate(activeDueObj);
+
+              // Calculate the upcoming next cycle
+              const nextCycleDueStr = advanceRecurringTaskDue(effectiveDue, freq, rec.days);
+              const [nxY, nxM, nxD] = nextCycleDueStr.split('-').map(Number);
+              const nextCycleObj = new Date(nxY, nxM - 1, nxD, 0, 0, 0, 0);
+              if (task.dueTime && task.dueTime.trim() !== '') {
+                const [h, m] = task.dueTime.split(':').map(Number);
+                if (!isNaN(h) && !isNaN(m)) nextCycleObj.setHours(h, m, 0, 0);
+              } else {
+                nextCycleObj.setHours(23, 59, 59, 999);
+              }
+              const nextCycleFormatted = formatCustomDate(nextCycleObj);
 
               const DAY_ABBR = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
@@ -1279,7 +1293,7 @@ export default function DetailPanel({
                 <View style={{
                   backgroundColor: colors.ghSurface,
                   borderWidth: 1,
-                  borderColor: 'rgba(88, 166, 255, 0.25)',
+                  borderColor: isOverdue ? 'rgba(248, 81, 73, 0.3)' : 'rgba(88, 166, 255, 0.25)',
                   borderRadius: 12,
                   padding: 14,
                   marginBottom: 16,
@@ -1287,16 +1301,16 @@ export default function DetailPanel({
                   {/* Header Row */}
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <View style={{ backgroundColor: 'rgba(88, 166, 255, 0.12)', width: 28, height: 28, borderRadius: 7, alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
-                        <Feather name="repeat" size={13} color={colors.ghBlue} />
+                      <View style={{ backgroundColor: isOverdue ? 'rgba(248, 81, 73, 0.12)' : 'rgba(88, 166, 255, 0.12)', width: 28, height: 28, borderRadius: 7, alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
+                        <Feather name="repeat" size={13} color={isOverdue ? (colors.ghRed || '#f85149') : colors.ghBlue} />
                       </View>
                       <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 0 }]}>
                         RECURRING SCHEDULE
                       </Text>
                     </View>
-                    <View style={{ backgroundColor: 'rgba(88, 166, 255, 0.12)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
-                      <Text style={{ color: colors.ghBlue, fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>
-                        {freqLabel}
+                    <View style={{ backgroundColor: isOverdue ? 'rgba(248, 81, 73, 0.12)' : 'rgba(88, 166, 255, 0.12)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                      <Text style={{ color: isOverdue ? (colors.ghRed || '#f85149') : colors.ghBlue, fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>
+                        {isOverdue ? `${freqLabel} • Overdue` : freqLabel}
                       </Text>
                     </View>
                   </View>
@@ -1304,7 +1318,7 @@ export default function DetailPanel({
                   {/* Summary Box */}
                   <View style={{ backgroundColor: `${colors.ghMuted}08`, borderRadius: 8, padding: 10, marginBottom: 12 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                      <Feather name="calendar" size={13} color={colors.ghBlue} />
+                      <Feather name="calendar" size={13} color={isOverdue ? (colors.ghRed || '#f85149') : colors.ghBlue} />
                       <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: '700' }}>
                         {scheduleSummary}
                       </Text>
@@ -1397,14 +1411,19 @@ export default function DetailPanel({
                       </Text>
                     </View>
 
-                    {/* Next Window Due */}
+                    {/* Deadline occurrence */}
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: colors.ghMuted, fontSize: 11, marginBottom: 2 }}>
-                        Next Deadline
+                      <Text style={{ color: isOverdue ? (colors.ghRed || '#f85149') : colors.ghMuted, fontSize: 11, marginBottom: 2, fontWeight: isOverdue ? '700' : '400' }}>
+                        {isOverdue ? '! Overdue Deadline' : 'Next Deadline'}
                       </Text>
-                      <Text style={{ color: colors.ghBlue, fontSize: 13, fontWeight: '700' }}>
-                        {nextDeadlineFormatted}
+                      <Text style={{ color: isOverdue ? (colors.ghRed || '#f85149') : colors.ghBlue, fontSize: 13, fontWeight: '700' }}>
+                        {activeDeadlineFormatted}
                       </Text>
+                      {isOverdue && (
+                        <Text style={{ color: colors.ghBlue, fontSize: 11, marginTop: 4, fontWeight: '600' }}>
+                          Next cycle: {nextCycleFormatted}
+                        </Text>
+                      )}
                     </View>
                   </View>
                 </View>
@@ -1509,7 +1528,7 @@ export default function DetailPanel({
               {(() => {
                 const createdAtStr = task.createdAt ? formatCustomDate(new Date(task.createdAt)) : "-";
                 
-                const effectiveDue = task.due || (task.recurrence ? getInitialRecurringDueDate(task.recurrence.frequency, task.recurrence.days) : null);
+                const effectiveDue = task.due || (task.recurrence ? getInitialRecurringDueDate(task.recurrence.frequency, task.recurrence.days, task.dueTime) : null);
 
                 let dueStr = "-";
                 if (effectiveDue) {
@@ -1561,9 +1580,11 @@ export default function DetailPanel({
                   "Completed": { name: "check-circle", color: colors.ghGreen },
                   "Due": { name: "calendar", color: colors.ghBlue },
                   "Next Deadline": { name: "calendar", color: colors.ghBlue },
+                  "Overdue Deadline": { name: "alert-circle", color: colors.ghRed || '#f85149' },
+                  "Next Occurrence": { name: "calendar", color: colors.ghBlue },
                   "Recurrence": { name: "repeat", color: colors.ghBlue },
                   "Time Left": { name: "clock", color: colors.ghBlue },
-                  "Overdue Time": { name: "alert-circle", color: colors.ghRed },
+                  "Overdue Time": { name: "alert-circle", color: colors.ghRed || '#f85149' },
                 };
 
                 const renderAttr = (label: string, value: string, color: string = colors.ghText, isLast: boolean = false) => (
@@ -1587,11 +1608,32 @@ export default function DetailPanel({
                     value: recurrenceSummary,
                     color: colors.ghBlue || "#58a6ff"
                   });
-                  rows.push({
-                    label: "Next Deadline",
-                    value: dueStr,
-                    color: colors.ghText
-                  });
+
+                  if (overdueTimeStr !== "-") {
+                    rows.push({
+                      label: "Overdue Deadline",
+                      value: dueStr,
+                      color: colors.ghRed || '#f85149'
+                    });
+                    const nextCycleDue = advanceRecurringTaskDue(effectiveDue!, task.recurrence.frequency, task.recurrence.days);
+                    const [nxY, nxM, nxD] = nextCycleDue.split('-').map(Number);
+                    const nextCycleObj = new Date(nxY, nxM - 1, nxD, 0, 0, 0, 0);
+                    if (task.dueTime && task.dueTime.trim() !== '') {
+                      const [hh, mm] = task.dueTime.split(':').map(Number);
+                      if (!isNaN(hh) && !isNaN(mm)) nextCycleObj.setHours(hh, mm, 0, 0);
+                    }
+                    rows.push({
+                      label: "Next Occurrence",
+                      value: formatCustomDate(nextCycleObj),
+                      color: colors.ghBlue || "#58a6ff"
+                    });
+                  } else {
+                    rows.push({
+                      label: "Next Deadline",
+                      value: dueStr,
+                      color: colors.ghText
+                    });
+                  }
                 } else {
                   rows.push({ label: "Due", value: dueStr, color: colors.ghText });
                 }

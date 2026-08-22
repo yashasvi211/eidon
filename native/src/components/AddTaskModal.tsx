@@ -352,7 +352,7 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
       if (initialTask?.due && initialTask?.recurrence && initialTask.recurrence.frequency === recurrenceFrequency) {
         finalDue = initialTask.due;
       } else {
-        finalDue = getInitialRecurringDueDate(recurrenceFrequency, recurrenceDays.length > 0 ? recurrenceDays : undefined);
+        finalDue = getInitialRecurringDueDate(recurrenceFrequency, recurrenceDays.length > 0 ? recurrenceDays : undefined, dueTime || undefined);
       }
     } else {
       finalDue = due || undefined;

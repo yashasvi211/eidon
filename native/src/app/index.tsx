@@ -70,7 +70,7 @@ function processRecurrenceMissedDeadlines(tasks: Task[]): Task[] {
     // Auto-heal tasks missing 'due'
     let currDue = task.due;
     if (!currDue) {
-      currDue = getInitialRecurringDueDate(rec.frequency, rec.days);
+      currDue = getInitialRecurringDueDate(rec.frequency, rec.days, task.dueTime);
     }
 
     // If due date is today or future, nothing to process
@@ -734,7 +734,7 @@ export default function AppIndex() {
     // For a new recurring task with no due date set, auto-assign proper scheduled date
     let taskDue = due;
     if (recurrenceConfig && !taskDue) {
-      taskDue = getInitialRecurringDueDate(recurrenceConfig.frequency, recurrenceConfig.days);
+      taskDue = getInitialRecurringDueDate(recurrenceConfig.frequency, recurrenceConfig.days, dueTime);
     }
 
     const recurrence: RecurrenceConfig | undefined = recurrenceConfig
@@ -811,7 +811,7 @@ export default function AppIndex() {
   ) => {
     let taskDue = due;
     if (recurrenceConfig && !taskDue) {
-      taskDue = taskToEdit.due || getInitialRecurringDueDate(recurrenceConfig.frequency, recurrenceConfig.days);
+      taskDue = taskToEdit.due || getInitialRecurringDueDate(recurrenceConfig.frequency, recurrenceConfig.days, dueTime);
     }
 
     const recurrence: RecurrenceConfig | undefined = recurrenceConfig
