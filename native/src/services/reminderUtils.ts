@@ -138,3 +138,183 @@ export function formatEstimateDisplay(est?: string): string {
   if (h > 0) return `${h}h`;
   return `${m}m`;
 }
+
+function pad2(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+export function formatDateIso(d: Date): string {
+  const ny = d.getFullYear();
+  const nm = pad2(d.getMonth() + 1);
+  const nd = pad2(d.getDate());
+  return `${ny}-${nm}-${nd}`;
+}
+
+export function formatTime12h(time24?: string): string {
+  if (!time24) return '';
+  const [hStr, mStr] = time24.split(':');
+  const h = parseInt(hStr, 10);
+  const m = parseInt(mStr, 10);
+  if (isNaN(h) || isNaN(m)) return time24;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${pad2(m)} ${ampm}`;
+}
+
+/**
+ * Calculates the initial due date (YYYY-MM-DD) for a recurring task.
+ * If today matches the schedule, returns today's date.
+ * Otherwise, returns the next closest date that matches the recurrence days.
+ */
+export function getInitialRecurringDueDate(frequency: string = 'daily', days?: number[], baseDate: Date = new Date()): string {
+  const date = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate(), 0, 0, 0, 0);
+
+  if (frequency === 'weekly' && days && days.length > 0) {
+    const todayDay = date.getDay();
+    if (days.includes(todayDay)) {
+      return formatDateIso(date);
+    }
+    const d = new Date(date);
+    for (let i = 1; i <= 7; i++) {
+      d.setDate(d.getDate() + 1);
+      if (days.includes(d.getDay())) {
+        return formatDateIso(d);
+      }
+    }
+  } else if (frequency === 'monthly' && days && days.length > 0) {
+    const todayDate = date.getDate();
+    if (days.includes(todayDate)) {
+      return formatDateIso(date);
+    }
+    const d = new Date(date);
+    for (let i = 1; i <= 366; i++) {
+      d.setDate(d.getDate() + 1);
+      if (days.includes(d.getDate())) {
+        return formatDateIso(d);
+      }
+    }
+  }
+
+  return formatDateIso(date);
+}
+
+/**
+ * Advances a recurring task's due date to its next scheduled occurrence.
+ */
+export function advanceRecurringTaskDue(currentDue: string, frequency: string = 'daily', days?: number[]): string {
+  const [y, m, d] = currentDue.split('-').map(Number);
+  const date = new Date(y, m - 1, d, 0, 0, 0, 0);
+
+  if (frequency === 'daily') {
+    date.setDate(date.getDate() + 1);
+  } else if (frequency === 'weekly') {
+    if (days && days.length > 0) {
+      for (let i = 1; i <= 7; i++) {
+        date.setDate(date.getDate() + 1);
+        if (days.includes(date.getDay())) {
+          break;
+        }
+      }
+    } else {
+      date.setDate(date.getDate() + 7);
+    }
+  } else if (frequency === 'monthly') {
+    if (days && days.length > 0) {
+      for (let i = 1; i <= 366; i++) {
+        date.setDate(date.getDate() + 1);
+        if (days.includes(date.getDate())) {
+          break;
+        }
+      }
+    } else {
+      date.setMonth(date.getMonth() + 1);
+    }
+  } else if (frequency.startsWith('custom_')) {
+    const customDays = parseInt(frequency.split('_')[1], 10) || 1;
+    date.setDate(date.getDate() + customDays);
+  } else {
+    date.setDate(date.getDate() + 1);
+  }
+
+  return formatDateIso(date);
+}
+
+const SHORT_DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function getOrdinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+/**
+ * Returns a human-friendly description of recurrence schedule (e.g. "Every day", "Every Mon, Wed, Fri", "Monthly on the 1st, 15th")
+ */
+export function formatRecurrenceSchedule(frequency?: string, days?: number[]): string {
+  if (!frequency) return '';
+  const freq = frequency.toLowerCase();
+
+  if (freq === 'daily') {
+    return 'Every day';
+  }
+
+  if (freq === 'weekly') {
+    if (days && days.length > 0) {
+      if (days.length === 7) return 'Every day';
+      if (days.length === 5 && !days.includes(0) && !days.includes(6)) return 'Every weekday (Mon - Fri)';
+      if (days.length === 2 && days.includes(0) && days.includes(6)) return 'Every weekend (Sat, Sun)';
+      const sorted = [...days].sort((a, b) => a - b);
+      return `Every ${sorted.map(d => SHORT_DAY_NAMES[d]).join(', ')}`;
+    }
+    return 'Every week';
+  }
+
+  if (freq === 'monthly') {
+    if (days && days.length > 0) {
+      const sorted = [...days].sort((a, b) => a - b);
+      return `Monthly on the ${sorted.map(getOrdinal).join(', ')}`;
+    }
+    return 'Every month';
+  }
+
+  if (freq.startsWith('custom_')) {
+    const customDays = parseInt(freq.split('_')[1], 10) || 1;
+    return `Every ${customDays} days`;
+  }
+
+  return `Repeats ${frequency}`;
+}
+
+/**
+ * Returns formatted deadline description for recurring tasks (e.g., "Every day at 7:50 AM", "Every Mon, Wed at 7:50 AM")
+ */
+export function formatRecurrenceDeadline(frequency?: string, dueTime?: string, days?: number[]): string {
+  const timeStr = dueTime ? formatTime12h(dueTime) : 'End of day';
+  const schedStr = formatRecurrenceSchedule(frequency, days);
+  if (!schedStr) return timeStr;
+  return `${schedStr} at ${timeStr}`;
+}
+
+/**
+ * Returns a Date object representing the next deadline for the recurring task.
+ */
+export function getRecurringNextDeadlineDate(currentDue?: string, dueTime?: string, frequency?: string, days?: number[]): Date {
+  let targetDueDate = currentDue;
+  if (!targetDueDate) {
+    targetDueDate = getInitialRecurringDueDate(frequency || 'daily', days);
+  }
+  const [y, m, d] = targetDueDate.split('-').map(Number);
+  const dt = new Date(y, m - 1, d, 0, 0, 0, 0);
+
+  if (dueTime && dueTime.trim() !== '') {
+    const [h, min] = dueTime.split(':').map(Number);
+    if (!isNaN(h) && !isNaN(min)) {
+      dt.setHours(h, min, 0, 0);
+    }
+  } else {
+    dt.setHours(23, 59, 59, 999);
+  }
+
+  return dt;
+}
+

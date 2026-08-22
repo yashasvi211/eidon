@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Colors } from "../constants/theme";
 import { Task } from "./DetailPanel";
+import { formatRecurrenceSchedule, getInitialRecurringDueDate } from "../services/reminderUtils";
 import Animated, {
   FadeIn,
   FadeOut,
@@ -44,12 +45,13 @@ const fmtSeconds = (s: number) => {
 };
 
 const getExecutionStatus = (task: Task, colors: any) => {
-  if (!task.due) return null;
+  const effectiveDue = task.due || (task.recurrence ? getInitialRecurringDueDate(task.recurrence.frequency, task.recurrence.days) : null);
+  if (!effectiveDue) return null;
 
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
-  const dueObj = new Date(task.due + "T00:00:00");
+  const dueObj = new Date(effectiveDue + "T00:00:00");
   if (task.dueTime && task.dueTime.trim() !== '') {
     const [h, m] = task.dueTime.split(":").map(Number);
     if (!isNaN(h) && !isNaN(m)) dueObj.setHours(h, m, 0, 0);
@@ -107,7 +109,7 @@ const getExecutionStatus = (task: Task, colors: any) => {
     };
   }
 
-  const [y, m, d] = task.due.split("-");
+  const [y, m, d] = effectiveDue.split("-");
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   return {
     label: `· ${months[parseInt(m) - 1]} ${parseInt(d)}`,
@@ -175,9 +177,10 @@ export default function TaskPanel({
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
   const isTaskOverdue = (t: Task) => {
-    if (t.done || !t.due) return false;
+    const effectiveDue = t.due || (t.recurrence ? getInitialRecurringDueDate(t.recurrence.frequency, t.recurrence.days) : null);
+    if (t.done || !effectiveDue) return false;
     const nowObj = new Date();
-    const dueObj = new Date(t.due + "T00:00:00");
+    const dueObj = new Date(effectiveDue + "T00:00:00");
     if (t.dueTime && t.dueTime.trim() !== '') {
       const [h, m] = t.dueTime.split(":").map(Number);
       if (!isNaN(h) && !isNaN(m)) dueObj.setHours(h, m, 0, 0);
@@ -201,16 +204,18 @@ export default function TaskPanel({
 
   const isTaskCurrent = (t: Task) => {
     if (t.target === "backlog") return false;
-    if (!t.due) return false;
+    const effectiveDue = t.due || (t.recurrence ? getInitialRecurringDueDate(t.recurrence.frequency, t.recurrence.days) : null);
+    if (!effectiveDue) return false;
     if (isTaskOverdue(t)) return false;
     if (t.execStartDate) {
       return isExecStartReached(t);
     }
-    return t.due === todayStr;
+    return effectiveDue === todayStr;
   };
 
   const isTaskArchive = (t: Task) => {
-    if (!t.due) return true;
+    const effectiveDue = t.due || (t.recurrence ? getInitialRecurringDueDate(t.recurrence.frequency, t.recurrence.days) : null);
+    if (!effectiveDue) return true;
     return false;
   };
 
@@ -388,7 +393,7 @@ export default function TaskPanel({
                         },
                       ]}
                     >
-                      ↻ {task.recurrence.frequency}
+                      ↻ {formatRecurrenceSchedule(task.recurrence.frequency, task.recurrence.days) || task.recurrence.frequency}
                     </Text>
                   )}
 

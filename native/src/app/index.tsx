@@ -33,7 +33,7 @@ import AddTrackerModal from "../components/AddTrackerModal";
 import { Tracker } from "../types/tracking";
 import AddTaskModal from "../components/AddTaskModal";
 import type { ReminderConfig, TaskRecurrenceConfig } from "../components/AddTaskModal";
-import { formatEstimateDisplay } from "../services/reminderUtils";
+import { formatEstimateDisplay, getInitialRecurringDueDate, advanceRecurringTaskDue, formatDateIso } from "../services/reminderUtils";
 import NotificationBanner, { NotificationData } from "../components/NotificationBanner";
 
 import { syncTaskNotifications, cancelTaskNotifications } from "../services/notifications";
@@ -52,26 +52,6 @@ import ConfirmationModal from "../components/sub_components/ConfirmationModal";
 
 // ─── Recurrence Helpers ──────────────────────────────────────────────────────
 
-/** Given a YYYY-MM-DD date string and a frequency, return the next period's due date string */
-function advanceRecurringTaskDue(currentDue: string, frequency: string): string {
-  const [y, m, d] = currentDue.split('-').map(Number);
-  const date = new Date(y, m - 1, d);
-  if (frequency === 'daily') {
-    date.setDate(date.getDate() + 1);
-  } else if (frequency === 'weekly') {
-    date.setDate(date.getDate() + 7);
-  } else if (frequency === 'monthly') {
-    date.setMonth(date.getMonth() + 1);
-  } else if (frequency.startsWith('custom_')) {
-    const days = parseInt(frequency.split('_')[1], 10) || 1;
-    date.setDate(date.getDate() + days);
-  }
-  const ny = date.getFullYear();
-  const nm = String(date.getMonth() + 1).padStart(2, '0');
-  const nd = String(date.getDate()).padStart(2, '0');
-  return `${ny}-${nm}-${nd}`;
-}
-
 /**
  * Called on app load. Checks all recurring tasks for missed deadlines:
  * If a recurring task's due date has passed and it's NOT yet done,
@@ -81,17 +61,27 @@ function advanceRecurringTaskDue(currentDue: string, frequency: string): string 
 function processRecurrenceMissedDeadlines(tasks: Task[]): Task[] {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const todayStr = formatDateIso(today);
 
   return tasks.map(task => {
-    if (!task.recurrence || !task.due) return task;
+    if (!task.recurrence) return task;
     const rec = task.recurrence;
 
+    // Auto-heal tasks missing 'due'
+    let currDue = task.due;
+    if (!currDue) {
+      currDue = getInitialRecurringDueDate(rec.frequency, rec.days);
+    }
+
     // If due date is today or future, nothing to process
-    if (task.due >= todayStr) return task;
+    if (currDue >= todayStr) {
+      if (task.due !== currDue) {
+        return { ...task, due: currDue };
+      }
+      return task;
+    }
 
     // Due date is in the past (< todayStr). Loop until due >= todayStr!
-    let currDue = task.due;
     let newCurrentStreak = rec.currentStreak;
     let newMaxStreak = rec.maxStreak;
     let newHistory = [...(rec.history || [])];
@@ -120,7 +110,7 @@ function processRecurrenceMissedDeadlines(tasks: Task[]): Task[] {
       // Once we process one cycle, subsequent missed cycles in the loop are not 'done'
       isDone = false;
       completedAt = null;
-      currDue = advanceRecurringTaskDue(currDue, rec.frequency);
+      currDue = advanceRecurringTaskDue(currDue, rec.frequency, rec.days);
     }
 
     return {
@@ -634,7 +624,7 @@ export default function AppIndex() {
 
       const newCurrentStreak = rec.currentStreak + 1;
       const newMaxStreak = Math.max(rec.maxStreak, newCurrentStreak);
-      const nextDue = advanceRecurringTaskDue(taskToToggle.due, rec.frequency);
+      const nextDue = advanceRecurringTaskDue(taskToToggle.due, rec.frequency, rec.days);
 
       const auditEntry: AuditEntry = {
         timestamp: nowTs,
@@ -741,17 +731,17 @@ export default function AppIndex() {
     recurrenceConfig?: TaskRecurrenceConfig,
     est?: string,
   ) => {
-    // For a new recurring task with no due date set, auto-assign today's date
+    // For a new recurring task with no due date set, auto-assign proper scheduled date
     let taskDue = due;
     if (recurrenceConfig && !taskDue) {
-      const now = new Date();
-      taskDue = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+      taskDue = getInitialRecurringDueDate(recurrenceConfig.frequency, recurrenceConfig.days);
     }
 
     const recurrence: RecurrenceConfig | undefined = recurrenceConfig
       ? {
-          frequency: recurrenceConfig.frequency,
+          frequency: recurrenceConfig.frequency as any,
           streakEnabled: recurrenceConfig.streakEnabled,
+          days: recurrenceConfig.days,
           currentStreak: 0,
           maxStreak: 0,
           history: [],
@@ -819,10 +809,16 @@ export default function AppIndex() {
     recurrenceConfig?: TaskRecurrenceConfig,
     est?: string,
   ) => {
+    let taskDue = due;
+    if (recurrenceConfig && !taskDue) {
+      taskDue = taskToEdit.due || getInitialRecurringDueDate(recurrenceConfig.frequency, recurrenceConfig.days);
+    }
+
     const recurrence: RecurrenceConfig | undefined = recurrenceConfig
       ? {
-          frequency: recurrenceConfig.frequency,
+          frequency: recurrenceConfig.frequency as any,
           streakEnabled: recurrenceConfig.streakEnabled,
+          days: recurrenceConfig.days,
           currentStreak: taskToEdit.recurrence?.currentStreak ?? 0,
           maxStreak: taskToEdit.recurrence?.maxStreak ?? 0,
           history: taskToEdit.recurrence?.history ?? [],
@@ -833,7 +829,7 @@ export default function AppIndex() {
       ...taskToEdit,
       title,
       project,
-      due,
+      due: taskDue,
       dueTime,
       priority,
       est: formatEstimateDisplay(est) || undefined,

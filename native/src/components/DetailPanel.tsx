@@ -1,5 +1,14 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { countTotalReminders, generateSchedulePreview, formatEstimateDisplay } from "../services/reminderUtils";
+import {
+  countTotalReminders,
+  generateSchedulePreview,
+  formatEstimateDisplay,
+  formatTime12h,
+  formatRecurrenceSchedule,
+  formatRecurrenceDeadline,
+  getInitialRecurringDueDate,
+  getRecurringNextDeadlineDate,
+} from "../services/reminderUtils";
 import {
   View,
   Text,
@@ -118,7 +127,8 @@ export interface StreakEntry {
 }
 
 export interface RecurrenceConfig {
-  frequency: 'daily' | 'weekly' | 'monthly';
+  frequency: 'daily' | 'weekly' | 'monthly' | string;
+  days?: number[];
   streakEnabled: boolean;    // Whether to track streaks for this task
   currentStreak: number;     // Active consecutive completions
   maxStreak: number;         // All-time best streak
@@ -182,13 +192,6 @@ const fmtDateDisplay = (iso?: string) => {
     "Dec",
   ];
   return `${months[parseInt(m) - 1]} ${parseInt(d)}, ${y}`;
-};
-
-const formatTime12h = (time24: string) => {
-  const [h, m] = time24.split(':').map(Number);
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  const h12 = h % 12 || 12;
-  return `${h12}:${m.toString().padStart(2, '0')} ${ampm}`;
 };
 
 const fmtSeconds = (s: number) => {
@@ -272,15 +275,17 @@ const formatCountdown = (ms: number): string => {
 };
 
 function getNextReminderTime(task: Task): number | null {
-  if (task.done || !task.due || !task.reminder || task.reminder.dismissed) return null;
+  if (task.done || !task.reminder || task.reminder.dismissed) return null;
+  const effectiveDue = task.due || (task.recurrence ? getInitialRecurringDueDate(task.recurrence.frequency, task.recurrence.days) : null);
+  if (!effectiveDue) return null;
   const now = Date.now();
   let targetDueTime: number;
   if (task.dueTime) {
-    const [y, m, d] = task.due.split('-').map(Number);
+    const [y, m, d] = effectiveDue.split('-').map(Number);
     const [h, min] = task.dueTime.split(':').map(Number);
     targetDueTime = new Date(y, m - 1, d, h, min, 0, 0).getTime();
   } else {
-    const [y, m, d] = task.due.split('-').map(Number);
+    const [y, m, d] = effectiveDue.split('-').map(Number);
     targetDueTime = new Date(y, m - 1, d, 0, 0, 0, 0).getTime();
   }
   const dueEndOfDay = new Date(targetDueTime);
@@ -288,7 +293,7 @@ function getNextReminderTime(task: Task): number | null {
   if (now >= dueEndOfDay.getTime()) return null;
   if (task.dueTime && now >= targetDueTime) return null;
 
-  let scheduleTime = targetDueTime - task.reminder.remindBefore;
+  let scheduleTime = targetDueTime - (task.reminder.remindBefore || 0);
   
   if (scheduleTime <= now) {
     if (!task.reminder.repeatEvery) {
@@ -374,16 +379,18 @@ const AUDIT_ICONS: {
   task_updated: { iconName: "edit", library: "Feather", label: "Task updated", color: "#58a6ff" },
 };
 
-
-
-const getDeadlineInfo = (dueDate?: string, colors?: any, isDone?: boolean, dueTime?: string) => {
+const getDeadlineInfo = (dueDate?: string, colors?: any, isDone?: boolean, dueTime?: string, recurrence?: RecurrenceConfig) => {
   if (isDone) {
-    return { color: colors.ghGreen || "#3fb950", label: "Completed", dotColor: colors.ghGreen || "#3fb950" };
+    return { color: colors?.ghGreen || "#3fb950", label: "Completed", dotColor: colors?.ghGreen || "#3fb950" };
   }
-  if (!dueDate)
-    return { color: colors.ghText, label: "", dotColor: "transparent" };
+  let targetDueDate = dueDate;
+  if (!targetDueDate && recurrence) {
+    targetDueDate = getInitialRecurringDueDate(recurrence.frequency, recurrence.days);
+  }
+  if (!targetDueDate)
+    return { color: colors?.ghText, label: "", dotColor: "transparent" };
   const now = new Date();
-  const due = new Date(dueDate + "T00:00:00");
+  const due = new Date(targetDueDate + "T00:00:00");
   if (dueTime && dueTime.trim() !== '') {
     const [h, m] = dueTime.split(":").map(Number);
     if (!isNaN(h) && !isNaN(m)) due.setHours(h, m, 0, 0);
@@ -479,9 +486,10 @@ export default function DetailPanel({
   }, [task?.done, task?.id]);
 
   const totalReminders = useMemo(() => {
-    if (!task || !task.due || !task.reminder || task.reminder.remindBefore === null) return 0;
+    const effectiveDue = task?.due || (task?.recurrence ? getInitialRecurringDueDate(task.recurrence.frequency, task.recurrence.days) : null);
+    if (!task || !effectiveDue || !task.reminder || task.reminder.remindBefore === null || task.reminder.remindBefore === undefined) return 0;
     
-    const [y, m, d] = task.due.split('-').map(Number);
+    const [y, m, d] = effectiveDue.split('-').map(Number);
     const dateObj = new Date(y, m - 1, d);
     
     if (task.dueTime) {
@@ -518,8 +526,9 @@ export default function DetailPanel({
   }, []);
 
   const nextReminder = useMemo(() => {
-    if (!task || !task.due || !task.reminder || task.reminder.remindBefore === null) return null;
-    const [y, m, d] = task.due.split('-').map(Number);
+    const effectiveDue = task?.due || (task?.recurrence ? getInitialRecurringDueDate(task.recurrence.frequency, task.recurrence.days) : null);
+    if (!task || !effectiveDue || !task.reminder || task.reminder.remindBefore === null || task.reminder.remindBefore === undefined) return null;
+    const [y, m, d] = effectiveDue.split('-').map(Number);
     const dateObj = new Date(y, m - 1, d);
     if (task.dueTime) {
       const [h, min] = task.dueTime.split(':').map(Number);
@@ -816,7 +825,7 @@ export default function DetailPanel({
   const totalSubtasks = subtasks.length;
   const progress = getSubtaskProgressInfo(subtasksDone, totalSubtasks, colors);
 
-  const dlInfo = getDeadlineInfo(task.due, colors, task.done, task.dueTime);
+  const dlInfo = getDeadlineInfo(task.due, colors, task.done, task.dueTime, task.recurrence);
   const isThisTaskTimerRunning =
     isTimerRunning && activeTimerTaskId === task.id;
 
@@ -1071,6 +1080,7 @@ export default function DetailPanel({
             {/* ── Streak Banner (compact) for recurring tasks ── */}
             {task.recurrence?.streakEnabled && (() => {
               const rec = task.recurrence!;
+              const schedDesc = formatRecurrenceSchedule(rec.frequency, rec.days);
               return (
                 <View style={{ backgroundColor: 'rgba(240,136,62,0.07)', borderWidth: 1, borderColor: 'rgba(240,136,62,0.22)', borderRadius: 12, padding: 12, marginBottom: 14, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(240,136,62,0.15)', alignItems: 'center', justifyContent: 'center' }}>
@@ -1078,10 +1088,10 @@ export default function DetailPanel({
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: '#f0883e', fontSize: 13, fontWeight: '700' }}>
-                      {rec.currentStreak > 0 ? `${rec.currentStreak}-day streak!` : 'Start your streak today!'}
+                      {rec.currentStreak > 0 ? `${rec.currentStreak} streak!` : 'Start your streak today!'}
                     </Text>
                     <Text style={{ color: colors.ghMuted, fontSize: 11, marginTop: 1 }}>
-                      Best: {rec.maxStreak} • {rec.frequency.charAt(0).toUpperCase() + rec.frequency.slice(1)} recurring
+                      Best: {rec.maxStreak} • {schedDesc || `${rec.frequency} recurring`}
                     </Text>
                   </View>
                   <View style={{ backgroundColor: 'rgba(240,136,62,0.15)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 }}>
@@ -1093,9 +1103,10 @@ export default function DetailPanel({
 
             {/* Overdue Alert Banner / Card */}
             {(() => {
-              if (task.done || !task.due) return null;
+              const effectiveDue = task.due || (task.recurrence ? getInitialRecurringDueDate(task.recurrence.frequency, task.recurrence.days) : null);
+              if (task.done || !effectiveDue) return null;
               const now = new Date();
-              const due = new Date(task.due + "T00:00:00");
+              const due = new Date(effectiveDue + "T00:00:00");
               if (task.dueTime && task.dueTime.trim() !== '') {
                 const [h, m] = task.dueTime.split(":").map(Number);
                 if (!isNaN(h) && !isNaN(m)) due.setHours(h, m, 0, 0);
@@ -1138,7 +1149,8 @@ export default function DetailPanel({
                       ! Task is Overdue by {timeStr}
                     </Text>
                     <Text style={{ color: colors.ghMuted, fontSize: 12 }}>
-                      Due date was {task.dueTime ? formatCustomDate(due) : formatCustomDate(due).split(',')[0]}
+                      {task.recurrence ? 'Deadline was ' : 'Due date was '}
+                      {task.dueTime ? formatCustomDate(due) : formatCustomDate(due).split(',')[0]}
                     </Text>
                   </View>
                 </View>
@@ -1242,6 +1254,163 @@ export default function DetailPanel({
               })()}
             </View>
 
+            {/* ── Recurring Task Schedule Card ── */}
+            {task.recurrence && (() => {
+              const rec = task.recurrence;
+              const freq = (rec.frequency || 'daily').toLowerCase();
+              const freqLabel = freq === 'daily' ? 'Daily' : freq === 'weekly' ? 'Weekly' : freq === 'monthly' ? 'Monthly' : freq;
+              const scheduleSummary = formatRecurrenceSchedule(freq, rec.days);
+              const deadlineTimeFormatted = task.dueTime ? formatTime12h(task.dueTime) : null;
+              
+              const effectiveDue = task.due || getInitialRecurringDueDate(freq, rec.days);
+              const [ny, nm, nd] = effectiveDue.split('-').map(Number);
+              const nextDueObj = new Date(ny, nm - 1, nd, 0, 0, 0, 0);
+              if (task.dueTime && task.dueTime.trim() !== '') {
+                const [h, m] = task.dueTime.split(':').map(Number);
+                if (!isNaN(h) && !isNaN(m)) nextDueObj.setHours(h, m, 0, 0);
+              } else {
+                nextDueObj.setHours(23, 59, 59, 999);
+              }
+              const nextDeadlineFormatted = formatCustomDate(nextDueObj);
+
+              const DAY_ABBR = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
+              return (
+                <View style={{
+                  backgroundColor: colors.ghSurface,
+                  borderWidth: 1,
+                  borderColor: 'rgba(88, 166, 255, 0.25)',
+                  borderRadius: 12,
+                  padding: 14,
+                  marginBottom: 16,
+                }}>
+                  {/* Header Row */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View style={{ backgroundColor: 'rgba(88, 166, 255, 0.12)', width: 28, height: 28, borderRadius: 7, alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
+                        <Feather name="repeat" size={13} color={colors.ghBlue} />
+                      </View>
+                      <Text style={[styles.sectionTitle, { color: colors.ghMuted, marginBottom: 0 }]}>
+                        RECURRING SCHEDULE
+                      </Text>
+                    </View>
+                    <View style={{ backgroundColor: 'rgba(88, 166, 255, 0.12)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                      <Text style={{ color: colors.ghBlue, fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>
+                        {freqLabel}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Summary Box */}
+                  <View style={{ backgroundColor: `${colors.ghMuted}08`, borderRadius: 8, padding: 10, marginBottom: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <Feather name="calendar" size={13} color={colors.ghBlue} />
+                      <Text style={{ color: colors.ghText, fontSize: 13, fontWeight: '700' }}>
+                        {scheduleSummary}
+                      </Text>
+                    </View>
+                    <Text style={{ color: colors.ghMuted, fontSize: 11 }}>
+                      {freq === 'daily'
+                        ? 'Applies every day — resets automatically on completion or cycle rollover.'
+                        : freq === 'weekly'
+                        ? 'Applies on selected days of the week — advances to next scheduled day.'
+                        : 'Applies on selected dates of the month — advances to next scheduled date.'}
+                    </Text>
+                  </View>
+
+                  {/* Weekly Days Indicator Chips */}
+                  {freq === 'weekly' && (
+                    <View style={{ marginBottom: 12 }}>
+                      <Text style={{ color: colors.ghMuted, fontSize: 11, fontWeight: '600', textTransform: 'uppercase', marginBottom: 6 }}>
+                        Active Days
+                      </Text>
+                      <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                        {DAY_ABBR.map((dayName, idx) => {
+                          const isActive = !rec.days || rec.days.length === 0 || rec.days.includes(idx);
+                          return (
+                            <View
+                              key={dayName}
+                              style={{
+                                width: 32,
+                                height: 28,
+                                borderRadius: 6,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: isActive ? 'rgba(88, 166, 255, 0.15)' : `${colors.ghMuted}08`,
+                                borderWidth: 1,
+                                borderColor: isActive ? colors.ghBlue : colors.ghBorder,
+                              }}
+                            >
+                              <Text style={{
+                                fontSize: 11,
+                                fontWeight: isActive ? '700' : '400',
+                                color: isActive ? colors.ghBlue : colors.ghMuted,
+                              }}>
+                                {dayName}
+                              </Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Monthly Dates Indicator Chips */}
+                  {freq === 'monthly' && rec.days && rec.days.length > 0 && (
+                    <View style={{ marginBottom: 12 }}>
+                      <Text style={{ color: colors.ghMuted, fontSize: 11, fontWeight: '600', textTransform: 'uppercase', marginBottom: 6 }}>
+                        Active Dates of Month
+                      </Text>
+                      <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                        {[...rec.days].sort((a, b) => a - b).map((d) => (
+                          <View
+                            key={d}
+                            style={{
+                              paddingHorizontal: 8,
+                              height: 26,
+                              borderRadius: 6,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              backgroundColor: 'rgba(88, 166, 255, 0.15)',
+                              borderWidth: 1,
+                              borderColor: colors.ghBlue,
+                            }}
+                          >
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: colors.ghBlue }}>
+                              Day {d}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Deadline & Next Occurrence Grid */}
+                  <View style={{ flexDirection: 'row', gap: 10, borderTopWidth: 1, borderTopColor: colors.ghBorder, paddingTop: 10 }}>
+                    {/* Time-of-day deadline */}
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: colors.ghMuted, fontSize: 11, marginBottom: 2 }}>
+                        {freq === 'daily' ? 'Daily Deadline' : 'Scheduled Deadline'}
+                      </Text>
+                      <Text style={{ color: deadlineTimeFormatted ? colors.ghText : colors.ghMuted, fontSize: 13, fontWeight: '700' }}>
+                        {deadlineTimeFormatted || 'End of Day'}
+                      </Text>
+                    </View>
+
+                    {/* Next Window Due */}
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: colors.ghMuted, fontSize: 11, marginBottom: 2 }}>
+                        Next Deadline
+                      </Text>
+                      <Text style={{ color: colors.ghBlue, fontSize: 13, fontWeight: '700' }}>
+                        {nextDeadlineFormatted}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              );
+            })()}
+
             {/* Overview Stats Card */}
             <View style={{ backgroundColor: colors.ghSurface, borderWidth: 1, borderColor: colors.ghBorder, borderRadius: 12, padding: 14, marginBottom: 16 }}>
               <View style={{ flexDirection: "row", flexWrap: "wrap", marginHorizontal: -5 }}>
@@ -1340,12 +1509,14 @@ export default function DetailPanel({
               {(() => {
                 const createdAtStr = task.createdAt ? formatCustomDate(new Date(task.createdAt)) : "-";
                 
+                const effectiveDue = task.due || (task.recurrence ? getInitialRecurringDueDate(task.recurrence.frequency, task.recurrence.days) : null);
+
                 let dueStr = "-";
-                if (task.due) {
-                  const dueDate = new Date(task.due + "T00:00:00");
-                  if (task.dueTime) {
+                if (effectiveDue) {
+                  const dueDate = new Date(effectiveDue + "T00:00:00");
+                  if (task.dueTime && task.dueTime.trim() !== '') {
                     const [hh, mm] = task.dueTime.split(":").map(Number);
-                    dueDate.setHours(hh, mm, 0, 0);
+                    if (!isNaN(hh) && !isNaN(mm)) dueDate.setHours(hh, mm, 0, 0);
                   }
                   dueStr = formatCustomDate(dueDate);
                 }
@@ -1358,16 +1529,18 @@ export default function DetailPanel({
                 let overdueTimeStr = "-";
                 let timeLeftStr = "-";
 
-                if (task.due) {
-                  const dueObj = new Date(task.due + "T00:00:00");
-                  if (task.dueTime) {
+                if (effectiveDue && !task.done) {
+                  const dueObj = new Date(effectiveDue + "T00:00:00");
+                  if (task.dueTime && task.dueTime.trim() !== '') {
                     const [h, m] = task.dueTime.split(":").map(Number);
-                    dueObj.setHours(h, m, 0, 0);
+                    if (!isNaN(h) && !isNaN(m)) dueObj.setHours(h, m, 0, 0);
+                  } else {
+                    dueObj.setHours(23, 59, 59, 999);
                   }
                   
                   const diffMs = dueObj.getTime() - nowTime;
                   
-                  if (diffMs > 0 && !task.done) {
+                  if (diffMs > 0) {
                     const d = Math.floor(diffMs / (1000 * 60 * 60 * 24));
                     const h = Math.floor((diffMs / (1000 * 60 * 60)) % 24);
                     const m = Math.floor((diffMs / 1000 / 60) % 60);
@@ -1387,6 +1560,8 @@ export default function DetailPanel({
                   "Created": { name: "plus-circle", color: colors.ghGreen },
                   "Completed": { name: "check-circle", color: colors.ghGreen },
                   "Due": { name: "calendar", color: colors.ghBlue },
+                  "Next Deadline": { name: "calendar", color: colors.ghBlue },
+                  "Recurrence": { name: "repeat", color: colors.ghBlue },
                   "Time Left": { name: "clock", color: colors.ghBlue },
                   "Overdue Time": { name: "alert-circle", color: colors.ghRed },
                 };
@@ -1404,7 +1579,23 @@ export default function DetailPanel({
                 const rows: { label: string; value: string; color: string }[] = [];
                 rows.push({ label: "Created", value: createdAtStr, color: colors.ghText });
                 if (completedAtStr) rows.push({ label: "Completed", value: completedAtStr, color: colors.ghGreen || "#3fb950" });
-                rows.push({ label: "Due", value: dueStr, color: colors.ghText });
+                
+                if (task.recurrence) {
+                  const recurrenceSummary = formatRecurrenceSchedule(task.recurrence.frequency, task.recurrence.days);
+                  rows.push({
+                    label: "Recurrence",
+                    value: recurrenceSummary,
+                    color: colors.ghBlue || "#58a6ff"
+                  });
+                  rows.push({
+                    label: "Next Deadline",
+                    value: dueStr,
+                    color: colors.ghText
+                  });
+                } else {
+                  rows.push({ label: "Due", value: dueStr, color: colors.ghText });
+                }
+
                 if (timeLeftStr !== "-") rows.push({ label: "Time Left", value: timeLeftStr, color: colors.ghBlue || "#58a6ff" });
                 if (overdueTimeStr !== "-") rows.push({ label: "Overdue Time", value: overdueTimeStr, color: colors.ghRed || '#f85149' });
 
@@ -1714,7 +1905,7 @@ export default function DetailPanel({
             {task.recurrence?.streakEnabled && (() => {
               const rec = task.recurrence!;
               const history = rec.history || [];
-              const freqLabel = rec.frequency === 'daily' ? 'Daily' : rec.frequency === 'weekly' ? 'Weekly' : 'Monthly';
+              const freqLabel = formatRecurrenceSchedule(rec.frequency, rec.days) || (rec.frequency === 'daily' ? 'Daily' : rec.frequency === 'weekly' ? 'Weekly' : 'Monthly');
 
               // Last 28 entries for the dot grid
               const dotHistory = history.slice(-28);

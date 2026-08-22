@@ -143,7 +143,7 @@ export default function ScheduledView({ tasks, onSelectTask, showCompleted, onSw
     ? `TASKS FOR WEEK ${getWeekNumber(selectedDate)}`
     : `TASKS FOR ${selectedDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }).toUpperCase()}`;
 
-  const weeks = [];
+  const weeks: any[][] = [];
   for (let i = 0; i < calendarData.length; i += 7) {
     weeks.push(calendarData.slice(i, i + 7));
   }
@@ -302,8 +302,8 @@ export default function ScheduledView({ tasks, onSelectTask, showCompleted, onSw
             let durationHours = 1;
             if (session.end) {
                durationHours = (session.end - session.start) / 3600000;
-            } else if (session.durationMinutes) {
-               durationHours = session.durationMinutes / 60;
+            } else if ((session as any).durationMinutes) {
+               durationHours = (session as any).durationMinutes / 60;
             }
             durationHours = Math.max(durationHours, 0.5); 
             

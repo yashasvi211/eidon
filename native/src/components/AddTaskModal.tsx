@@ -17,8 +17,7 @@ import Animated, {
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { Colors } from '@/constants/theme';
 import { Feather } from '@expo/vector-icons';
-import { validateReminder } from '@/services/notifications';
-import { getValidOffsets, getValidRepeats, generateSchedulePreview, countTotalReminders, getRecurringReminderOffsets, Preset, formatEstimateDisplay } from '@/services/reminderUtils';
+import { getValidOffsets, getValidRepeats, generateSchedulePreview, countTotalReminders, getRecurringReminderOffsets, Preset, formatEstimateDisplay, getInitialRecurringDueDate } from '@/services/reminderUtils';
 
 const DISMISS_THRESHOLD = 120;
 const OPEN_SPRING = { damping: 28, stiffness: 220, mass: 0.9 };
@@ -346,9 +345,18 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
       ? { frequency: recurrenceFrequency, streakEnabled: true, days: recurrenceDays.length > 0 ? recurrenceDays : undefined }
       : undefined;
 
-    // Recurring tasks have no user-set due date — pass undefined so
-    // handleAddTask auto-assigns today's date, keeping the rollover logic intact.
-    const finalDue = isRecurring ? undefined : (due || undefined);
+    // Recurring tasks: if existing task had a valid due date for this recurrence, preserve it;
+    // otherwise auto-calculate the appropriate next scheduled due date.
+    let finalDue: string | undefined;
+    if (isRecurring) {
+      if (initialTask?.due && initialTask?.recurrence && initialTask.recurrence.frequency === recurrenceFrequency) {
+        finalDue = initialTask.due;
+      } else {
+        finalDue = getInitialRecurringDueDate(recurrenceFrequency, recurrenceDays.length > 0 ? recurrenceDays : undefined);
+      }
+    } else {
+      finalDue = due || undefined;
+    }
 
     animateClose(() => {
       onAdd(title.trim(), project, finalDue, reminder, dueTime || undefined, priority, undefined, undefined, recurrenceConfig, formatEstimateDisplay(est) || undefined);
@@ -684,8 +692,6 @@ export default function AddTaskModal({ visible, onClose, onAdd, projects, initia
                     </Text>
                   )}
                 </View>
-              )}
-
               )}
 
               {/* Calendar & Clock Modals */}
