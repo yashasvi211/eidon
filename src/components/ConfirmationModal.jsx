@@ -1,9 +1,9 @@
-import React, { useEffect } from "react";
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import "../App.css";
 
 export default function ConfirmationModal({
-  isOpen,
+  isOpen = true,
   onClose,
   onConfirm,
   title,
@@ -20,6 +20,8 @@ export default function ConfirmationModal({
     window.addEventListener("keydown", handleEsc);
     return () => window.removeEventListener("keydown", handleEsc);
   }, [onClose]);
+
+  if (!isOpen) return null;
 
   return (
     <motion.div

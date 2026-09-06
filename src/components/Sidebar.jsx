@@ -1,4 +1,5 @@
 import React from "react";
+import { getInitialRecurringDueDate } from "../utils/reminderUtils";
 
 function NavItem({ active, onClick, icon, label, badge }) {
   return (
@@ -56,7 +57,7 @@ function NavItem({ active, onClick, icon, label, badge }) {
   );
 }
 
-function ProjectItem({ color, label, active, onClick }) {
+function ProjectItem({ color, label, active, onClick, badge }) {
   return (
     <div
       className="project-item"
@@ -95,6 +96,22 @@ function ProjectItem({ color, label, active, onClick }) {
       >
         {label}
       </span>
+      {badge !== undefined && badge > 0 && (
+        <span
+          className="nav-badge"
+          style={{
+            marginLeft: "auto",
+            background: "var(--gh-surface)",
+            border: "1px solid var(--gh-border)",
+            borderRadius: "20px",
+            padding: "1px 7px",
+            fontFamily: "var(--mono)",
+            fontSize: "10px",
+          }}
+        >
+          {badge}
+        </span>
+      )}
       {active && (
         <div
           style={{
@@ -112,9 +129,25 @@ function ProjectItem({ color, label, active, onClick }) {
   );
 }
 
+const AllTasksIcon = (props) => (
+  <svg {...props} viewBox="0 0 16 16" fill="currentColor">
+    <path d="M5 3.25a.75.75 0 01.75-.75h4.5a.75.75 0 010 1.5h-4.5A.75.75 0 015 3.25zm0 3.5a.75.75 0 01.75-.75h4.5a.75.75 0 010 1.5h-4.5A.75.75 0 015 6.75zm0 3.5a.75.75 0 01.75-.75h4.5a.75.75 0 010 1.5h-4.5A.75.75 0 015 10.25z" />
+    <path fillRule="evenodd" d="M2 1.75C2 .784 2.784 0 3.75 0h8.5C13.216 0 14 .784 14 1.75v12.5A1.75 1.75 0 0112.25 16h-8.5A1.75 1.75 0 012 14.25V1.75zm1.75-.25a.25.25 0 00-.25.25v12.5c0 .138.112.25.25.25h8.5a.25.25 0 00.25-.25V1.75a.25.25 0 00-.25-.25h-8.5z" />
+  </svg>
+);
 const TodayIcon = (props) => (
   <svg {...props} viewBox="0 0 16 16" fill="currentColor">
     <path d="M2 2.5A2.5 2.5 0 014.5 0h8.75a.75.75 0 01.75.75v12.5a.75.75 0 01-.75.75h-2.5a.75.75 0 010-1.5h1.75v-2h-8a1 1 0 00-.714 1.7.75.75 0 01-1.072 1.05A2.495 2.495 0 012 11.5v-9zm10.5-1V9h-8c-.356 0-.694.074-1 .208V2.5a1 1 0 011-1h8zM5 12.25v3.25a.25.25 0 00.4.2l1.45-1.087a.25.25 0 01.3 0L8.6 15.7a.25.25 0 00.4-.2v-3.25a.25.25 0 00-.25-.25h-3.5a.25.25 0 00-.25.25z" />
+  </svg>
+);
+const ArchiveIcon = (props) => (
+  <svg {...props} viewBox="0 0 16 16" fill="currentColor">
+    <path d="M1 2.75C1 1.784 1.784 1 2.75 1h10.5c.966 0 1.75.784 1.75 1.75v1.5A1.75 1.75 0 0113.25 6H13v7.25A1.75 1.75 0 0111.25 15h-6.5A1.75 1.75 0 013 13.25V6h-.25A1.75 1.75 0 011 4.25v-1.5zm1.75-.25a.25.25 0 00-.25.25v1.5c0 .138.112.25.25.25h10.5a.25.25 0 00.25-.25v-1.5a.25.25 0 00-.25-.25H2.75zM4.5 6v7.25c0 .138.112.25.25.25h6.5a.25.25 0 00.25-.25V6h-7zm2 2a.75.75 0 01.75-.75h1.5a.75.75 0 010 1.5h-1.5A.75.75 0 016.5 8z" />
+  </svg>
+);
+const BacklogIcon = (props) => (
+  <svg {...props} viewBox="0 0 16 16" fill="currentColor">
+    <path d="M0 2a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H4.414a2 2 0 01-1.414-.586l-2-2A2 2 0 010 8V2zm5.5 3a.5.5 0 00-.5.5v1a.5.5 0 00.5.5h5a.5.5 0 00.5-.5v-1a.5.5 0 00-.5-.5h-5z" />
   </svg>
 );
 const ScheduledIcon = (props) => (
@@ -130,14 +163,14 @@ const TimeIcon = (props) => (
     />
   </svg>
 );
-const BacklogIcon = (props) => (
-  <svg {...props} viewBox="0 0 16 16" fill="currentColor">
-    <path d="M0 2a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H4.414a2 2 0 01-1.414-.586l-2-2A2 2 0 010 8V2zm5.5 3a.5.5 0 00-.5.5v1a.5.5 0 00.5.5h5a.5.5 0 00.5-.5v-1a.5.5 0 00-.5-.5h-5z" />
-  </svg>
-);
 const StatsIcon = (props) => (
   <svg {...props} viewBox="0 0 16 16" fill="currentColor">
     <path d="M0 13h16v2H0v-2zm2-8h3v7H2V5zm5-4h2v11H7V1zm5 5h2v6h-2V6z" />
+  </svg>
+);
+const InboxIcon = (props) => (
+  <svg {...props} viewBox="0 0 16 16" fill="currentColor">
+    <path d="M2.8 2.06A1.75 1.75 0 014.41 1h7.18c.67 0 1.29.38 1.61.99l2.58 4.908A1.75 1.75 0 0116 7.68v5.57A1.75 1.75 0 0114.25 15H1.75A1.75 1.75 0 010 13.25V7.68c0-.33.093-.653.27-.932L2.8 2.06zM4.41 2.5a.25.25 0 00-.23.14L1.76 7.25h3.49a1.75 1.75 0 001.5 1h2.5a1.75 1.75 0 001.5-1h3.49l-2.42-4.61a.25.25 0 00-.23-.14H4.41zM1.5 8.75v4.5c0 .138.112.25.25.25h12.5a.25.25 0 00.25-.25v-4.5H11.5a.25.25 0 00-.25.25v.25a1.75 1.75 0 01-1.75 1.75h-3A1.75 1.75 0 014.75 9v-.25a.25.25 0 00-.25-.25H1.5z" />
   </svg>
 );
 
@@ -180,6 +213,64 @@ export default function Sidebar({
     setIsAdding(false);
   };
 
+  const uniqTasks = tasks.filter((t, idx, self) => self.findIndex((x) => x.id === t.id) === idx);
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+  const isTaskOverdue = (t) => {
+    const effectiveDue = t.due || (t.recurrence ? getInitialRecurringDueDate(t.recurrence.frequency, t.recurrence.days, t.dueTime) : null);
+    if (t.done || !effectiveDue) return false;
+    const nowObj = new Date();
+    const dueObj = new Date(effectiveDue + "T00:00:00");
+    if (t.dueTime && t.dueTime.trim() !== "") {
+      const [h, m] = t.dueTime.split(":").map(Number);
+      if (!isNaN(h) && !isNaN(m)) dueObj.setHours(h, m, 0, 0);
+    } else {
+      dueObj.setHours(23, 59, 59, 999);
+    }
+    return nowObj.getTime() > dueObj.getTime();
+  };
+
+  const isExecStartReached = (t) => {
+    if (!t.execStartDate) return false;
+    const execObj = new Date(t.execStartDate + "T00:00:00");
+    if (t.execStartTime && t.execStartTime.trim() !== "") {
+      const [h, m] = t.execStartTime.split(":").map(Number);
+      if (!isNaN(h) && !isNaN(m)) execObj.setHours(h, m, 0, 0);
+    } else {
+      execObj.setHours(0, 0, 0, 0);
+    }
+    return now.getTime() >= execObj.getTime();
+  };
+
+  const isTaskCurrent = (t) => {
+    if (t.target === "backlog") return false;
+    const effectiveDue = t.due || (t.recurrence ? getInitialRecurringDueDate(t.recurrence.frequency, t.recurrence.days, t.dueTime) : null);
+    if (!effectiveDue) return false;
+    if (isTaskOverdue(t)) return false;
+    if (t.execStartDate) {
+      return isExecStartReached(t);
+    }
+    return effectiveDue === todayStr;
+  };
+
+  const isTaskArchive = (t) => {
+    const effectiveDue = t.due || (t.recurrence ? getInitialRecurringDueDate(t.recurrence.frequency, t.recurrence.days, t.dueTime) : null);
+    return !effectiveDue;
+  };
+
+  const isTaskBacklog = (t) => {
+    if (t.target === "backlog") return true;
+    if (isTaskOverdue(t)) return true;
+    return false;
+  };
+
+  const allBadgeCount = uniqTasks.filter((t) => !t.done).length;
+  const todayBadgeCount = uniqTasks.filter((t) => !t.done && isTaskCurrent(t)).length;
+  const archiveBadgeCount = uniqTasks.filter((t) => !t.done && isTaskArchive(t)).length;
+  const backlogBadgeCount = uniqTasks.filter((t) => !t.done && isTaskBacklog(t)).length;
+  const inboxBadgeCount = uniqTasks.filter((t) => !t.done && t.project === "Inbox").length;
+
   return (
     <aside
       className="sidebar"
@@ -205,6 +296,16 @@ export default function Sidebar({
           Workspace
         </div>
         <NavItem
+          active={currentView === "all" && !currentProject}
+          onClick={() => {
+            setCurrentView("all");
+            setCurrentProject(null);
+          }}
+          icon={<AllTasksIcon />}
+          label="All Tasks"
+          badge={allBadgeCount}
+        />
+        <NavItem
           active={currentView === "today" && !currentProject}
           onClick={() => {
             setCurrentView("today");
@@ -212,34 +313,17 @@ export default function Sidebar({
           }}
           icon={<TodayIcon />}
           label="Today's Tasks"
-          badge={tasks.filter((t) => t.target === "today" && !t.done).length}
+          badge={todayBadgeCount}
         />
         <NavItem
-          active={currentView === "scheduled"}
+          active={currentView === "archive" && !currentProject}
           onClick={() => {
-            setCurrentView("scheduled");
+            setCurrentView("archive");
             setCurrentProject(null);
           }}
-          icon={<ScheduledIcon />}
-          label="Scheduled"
-        />
-        <NavItem
-          active={currentView === "timetracking"}
-          onClick={() => {
-            setCurrentView("timetracking");
-            setCurrentProject(null);
-          }}
-          icon={<TimeIcon />}
-          label="Time Tracking"
-        />
-        <NavItem
-          active={currentView === "stats"}
-          onClick={() => {
-            setCurrentView("stats");
-            setCurrentProject(null);
-          }}
-          icon={<StatsIcon />}
-          label="Deep Stats"
+          icon={<ArchiveIcon />}
+          label="Archive"
+          badge={archiveBadgeCount}
         />
         <NavItem
           active={currentView === "backlog" && !currentProject}
@@ -249,7 +333,44 @@ export default function Sidebar({
           }}
           icon={<BacklogIcon />}
           label="Backlog"
-          badge={tasks.filter((t) => t.target === "backlog" && !t.done).length}
+          badge={backlogBadgeCount}
+        />
+        <NavItem
+          active={currentView === "scheduled" && !currentProject}
+          onClick={() => {
+            setCurrentView("scheduled");
+            setCurrentProject(null);
+          }}
+          icon={<ScheduledIcon />}
+          label="Scheduled"
+        />
+        <NavItem
+          active={currentView === "timetracking" && !currentProject}
+          onClick={() => {
+            setCurrentView("timetracking");
+            setCurrentProject(null);
+          }}
+          icon={<TimeIcon />}
+          label="Time Tracking"
+        />
+        <NavItem
+          active={currentView === "stats" && !currentProject}
+          onClick={() => {
+            setCurrentView("stats");
+            setCurrentProject(null);
+          }}
+          icon={<StatsIcon />}
+          label="Deep Stats"
+        />
+        <NavItem
+          active={currentView === "inbox" && !currentProject}
+          onClick={() => {
+            setCurrentView("inbox");
+            setCurrentProject(null);
+          }}
+          icon={<InboxIcon />}
+          label="Inbox"
+          badge={inboxBadgeCount}
         />
       </div>
 
@@ -426,20 +547,21 @@ export default function Sidebar({
         )}
 
         <div style={{ display: "flex", flexDirection: "column" }}>
-          {projects.map((proj) => (
-            <ProjectItem
-              key={proj.name}
-              color={proj.color}
-              label={proj.name}
-              active={currentProject === proj.name}
-              onClick={() => {
-                setCurrentProject(proj.name);
-                if (currentView !== "today" && currentView !== "backlog") {
-                  setCurrentView("today");
-                }
-              }}
-            />
-          ))}
+          {projects.map((proj) => {
+            const projectTaskCount = uniqTasks.filter((t) => !t.done && t.project === proj.name).length;
+            return (
+              <ProjectItem
+                key={proj.name}
+                color={proj.color}
+                label={proj.name}
+                active={currentProject === proj.name}
+                badge={projectTaskCount}
+                onClick={() => {
+                  setCurrentProject(proj.name);
+                }}
+              />
+            );
+          })}
         </div>
       </div>
 

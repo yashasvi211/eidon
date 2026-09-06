@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 const fmtSeconds = (s) => {
   const h = Math.floor(s / 3600);

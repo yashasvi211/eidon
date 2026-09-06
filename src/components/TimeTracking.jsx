@@ -17,21 +17,19 @@ const fmtDuration = (ms) => {
 
 const todayISO = () => new Date().toISOString().split('T')[0];
 
-export default function TimeTracking({ tasks, isSleeping, sleepStartTime, settings }) {
-  const [currentSleepDuration, setCurrentSleepDuration] = useState("");
+export default function TimeTracking({ tasks, isSleeping, sleepStartTime }) {
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
-    if (!isSleeping || !sleepStartTime) {
-      setCurrentSleepDuration("");
-      return;
-    }
-    const update = () => {
-      setCurrentSleepDuration(fmtDuration(Date.now() - sleepStartTime));
-    };
-    update();
-    const interval = setInterval(update, 1000);
+    if (!isSleeping || !sleepStartTime) return;
+    const interval = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(interval);
   }, [isSleeping, sleepStartTime]);
+
+  const currentSleepDuration =
+    isSleeping && sleepStartTime
+      ? fmtDuration(nowMs - sleepStartTime)
+      : "";
 
   const today = todayISO();
 

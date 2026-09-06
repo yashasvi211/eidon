@@ -1,25 +1,20 @@
-import React, { useState, useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useState, useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 
-export default function StartTimerModal({ isOpen, onClose, onStart }) {
+function TimerNoteDialog({ onClose, onStart }) {
   const [note, setNote] = useState("");
   const textareaRef = useRef(null);
 
   useEffect(() => {
-    if (isOpen && textareaRef.current) {
-      setTimeout(() => textareaRef.current.focus(), 100);
+    if (textareaRef.current) {
+      setTimeout(() => textareaRef.current?.focus(), 100);
     }
-    if (isOpen) {
-      setNote("");
-    }
-  }, [isOpen]);
+  }, []);
 
   const handleStart = () => {
     onStart(note.trim());
-    setNote("");
+    onClose();
   };
-
-  if (!isOpen) return null;
 
   return (
     <motion.div
@@ -166,4 +161,9 @@ export default function StartTimerModal({ isOpen, onClose, onStart }) {
       </motion.div>
     </motion.div>
   );
+}
+
+export default function StartTimerModal({ isOpen, onClose, onStart }) {
+  if (!isOpen) return null;
+  return <TimerNoteDialog onClose={onClose} onStart={onStart} />;
 }
